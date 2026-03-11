@@ -1,4 +1,4 @@
-rootProject.name = "ktor-aitsm"
+rootProject.name = "aitsm"
 
 dependencyResolutionManagement {
     repositories {
