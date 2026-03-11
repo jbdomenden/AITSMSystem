@@ -1,0 +1,130 @@
+package backend.config
+
+import com.zaxxer.hikari.HikariConfig
+import com.zaxxer.hikari.HikariDataSource
+import org.jetbrains.exposed.sql.Database
+import org.jetbrains.exposed.sql.SchemaUtils
+import org.jetbrains.exposed.sql.Table
+import org.jetbrains.exposed.sql.javatime.datetime
+import org.jetbrains.exposed.sql.transactions.transaction
+
+object UsersTable : Table("users") {
+    val id = integer("id").autoIncrement()
+    val fullName = varchar("full_name", 150)
+    val email = varchar("email", 200).uniqueIndex()
+    val company = varchar("company", 150)
+    val department = varchar("department", 120)
+    val passwordHash = varchar("password_hash", 255)
+    val role = varchar("role", 20)
+    val createdAt = datetime("created_at")
+    override val primaryKey = PrimaryKey(id)
+}
+
+object EulaAcceptanceTable : Table("eula_acceptance") {
+    val id = integer("id").autoIncrement()
+    val userId = integer("user_id").references(UsersTable.id)
+    val eulaVersion = varchar("eula_version", 20)
+    val acceptedAt = datetime("accepted_at")
+    override val primaryKey = PrimaryKey(id)
+}
+
+object DevicesTable : Table("devices") {
+    val id = integer("id").autoIncrement()
+    val deviceName = varchar("device_name", 150)
+    val ipAddress = varchar("ip_address", 45)
+    val department = varchar("department", 120)
+    val assignedUser = varchar("assigned_user", 150)
+    val cpuUsage = integer("cpu_usage")
+    val memoryUsage = integer("memory_usage")
+    val status = varchar("status", 50)
+    val lastSeen = datetime("last_seen")
+    override val primaryKey = PrimaryKey(id)
+}
+
+object TicketsTable : Table("tickets") {
+    val id = integer("id").autoIncrement()
+    val userId = integer("user_id").references(UsersTable.id)
+    val title = varchar("title", 200)
+    val description = text("description")
+    val priority = varchar("priority", 20)
+    val category = varchar("category", 80)
+    val status = varchar("status", 30)
+    val assignedTo = varchar("assigned_to", 150).nullable()
+    val deviceId = integer("device_id").references(DevicesTable.id).nullable()
+    val createdAt = datetime("created_at")
+    val updatedAt = datetime("updated_at")
+    override val primaryKey = PrimaryKey(id)
+}
+
+object TicketHistoryTable : Table("ticket_history") {
+    val id = integer("id").autoIncrement()
+    val ticketId = integer("ticket_id").references(TicketsTable.id)
+    val status = varchar("status", 30)
+    val updatedBy = varchar("updated_by", 150)
+    val timestamp = datetime("timestamp")
+    override val primaryKey = PrimaryKey(id)
+}
+
+object NotificationsTable : Table("notifications") {
+    val id = integer("id").autoIncrement()
+    val userId = integer("user_id").references(UsersTable.id)
+    val message = text("message")
+    val type = varchar("type", 40)
+    val createdAt = datetime("created_at")
+    override val primaryKey = PrimaryKey(id)
+}
+
+object SLAPoliciesTable : Table("sla_policies") {
+    val id = integer("id").autoIncrement()
+    val priority = varchar("priority", 20)
+    val responseTime = integer("response_time")
+    val resolutionTime = integer("resolution_time")
+    override val primaryKey = PrimaryKey(id)
+}
+
+object KnowledgeArticlesTable : Table("knowledge_articles") {
+    val id = integer("id").autoIncrement()
+    val title = varchar("title", 200)
+    val content = text("content")
+    val category = varchar("category", 100)
+    val createdAt = datetime("created_at")
+    override val primaryKey = PrimaryKey(id)
+}
+
+object AuditLogsTable : Table("audit_logs") {
+    val id = integer("id").autoIncrement()
+    val userId = integer("user_id").nullable()
+    val action = varchar("action", 160)
+    val entity = varchar("entity", 80)
+    val timestamp = datetime("timestamp")
+    override val primaryKey = PrimaryKey(id)
+}
+
+object DatabaseFactory {
+    fun init() {
+        val config = HikariConfig().apply {
+            jdbcUrl = System.getenv("DB_URL") ?: "jdbc:postgresql://localhost:5432/aitsm_db"
+            username = System.getenv("DB_USER") ?: "postgres"
+            password = System.getenv("DB_PASSWORD") ?: "root"
+            driverClassName = "org.postgresql.Driver"
+            maximumPoolSize = 10
+            isAutoCommit = false
+            transactionIsolation = "TRANSACTION_REPEATABLE_READ"
+            validate()
+        }
+        Database.connect(HikariDataSource(config))
+        transaction {
+            SchemaUtils.create(
+                UsersTable,
+                EulaAcceptanceTable,
+                DevicesTable,
+                TicketsTable,
+                TicketHistoryTable,
+                NotificationsTable,
+                SLAPoliciesTable,
+                KnowledgeArticlesTable,
+                AuditLogsTable
+            )
+        }
+    }
+}

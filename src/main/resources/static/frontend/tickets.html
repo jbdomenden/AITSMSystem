@@ -1,0 +1,16 @@
+<!doctype html>
+<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Tickets | AITSM</title><link rel='stylesheet' href='/css/styles.css'></head>
+<body>
+<div class='app-layout'>
+  <aside class='sidebar'><div class='brand'>AITSM</div><nav class='nav-group'>
+    <a class='nav-item' data-page='dashboard-admin.html' href='/dashboard-admin.html'>Dashboard</a>
+    <a class='nav-item' data-page='create-ticket.html' href='/create-ticket.html'>Create Ticket</a>
+    <a class='nav-item' data-page='tickets.html' href='/tickets.html'>Tickets</a>
+  </nav></aside>
+  <main class='content'>
+    <div class='topbar'><div><h1 class='page-title'>Tickets</h1><p class='page-subtitle'>Centralized incident tracking with SLA visibility.</p></div></div>
+    <section class='card table-wrap'><table><thead><tr><th>ID</th><th>Title</th><th>Priority</th><th>Status</th><th>SLA</th></tr></thead><tbody id='ticketRows'></tbody></table></section>
+  </main>
+</div>
+<script src='/js/app.js'></script><script src='/js/tickets.js'></script>
+</body></html>
