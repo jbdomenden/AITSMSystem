@@ -1,0 +1,25 @@
+<!doctype html>
+<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Assets | AITSM</title><link rel='stylesheet' href='/css/styles.css'></head>
+<body>
+<div class='app-layout'>
+  <aside class='sidebar'><div class='brand'>AITSM</div><nav class='nav-group'>
+    <a class='nav-item' data-page='dashboard-admin.html' href='/dashboard-admin.html'>Dashboard</a>
+    <a class='nav-item' data-page='assets.html' href='/assets.html'>Assets</a>
+  </nav></aside>
+  <main class='content'>
+    <div class='topbar'><div><h1 class='page-title'>Asset Management</h1><p class='page-subtitle'>Register and manage company devices.</p></div></div>
+    <section class='card'>
+      <div class='form-grid'>
+        <div class='form-group'><label>Device Name</label><input id='deviceName'></div>
+        <div class='form-group'><label>IP Address (LAN)</label><input id='ipAddress' placeholder='192.168.x.x'></div>
+        <div class='form-group'><label>Department</label><input id='department'></div>
+        <div class='form-group'><label>Assigned User</label><input id='assignedUser'></div>
+        <div class='form-group'><label>Status</label><select id='status'><option>Online</option><option>Offline</option><option>Critical</option></select></div>
+      </div>
+      <div class='inline-actions'><button class='btn btn-primary' onclick='registerDevice()'>Register Device</button></div>
+    </section>
+    <section class='card' style='margin-top:16px'><h3>Registered Devices</h3><ul id='deviceList'></ul></section>
+  </main>
+</div>
+<script src='/js/app.js'></script><script src='/js/monitoring.js'></script>
+</body></html>
