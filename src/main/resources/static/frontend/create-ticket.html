@@ -1,0 +1,5 @@
+<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='/css/styles.css'><title>Create Ticket</title></head><body>
+<div class='layout'><aside class='sidebar'><a href='/dashboard-user.html'>Dashboard</a><a href='/tickets.html'>Tickets</a></aside><main class='main'><h1>Create Ticket</h1>
+<div class='card'><input id='title' placeholder='Title'><br><br><textarea id='description' placeholder='Describe the issue'></textarea><br><br><select id='priority'><option>Critical</option><option>High</option><option selected>Medium</option><option>Low</option></select><br><br><input id='category' placeholder='Category'><br><br><button onclick='createTicket()'>Submit Ticket</button></div>
+<div class='card' style='margin-top:16px'><h3>AI Troubleshooting Assistant</h3><button onclick='suggestFixes()'>Generate suggestions</button><ul id='aiTips'></ul></div>
+</main></div><script src='/js/tickets.js'></script><script src='/js/ai-assistant.js'></script></body></html>

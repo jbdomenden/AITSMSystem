@@ -1,0 +1,6 @@
+<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='/css/styles.css'><title>Admin Dashboard</title></head>
+<body><div class='layout'><aside class='sidebar'><h2>AITSM Admin</h2><a href='/dashboard-admin.html'>Dashboard</a><a href='/tickets.html'>Tickets</a><a href='/monitoring.html'>Monitoring</a><a href='/assets.html'>Assets</a><a href='/knowledge.html'>Knowledge</a></aside>
+<main class='main'><div class='topbar'><h1>Admin Dashboard</h1><button onclick='logout()'>Logout</button></div>
+<div id='summary' class='grid cards'></div>
+<div class='grid cards' style='margin-top:16px'><div class='card'><h3>Ticket Trends</h3><pre id='trend'></pre></div><div class='card'><h3>System Performance</h3><pre id='health'></pre></div></div>
+</main></div><script src='/js/dashboard.js'></script></body></html>
