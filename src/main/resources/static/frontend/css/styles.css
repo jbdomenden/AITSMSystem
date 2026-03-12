@@ -277,6 +277,49 @@ textarea { resize: vertical; min-height: 120px; }
 .remember-row { display: flex; align-items: center; gap: 8px; margin: 10px 0 2px; color: #c8d5f7; font-size: 14px; }
 .auth-links { margin-top: 12px; text-align: left; }
 .auth-dark .text-primary { color: #8ec7ff; }
+.auth-panel-wide { width: min(700px, 100%); }
+.signup-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
+.auth-heading { margin: 0 0 8px; font-size: 40px; color: #fff; letter-spacing: -0.02em; }
+.auth-subtitle-left { text-align: left; margin-bottom: 18px; }
+.auth-eyebrow { color: #8ec7ff; margin-bottom: 10px; }
+.auth-section-title { margin: 18px 0 10px; color: #f8fbff; }
+.auth-eula-box { border-color: rgba(99, 141, 255, .3); background: rgba(15, 31, 75, .72); color: #c4d4ff; }
+.signup-eula { margin-top: 12px; }
+.auth-actions { margin-top: 14px; }
+.auth-ghost-btn { background: rgba(11, 24, 62, .8); border-color: rgba(148, 163, 184, .45); color: #d7e4ff; }
+.auth-ghost-btn:hover { background: rgba(24, 44, 96, .95); border-color: rgba(186, 206, 255, .65); }
+.signup-eula-wrap { display: flex; align-items: center; gap: 10px; margin-top: 12px; color: #c8d5f7; }
+.signup-eula-wrap input { width: auto; }
+.eula-link-btn { border: 0; background: transparent; color: #8ec7ff; text-align: left; padding: 0; cursor: pointer; font-size: 14px; }
+.eula-link-btn:hover { text-decoration: underline; }
+.eula-modal-card {
+  background: linear-gradient(180deg, #102250 0%, #0c1b42 100%);
+  border-color: rgba(99, 141, 255, .38);
+  color: #e6edff;
+  width: min(620px, 100%);
+  padding: 0;
+  overflow: hidden;
+}
+.eula-modal-head { padding: 20px 20px 10px; border-bottom: 1px solid rgba(148, 163, 184, .22); }
+.eula-modal-eyebrow { color: #8ec7ff; margin-bottom: 6px; }
+.eula-modal-card .section-title { color: #fff; margin: 0; }
+.eula-modal-subtitle { margin-top: 8px; color: #c4d4ff; }
+.eula-modal-card .eula-box {
+  margin: 14px 20px;
+  background: rgba(8, 22, 60, .85);
+  border-color: rgba(99, 141, 255, .35);
+  color: #cbd8ff;
+  max-height: 260px;
+}
+.eula-points { margin: 0; padding-left: 18px; display: grid; gap: 12px; }
+.eula-points li { line-height: 1.45; }
+.eula-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px 20px;
+  border-top: 1px solid rgba(148, 163, 184, .22);
+}
 
 @media (max-width: 1180px) {
   .admin-panels, .monitor-grid, .settings-grid { grid-template-columns: 1fr; }
@@ -288,6 +331,7 @@ textarea { resize: vertical; min-height: 120px; }
   .content { padding: 16px; }
   .page-title { font-size: 30px; }
   .form-grid, .portal-grid, .device-kpis, .insight-grid { grid-template-columns: 1fr; }
+  .signup-grid { grid-template-columns: 1fr; }
 }
 
 .utility-bar {
