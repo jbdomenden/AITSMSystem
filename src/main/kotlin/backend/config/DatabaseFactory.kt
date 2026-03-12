@@ -121,6 +121,10 @@ object DatabaseFactory {
             // was created as an integer FK to `users.id`.
             // Current model expects a VARCHAR username/owner field.
             exec("ALTER TABLE IF EXISTS devices DROP CONSTRAINT IF EXISTS devices_assigned_user_fkey")
+            // Compatibility fix for legacy schemas where `ticket_history.updated_by`
+            // was created as an integer FK to `users.id`.
+            // Current model expects a VARCHAR audit actor field.
+            exec("ALTER TABLE IF EXISTS ticket_history DROP CONSTRAINT IF EXISTS ticket_history_updated_by_fkey")
 
             SchemaUtils.createMissingTablesAndColumns(
                 UsersTable,
