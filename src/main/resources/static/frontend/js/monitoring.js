@@ -1,7 +1,7 @@
 async function loadMonitoring() {
   const wrap = document.getElementById('monitorCards');
   if (!wrap) return;
-  const devices = await fetch('/api/monitoring/devices').then(r => r.json());
+  const devices = await fetch('/api/monitoring/devices', { headers: authHeaders() }).then(r => r.json());
   wrap.innerHTML = devices.map(d => `
     <div class='card'>
       <h3>${d.deviceName}</h3>
@@ -19,7 +19,7 @@ async function registerDevice() {
     assignedUser: assignedUser.value.trim(),
     status: status.value
   };
-  const res = await fetch('/api/devices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const res = await fetch('/api/devices', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
   const data = await res.json();
   if (!res.ok) return alert(data.error || 'Failed to register device (LAN only policy).');
   deviceName.value = ipAddress.value = department.value = assignedUser.value = '';
@@ -29,7 +29,7 @@ async function registerDevice() {
 async function loadDevices() {
   const list = document.getElementById('deviceList');
   if (!list) return;
-  const devices = await fetch('/api/devices').then(r => r.json());
+  const devices = await fetch('/api/devices', { headers: authHeaders() }).then(r => r.json());
   list.innerHTML = devices.map(d => `<li>${d.deviceName} (${d.ipAddress}) - ${d.assignedUser}</li>`).join('');
 }
 

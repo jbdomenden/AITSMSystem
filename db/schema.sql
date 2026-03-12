@@ -9,6 +9,9 @@ CREATE TABLE IF NOT EXISTS users (
   department VARCHAR(120) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   role VARCHAR(20) NOT NULL DEFAULT 'end-user',
+  email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+  verification_code VARCHAR(12),
+  verification_expires_at TIMESTAMP,
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
