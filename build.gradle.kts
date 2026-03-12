@@ -14,9 +14,6 @@ application {
     mainClass = "io.ktor.server.netty.EngineMain"
 }
 
-kotlin {
-    jvmToolchain(21)
-}
 
 dependencies {
     implementation("io.ktor:ktor-server-core-jvm")
@@ -30,7 +27,6 @@ dependencies {
     implementation("io.ktor:ktor-server-status-pages-jvm")
     implementation("io.ktor:ktor-server-auth-jvm")
     implementation("io.ktor:ktor-server-auth-jwt-jvm")
-    implementation("io.ktor:ktor-server-static-content")
 
     implementation("org.jetbrains.exposed:exposed-core:0.52.0")
     implementation("org.jetbrains.exposed:exposed-jdbc:0.52.0")
