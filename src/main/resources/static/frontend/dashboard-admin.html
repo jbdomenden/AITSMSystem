@@ -4,23 +4,35 @@
 <body>
 <div class='app-layout'>
   <aside class='sidebar'>
-    <div class='brand'>AITSM Admin</div>
+    <div class='brand'>AITSM Control</div>
     <nav class='nav-group'>
-      <a class='nav-item' data-page='dashboard-admin.html' href='/dashboard-admin.html'>Dashboard</a>
-      <a class='nav-item' data-page='monitoring.html' href='/monitoring.html'>Monitoring</a>
+      <div class='nav-section-title'>Dashboard</div>
+      <a class='nav-item' data-page='dashboard-admin.html' href='/dashboard-admin.html'>Overview</a>
+      <a class='nav-item' data-page='monitoring.html' href='/monitoring.html'>LAN Monitoring</a>
       <a class='nav-item' data-page='assets.html' href='/assets.html'>Assets</a>
       <a class='nav-item' data-page='settings.html' href='/settings.html'>Settings</a>
     </nav>
   </aside>
   <main class='content'>
     <div class='topbar'>
-      <div><h1 class='page-title'>Admin Analytics</h1><p class='page-subtitle'>Operational visibility for service quality and infrastructure health.</p></div>
+      <div><h1 class='page-title'>Dashboard</h1><p class='page-subtitle'>Live overview of service operations and LAN system health.</p></div>
       <div class='inline-actions'><button class='btn btn-ghost' onclick='logout()'>Logout</button></div>
     </div>
     <section id='summaryCards' class='grid stats'></section>
-    <section class='grid' style='margin-top:18px;grid-template-columns:1fr 1fr'>
+    <section class='grid admin-panels'>
       <article class='card'><h3>Ticket Trend</h3><p class='small'>Open vs resolved pattern and AI insights</p><pre id='ticketTrend' class='chart-placeholder' style='margin:0;white-space:pre-wrap'></pre></article>
-      <article class='card'><h3>System Health</h3><p class='small'>CPU analytics and health score</p><pre id='systemHealth' class='chart-placeholder' style='margin:0;white-space:pre-wrap'></pre></article>
+      <article class='card'><h3>System Health</h3><p class='small'>CPU analytics from LAN-connected devices only</p><pre id='systemHealth' class='chart-placeholder' style='margin:0;white-space:pre-wrap'></pre></article>
+    </section>
+
+    <section class='card' style='margin-top:18px'>
+      <h3>User Access Management</h3>
+      <p class='small'>Promote end users to admin or revoke admin rights.</p>
+      <div class='table-wrap'>
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Email Verified</th><th>Action</th></tr></thead>
+          <tbody id='userRows'></tbody>
+        </table>
+      </div>
     </section>
   </main>
 </div>

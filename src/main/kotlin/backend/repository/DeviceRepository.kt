@@ -32,6 +32,7 @@ class DeviceRepository {
     fun list(): List<Device> = transaction { DevicesTable.selectAll().map(::toDevice) }
 
     fun update(id: Int, req: DeviceRequest): Device? = transaction {
+        require(privateNetworks.any { req.ipAddress.startsWith(it) }) { "Only LAN devices are monitorable." }
         DevicesTable.update({ DevicesTable.id eq id }) {
             it[deviceName] = req.deviceName
             it[ipAddress] = req.ipAddress

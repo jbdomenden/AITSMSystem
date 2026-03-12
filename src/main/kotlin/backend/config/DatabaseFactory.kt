@@ -16,6 +16,9 @@ object UsersTable : Table("users") {
     val department = varchar("department", 120)
     val passwordHash = varchar("password_hash", 255)
     val role = varchar("role", 20)
+    val emailVerified = bool("email_verified").default(false)
+    val verificationCode = varchar("verification_code", 12).nullable()
+    val verificationExpiresAt = datetime("verification_expires_at").nullable()
     val createdAt = datetime("created_at")
     override val primaryKey = PrimaryKey(id)
 }
@@ -114,7 +117,7 @@ object DatabaseFactory {
         }
         Database.connect(HikariDataSource(config))
         transaction {
-            SchemaUtils.create(
+            SchemaUtils.createMissingTablesAndColumns(
                 UsersTable,
                 EulaAcceptanceTable,
                 DevicesTable,

@@ -53,3 +53,18 @@ You can override these using environment variables:
 - `SUPERADMIN_NAME`
 - `SUPERADMIN_COMPANY`
 - `SUPERADMIN_DEPARTMENT`
+
+
+## Email verification
+
+End-user sign up now requires email verification before first login.
+
+- `POST /api/auth/register` creates the account and generates a 6-digit verification code (15-minute expiry).
+- `POST /api/auth/verify-email` verifies the code and returns an authenticated session payload.
+- `POST /api/auth/resend-verification` regenerates the code for unverified users.
+
+> In this environment, no SMTP server is configured, so the API returns `devVerificationCode` in the response for testing.
+
+## Admin role management
+
+Admins and superadmins can manage user roles from the Admin Dashboard (User Access Management) or via API: `PUT /api/users/{id}/role` with role `admin` or `end-user`.

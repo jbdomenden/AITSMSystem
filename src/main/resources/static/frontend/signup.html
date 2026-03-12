@@ -11,18 +11,34 @@
   <p class='eyebrow'>End-User Portal</p>
   <h2>Create your ticketing account</h2>
   <p class='page-subtitle'>Self-registration is available for end users only. Admin accounts are provisioned by system owners.</p>
-  <div class='form-grid'>
-    <div class='form-group'><label>Full Name</label><input id='fullName'></div>
-    <div class='form-group'><label>Email Address</label><input id='email' type='email'></div>
-    <div class='form-group'><label>Company</label><input id='company'></div>
-    <div class='form-group'><label>Department</label><input id='department'></div>
-    <div class='form-group'><label>Password</label><input id='password' type='password'></div>
-    <div class='form-group'><label>Confirm Password</label><input id='confirmPassword' type='password'></div>
+
+  <div id='registrationStep'>
+    <div class='form-grid'>
+      <div class='form-group'><label>Full Name</label><input id='fullName'></div>
+      <div class='form-group'><label>Email Address</label><input id='email' type='email'></div>
+      <div class='form-group'><label>Company</label><input id='company'></div>
+      <div class='form-group'><label>Department</label><input id='department'></div>
+      <div class='form-group'><label>Password</label><input id='password' type='password'></div>
+      <div class='form-group'><label>Confirm Password</label><input id='confirmPassword' type='password'></div>
+    </div>
+    <h4>EULA</h4>
+    <div class='eula-box'>By using AITSM, you agree to enterprise IT service terms, audit logging, and security controls required for managed support workflows.</div>
+    <label style='display:flex;gap:8px;margin-top:12px'><input id='eula' type='checkbox' style='width:auto'> I have read and agree to the End-User License Agreement.</label>
+    <div class='inline-actions' style='margin-top:14px'><button class='btn btn-primary' onclick='signup()'>Register End-User Account</button></div>
   </div>
-  <h4>EULA</h4>
-  <div class='eula-box'>By using AITSM, you agree to enterprise IT service terms, audit logging, and security controls required for managed support workflows.</div>
-  <label style='display:flex;gap:8px;margin-top:12px'><input id='eula' type='checkbox' style='width:auto'> I have read and agree to the End-User License Agreement.</label>
-  <div class='inline-actions' style='margin-top:14px'><button class='btn btn-primary' onclick='signup()'>Register End-User Account</button></div>
+
+  <div id='verificationStep' style='display:none'>
+    <h3>Email Verification</h3>
+    <p class='small'>Enter the verification code sent to your email address.</p>
+    <div class='form-grid' style='grid-template-columns:1fr'>
+      <div class='form-group'><label>Email</label><input id='verifyEmail' type='email'></div>
+      <div class='form-group'><label>Verification Code</label><input id='verificationCode' maxlength='6' placeholder='6-digit code'></div>
+    </div>
+    <div class='inline-actions'>
+      <button class='btn btn-ghost' onclick='resendVerificationCode()'>Resend Code</button>
+      <button class='btn btn-primary' onclick='verifyEmailCode()'>Verify & Continue</button>
+    </div>
+  </div>
 </section>
 <script src='/js/auth.js'></script>
 </body>

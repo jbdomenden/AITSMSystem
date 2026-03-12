@@ -19,7 +19,7 @@ async function loadAdminDashboard() {
     ['Open', tickets.filter(t => t.status === 'Open').length, 'Awaiting action'],
     ['In Progress', tickets.filter(t => t.status === 'In Progress').length, 'Currently handled'],
     ['Resolved', tickets.filter(t => t.status === 'Resolved').length, 'Closed successfully'],
-    ['CPU Usage', `${Math.round((cpu.reduce((a, c) => a + Number(c.cpu), 0) / (cpu.length || 1)) * 10) / 10}%`, 'Infrastructure load'],
+    ['LAN CPU Avg', `${Math.round((cpu.reduce((a, c) => a + Number(c.cpu), 0) / (cpu.length || 1)) * 10) / 10}%`, 'LAN-only infrastructure load'],
     ['Critical Alerts', cpu.filter(c => Number(c.cpu) > 85).length, 'Needs immediate attention']
   ];
   summary.innerHTML = cards.map(([label, value, hint]) => `<div class='card'><div>${label}</div><div class='metric-value'>${value}</div><div class='metric-hint'>${hint}</div></div>`).join('');
@@ -28,16 +28,44 @@ async function loadAdminDashboard() {
   document.getElementById('systemHealth').textContent = JSON.stringify(health.points, null, 2);
 }
 
-async function loadKnowledge() {
-  const list = document.getElementById('knowledgeCards');
-  if (!list) return;
-  const query = (document.getElementById('search')?.value || '').toLowerCase();
-  const data = await fetch('/api/knowledge').then(r => r.json());
-  const filtered = data.filter(a => a.title.toLowerCase().includes(query) || a.content.toLowerCase().includes(query));
-  list.innerHTML = filtered.map(a => `<article class='card'><h3>${a.title}</h3><div class='small'>${a.category}</div><p>${a.content}</p></article>`).join('') || `<div class='card'><p class='small'>No articles found.</p></div>`;
+async function loadUsers() {
+  const rows = document.getElementById('userRows');
+  if (!rows) return;
+
+  const users = await fetch('/api/users', { headers: authHeaders() }).then(r => r.json());
+  if (users.error) {
+    rows.innerHTML = `<tr><td colspan='5'>${users.error}</td></tr>`;
+    return;
+  }
+
+  rows.innerHTML = users.map(u => {
+    const canChange = u.role !== 'superadmin';
+    const action = u.role === 'admin'
+      ? `<button class='btn btn-ghost' ${canChange ? '' : 'disabled'} onclick='changeRole(${u.id}, "end-user")'>Set End-User</button>`
+      : `<button class='btn btn-primary' ${canChange ? '' : 'disabled'} onclick='changeRole(${u.id}, "admin")'>Make Admin</button>`;
+
+    return `<tr>
+      <td>${u.fullName}</td>
+      <td>${u.email}</td>
+      <td><span class='badge ${u.role === 'admin' || u.role === 'superadmin' ? 'in-progress' : 'resolved'}'>${u.role}</span></td>
+      <td>${u.emailVerified ? 'Yes' : 'No'}</td>
+      <td>${action}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function changeRole(userId, role) {
+  const res = await fetch(`/api/users/${userId}/role`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({ role })
+  });
+  const data = await res.json();
+  if (!res.ok) return alert(data.error || 'Unable to update role');
+  await loadUsers();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
   loadAdminDashboard();
-  loadKnowledge();
+  loadUsers();
 });
