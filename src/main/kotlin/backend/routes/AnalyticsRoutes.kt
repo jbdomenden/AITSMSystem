@@ -1,6 +1,7 @@
 package backend.routes
 
 import backend.models.AnalyticsResponse
+import backend.security.requireRole
 import backend.services.AIService
 import backend.services.MonitoringService
 import backend.services.TicketService
@@ -10,6 +11,7 @@ import io.ktor.server.routing.*
 fun Route.analyticsRoutes(ticketService: TicketService, monitoringService: MonitoringService, aiService: AIService) {
     route("/api/analytics") {
         get("/ticket-trends") {
+            if (!call.requireRole("admin")) return@get
             val tickets = ticketService.list(null, true)
             val total = tickets.size
             val open = tickets.count { it.status == "Open" }
@@ -17,6 +19,7 @@ fun Route.analyticsRoutes(ticketService: TicketService, monitoringService: Monit
             call.respond(AnalyticsResponse("ticket-trends", aiService.ticketTrendInsights(total, open, resolved)))
         }
         get("/system-health") {
+            if (!call.requireRole("admin")) return@get
             val devices = monitoringService.devices()
             val avgCpu = devices.map { it.cpuUsage }.average().toInt()
             val health = (100 - avgCpu).coerceAtLeast(0)

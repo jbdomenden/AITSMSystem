@@ -22,6 +22,7 @@ import backend.services.MonitoringService
 import backend.services.NotificationService
 import backend.services.SLAService
 import backend.services.TicketService
+import backend.security.PasswordHasher
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
@@ -69,11 +70,21 @@ fun Application.module() {
     val notificationService = NotificationService()
     val knowledgeService = KnowledgeService(knowledgeRepo, auditRepo)
 
+    val superAdminEmail = System.getenv("SUPERADMIN_EMAIL") ?: "superadmin@aitsm.local"
+    val superAdminPassword = System.getenv("SUPERADMIN_PASSWORD") ?: "SuperAdmin@123"
+    userRepo.ensureSuperAdmin(
+        email = superAdminEmail,
+        passwordHash = PasswordHasher.hash(superAdminPassword),
+        fullName = System.getenv("SUPERADMIN_NAME") ?: "System Super Admin",
+        company = System.getenv("SUPERADMIN_COMPANY") ?: "AITSM",
+        department = System.getenv("SUPERADMIN_DEPARTMENT") ?: "Platform"
+    )
+
     routing {
         staticResources("/", "static/frontend")
         authRoutes(authService)
         ticketRoutes(ticketService)
-        monitoringRoutes(monitoringService)
+        monitoringRoutes(monitoringService, deviceRepo)
         analyticsRoutes(ticketService, monitoringService, aiService)
         deviceRoutes(deviceRepo)
         notificationRoutes(notificationService)
