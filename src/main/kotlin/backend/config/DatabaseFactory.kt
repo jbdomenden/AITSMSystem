@@ -117,6 +117,11 @@ object DatabaseFactory {
         }
         Database.connect(HikariDataSource(config))
         transaction {
+            // Compatibility fix for legacy schemas where `devices.assigned_user`
+            // was created as an integer FK to `users.id`.
+            // Current model expects a VARCHAR username/owner field.
+            exec("ALTER TABLE IF EXISTS devices DROP CONSTRAINT IF EXISTS devices_assigned_user_fkey")
+
             SchemaUtils.createMissingTablesAndColumns(
                 UsersTable,
                 EulaAcceptanceTable,
