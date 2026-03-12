@@ -10,6 +10,7 @@ data class User(
     val company: String,
     val department: String,
     val role: String,
+    val emailVerified: Boolean = false,
     val createdAt: String
 )
 
@@ -27,6 +28,10 @@ data class RegisterRequest(
 
 @Serializable data class LoginRequest(val email: String, val password: String)
 @Serializable data class AuthResponse(val token: String, val user: User)
+@Serializable data class RegistrationResponse(val message: String, val email: String, val devVerificationCode: String? = null)
+@Serializable data class VerifyEmailRequest(val email: String, val code: String)
+@Serializable data class ResendVerificationRequest(val email: String)
+@Serializable data class RoleUpdateRequest(val role: String)
 
 @Serializable
 data class Ticket(
