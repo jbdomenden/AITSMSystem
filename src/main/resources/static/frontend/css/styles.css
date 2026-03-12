@@ -282,6 +282,7 @@ textarea { resize: vertical; min-height: 120px; }
   .admin-panels, .monitor-grid, .settings-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 980px) {
+  .admin-panels { grid-template-columns: 1fr; }
   .app-layout { grid-template-columns: 1fr; }
   .sidebar { flex-direction: row; overflow: auto; }
   .content { padding: 16px; }

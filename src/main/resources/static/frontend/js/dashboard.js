@@ -69,7 +69,7 @@ async function loadAdminDashboard() {
   const summary = document.getElementById('summaryCards');
   if (!summary) return;
 
-  const [tickets, cpu, trends, health, hostTelemetry, monitorSummary] = await Promise.all([
+const [tickets, cpu, trends, health, hostTelemetry, monitorSummary] = await Promise.all([
     fetch('/api/tickets', { headers: authHeaders() }).then(r => r.json()),
     fetch('/api/monitoring/cpu', { headers: authHeaders() }).then(r => r.json()),
     fetch('/api/analytics/ticket-trends', { headers: authHeaders() }).then(r => r.json()),
