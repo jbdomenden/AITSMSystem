@@ -38,3 +38,18 @@ If the server starts successfully, you'll see the following output:
 2024-12-04 14:32:45.682 [main] INFO  Application - Responding at http://0.0.0.0:8080
 ```
 
+
+## Default Superadmin Account
+
+On startup, the application ensures a `superadmin` account exists for administrative access.
+
+- Email: `superadmin@aitsm.local`
+- Password: `SuperAdmin@123`
+
+You can override these using environment variables:
+
+- `SUPERADMIN_EMAIL`
+- `SUPERADMIN_PASSWORD`
+- `SUPERADMIN_NAME`
+- `SUPERADMIN_COMPANY`
+- `SUPERADMIN_DEPARTMENT`

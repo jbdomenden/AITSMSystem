@@ -1,8 +1,16 @@
 <!doctype html>
-<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Sign Up | AITSM</title><link rel='stylesheet' href='/css/styles.css'></head>
+<html>
+<head>
+  <meta charset='utf-8'>
+  <meta name='viewport' content='width=device-width,initial-scale=1'>
+  <title>End-User Sign Up | AITSM</title>
+  <link rel='stylesheet' href='/css/styles.css'>
+</head>
 <body class='auth-shell'>
 <section class='card auth-card'>
-  <h2>Create account</h2><p class='page-subtitle'>Get started with AI-powered support operations.</p>
+  <p class='eyebrow'>End-User Portal</p>
+  <h2>Create your ticketing account</h2>
+  <p class='page-subtitle'>Self-registration is available for end users only. Admin accounts are provisioned by system owners.</p>
   <div class='form-grid'>
     <div class='form-group'><label>Full Name</label><input id='fullName'></div>
     <div class='form-group'><label>Email Address</label><input id='email' type='email'></div>
@@ -14,7 +22,8 @@
   <h4>EULA</h4>
   <div class='eula-box'>By using AITSM, you agree to enterprise IT service terms, audit logging, and security controls required for managed support workflows.</div>
   <label style='display:flex;gap:8px;margin-top:12px'><input id='eula' type='checkbox' style='width:auto'> I have read and agree to the End-User License Agreement.</label>
-  <div class='inline-actions' style='margin-top:14px'><button class='btn btn-primary' onclick='signup()'>Register</button></div>
+  <div class='inline-actions' style='margin-top:14px'><button class='btn btn-primary' onclick='signup()'>Register End-User Account</button></div>
 </section>
 <script src='/js/auth.js'></script>
-</body></html>
+</body>
+</html>

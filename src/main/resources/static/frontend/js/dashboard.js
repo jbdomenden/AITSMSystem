@@ -1,12 +1,18 @@
 async function loadAdminDashboard() {
   const summary = document.getElementById('summaryCards');
   if (!summary) return;
+
   const [tickets, cpu, trends, health] = await Promise.all([
     fetch('/api/tickets', { headers: authHeaders() }).then(r => r.json()),
-    fetch('/api/monitoring/cpu').then(r => r.json()),
-    fetch('/api/analytics/ticket-trends').then(r => r.json()),
-    fetch('/api/analytics/system-health').then(r => r.json())
+    fetch('/api/monitoring/cpu', { headers: authHeaders() }).then(r => r.json()),
+    fetch('/api/analytics/ticket-trends', { headers: authHeaders() }).then(r => r.json()),
+    fetch('/api/analytics/system-health', { headers: authHeaders() }).then(r => r.json())
   ]);
+
+  if (tickets.error || cpu.error || trends.error || health.error) {
+    summary.innerHTML = `<div class='card'><p class='small'>Unable to load admin analytics. Please verify you are logged in as admin.</p></div>`;
+    return;
+  }
 
   const cards = [
     ['Total Tickets', tickets.length, 'All incidents'],
