@@ -1,14 +1,29 @@
 <!doctype html>
-<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Login | AITSM</title><link rel='stylesheet' href='/css/styles.css'></head>
-<body class='auth-shell'>
-  <section class='card auth-card'>
-    <h2>Welcome back</h2><p class='page-subtitle'>Log in to your AITSM workspace.</p>
+<html>
+<head>
+  <meta charset='utf-8'>
+  <meta name='viewport' content='width=device-width,initial-scale=1'>
+  <title>Login | AITSM</title>
+  <link rel='stylesheet' href='/css/styles.css'>
+</head>
+<body class='auth-shell auth-dark'>
+  <section class='auth-panel'>
+    <h2 class='auth-title'>AITSM Portal</h2>
+    <p class='auth-subtitle'>Sign in to continue.</p>
     <div class='form-grid' style='grid-template-columns:1fr'>
-      <div class='form-group'><label>Email</label><input id='email' type='email' placeholder='you@company.com'></div>
-      <div class='form-group'><label>Password</label><input id='password' type='password' placeholder='••••••••'></div>
+      <div class='form-group'>
+        <label>Email</label>
+        <input id='email' type='email' placeholder='you@company.com'>
+      </div>
+      <div class='form-group'>
+        <label>Password</label>
+        <input id='password' type='password' placeholder='••••••••'>
+      </div>
     </div>
-    <div class='inline-actions' style='margin-top:14px'><button class='btn btn-primary' onclick='login()'>Login</button></div>
-    <p class='small'>No account yet? <a href='/signup.html' style='color:var(--primary)'>Create one</a></p>
+    <label class='remember-row'><input type='checkbox'> Remember me</label>
+    <button class='btn btn-primary auth-login-btn' onclick='login()'>Login</button>
+    <p class='small auth-links'>Need an account? <a href='/signup.html' class='text-primary'>Only end users can sign up</a>.</p>
   </section>
   <script src='/js/auth.js'></script>
-</body></html>
+</body>
+</html>

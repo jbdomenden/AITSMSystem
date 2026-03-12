@@ -1,7 +1,15 @@
 package backend.routes
 
+import backend.models.AdminEligibilityRequest
+import backend.models.AdminGrantRequest
+import backend.models.AdminSensitiveVerifyRequest
 import backend.models.LoginRequest
 import backend.models.RegisterRequest
+import backend.models.ResendVerificationRequest
+import backend.models.RoleUpdateRequest
+import backend.models.VerifyEmailRequest
+import backend.security.requireRole
+import backend.security.userId
 import backend.services.AuthService
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -13,7 +21,15 @@ fun Route.authRoutes(authService: AuthService) {
     route("/api/auth") {
         post("/register") {
             val req = call.receive<RegisterRequest>()
-            call.respond(authService.register(req))
+            call.respond(HttpStatusCode.Created, authService.register(req))
+        }
+        post("/verify-email") {
+            val req = call.receive<VerifyEmailRequest>()
+            call.respond(authService.verifyEmail(req.email, req.code))
+        }
+        post("/resend-verification") {
+            val req = call.receive<ResendVerificationRequest>()
+            call.respond(authService.resendVerification(req.email))
         }
         post("/login") {
             val req = call.receive<LoginRequest>()
@@ -21,6 +37,43 @@ fun Route.authRoutes(authService: AuthService) {
         }
         post("/logout") {
             call.respond(HttpStatusCode.OK, mapOf("message" to "Logged out"))
+        }
+    }
+
+    route("/api/users") {
+        get {
+            if (!call.requireRole("admin")) return@get
+            call.respond(authService.listUsers())
+        }
+        put("/{id}/role") {
+            if (!call.requireRole("admin")) return@put
+            val id = call.parameters["id"]?.toIntOrNull() ?: return@put call.respond(HttpStatusCode.BadRequest)
+            val req = call.receive<RoleUpdateRequest>()
+            call.respond(authService.updateUserRole(id, req.role, call.userId()))
+        }
+
+        route("/admin") {
+            post("/eligibility") {
+                if (!call.requireRole("admin")) return@post
+                val req = call.receive<AdminEligibilityRequest>()
+                call.respond(authService.adminGrantEligibility(req.targetEmail))
+            }
+            post("/verify") {
+                if (!call.requireRole("admin")) return@post
+                val actor = call.userId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+                val req = call.receive<AdminSensitiveVerifyRequest>()
+                val (ok, token, meta) = authService.verifySensitiveAction(actor, req.password)
+                if (!ok) return@post call.respond(HttpStatusCode.Forbidden, mapOf("verified" to false, "message" to meta))
+                call.respond(mapOf("verified" to true, "verificationToken" to token, "expiresAt" to meta, "message" to "Verification successful"))
+            }
+            post("/grant") {
+                if (!call.requireRole("admin")) return@post
+                val actor = call.userId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+                val req = call.receive<AdminGrantRequest>()
+                val result = authService.grantAdminByEmail(req.targetEmail, actor, req.verificationToken)
+                if (!result.success) return@post call.respond(HttpStatusCode.BadRequest, result)
+                call.respond(result)
+            }
         }
     }
 }

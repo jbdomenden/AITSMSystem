@@ -1,9 +1,54 @@
 <!doctype html>
-<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Settings | AITSM</title><link rel='stylesheet' href='/css/styles.css'></head>
+<html>
+<head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Settings | AITSM</title><link rel='stylesheet' href='/css/styles.css'></head>
 <body>
 <div class='app-layout'>
-  <aside class='sidebar'><div class='brand'>AITSM</div><nav class='nav-group'><a class='nav-item active' href='/settings.html'>Settings</a></nav></aside>
-  <main class='content'><h1 class='page-title'>Settings</h1><section class='card'><p class='page-subtitle'>Profile, notification preferences, and access controls will be configured here.</p></section></main>
+  <aside id='adminSidebar' class='sidebar'></aside>
+  <main class='content'>
+    <section id='utilityHeader' class='utility-bar card'></section>
+
+    <div class='topbar'>
+      <div>
+        <h1 class='page-title'>Settings</h1>
+        <p class='page-subtitle'>Configure profile, notifications, access controls, and operational preferences.</p>
+      </div>
+    </div>
+
+    <section class='settings-grid'>
+      <article class='card'>
+        <div class='card-head'><h3 class='section-title'>Profile</h3><span class='card-icon'>👤</span></div>
+        <div class='form-grid'>
+          <div class='form-group'><label>Display Name</label><input value='System Administrator'></div>
+          <div class='form-group'><label>Email</label><input value='admin@aitsm.local'></div>
+          <div class='form-group'><label>Department</label><input value='Operations'></div>
+          <div class='form-group'><label>Timezone</label><select><option>UTC+08:00</option></select></div>
+        </div>
+        <div class='inline-actions' style='margin-top:12px'><button class='btn btn-primary'>Save Profile</button></div>
+      </article>
+
+      <article class='card'>
+        <div class='card-head'><h3 class='section-title'>Notifications</h3><span class='card-icon'>🔔</span></div>
+        <div class='toggle-row'><div><strong>Email Alerts</strong><div class='small'>Receive critical issue notifications.</div></div><span class='toggle active'></span></div>
+        <div class='toggle-row'><div><strong>SLA Breach Warnings</strong><div class='small'>Alert when SLA thresholds are reached.</div></div><span class='toggle active'></span></div>
+        <div class='toggle-row'><div><strong>Daily Summary</strong><div class='small'>Digest of ticket and LAN status trends.</div></div><span class='toggle'></span></div>
+      </article>
+
+      <article class='card'>
+        <div class='card-head'><h3 class='section-title'>Access Control</h3><span class='card-icon'>🛡</span></div>
+        <div class='toggle-row'><div><strong>Require MFA</strong><div class='small'>Enforce MFA for admin and superadmin roles.</div></div><span class='toggle'></span></div>
+        <div class='toggle-row'><div><strong>Session Timeout</strong><div class='small'>Auto-signout after inactivity.</div></div><span class='badge in-progress'>30 min</span></div>
+        <div class='toggle-row'><div><strong>Role Change Approval</strong><div class='small'>Require confirmation for admin privilege updates.</div></div><span class='toggle active'></span></div>
+      </article>
+
+      <article class='card'>
+        <div class='card-head'><h3 class='section-title'>Preferences</h3><span class='card-icon'>⚙</span></div>
+        <div class='form-group'><label>Default Dashboard Range</label><select><option>Last 7 days</option><option>Last 30 days</option></select></div>
+        <div class='form-group'><label>Monitoring Refresh Interval</label><select><option>30 seconds</option><option>1 minute</option><option>5 minutes</option></select></div>
+        <div class='form-group'><label>Theme</label><select><option>System</option><option>Light</option><option>Dark</option></select></div>
+        <div class='inline-actions' style='margin-top:12px'><button class='btn btn-primary'>Save Preferences</button></div>
+      </article>
+    </section>
+  </main>
 </div>
-<script src='/js/app.js'></script>
+<script src='/js/admin-shell.js'></script><script src='/js/app.js'></script>
 </body></html>

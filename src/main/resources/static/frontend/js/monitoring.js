@@ -1,14 +1,114 @@
-async function loadMonitoring() {
+function statusBadge(status) {
+  const s = String(status || '').toLowerCase();
+  if (s === 'critical') return 'open';
+  if (s === 'offline' || s === 'unavailable') return 'warning';
+  return 'resolved';
+}
+
+function telemetryBadge(device) {
+  if (device.telemetryAvailable) return `<span class='badge resolved'>${device.telemetrySourceType}</span>`;
+  return `<span class='badge warning'>UNAVAILABLE</span>`;
+}
+
+function renderMonitorSummary(summary) {
+  const wrap = document.getElementById('monitorSummary');
+  if (!wrap) return;
+
+  const host = summary?.hostTelemetry || {};
+  const chips = [
+    ['Discovered Devices', summary?.totalDiscovered ?? 0],
+    ['Monitored Devices', summary?.monitoredDevices ?? 0],
+    ['Telemetry Available', summary?.telemetryAvailableDevices ?? 0],
+    ['Host CPU', `${Number(host.cpuUsagePercent ?? 0).toFixed(1)}%`]
+  ];
+
+  wrap.innerHTML = chips.map(([label, value]) => `<div class='kpi-chip'><div class='kpi-label'>${label}</div><div class='kpi-value'>${value}</div></div>`).join('');
+}
+
+function renderMonitoringHealthPanel(summary, devices) {
+  const panel = document.getElementById('monitorHealthPanel');
+  if (!panel) return;
+
+  const host = summary?.hostTelemetry;
+  if (!host) {
+    panel.innerHTML = `<div class='empty-state'><h3>Monitoring unavailable</h3><p>Unable to load host telemetry right now.</p></div>`;
+    return;
+  }
+
+  const available = devices.filter(d => d.telemetryAvailable).length;
+  panel.innerHTML = `
+    <div class='insight-grid'>
+      <div class='insight-item'><div class='insight-label'>Host</div><div class='insight-value'>${host.hostname}</div></div>
+      <div class='insight-item'><div class='insight-label'>Host Memory</div><div class='insight-value'>${Number(host.memoryUsagePercent ?? 0).toFixed(1)}%</div></div>
+      <div class='insight-item'><div class='insight-label'>Telemetry coverage</div><div class='insight-value'>${available}/${devices.length}</div></div>
+      <div class='insight-item'><div class='insight-label'>Last updated</div><div class='insight-value'>${summary.timestamp || host.timestamp || 'N/A'}</div></div>
+    </div>`;
+}
+
+function renderMonitorCards(devices) {
   const wrap = document.getElementById('monitorCards');
   if (!wrap) return;
-  const devices = await fetch('/api/monitoring/devices').then(r => r.json());
+
+  if (!devices.length) {
+    wrap.innerHTML = `<div class='empty-state'><h3>No LAN devices found</h3><p>Run discovery refresh or wait for LAN telemetry ingestion from clients.</p><button class='btn btn-primary' onclick='refreshDiscovery()'>Refresh discovery</button></div>`;
+    return;
+  }
+
   wrap.innerHTML = devices.map(d => `
-    <div class='card'>
-      <h3>${d.deviceName}</h3>
-      <div class='small'>${d.ipAddress} • ${d.department}</div>
-      <p>CPU ${d.cpuUsage}% | Memory ${d.memoryUsage}%</p>
-      <span class='badge ${d.status.toLowerCase()==='critical'?'open':'resolved'}'>${d.status}</span>
-    </div>`).join('') || `<div class='card'>No LAN devices found.</div>`;
+    <article class='card'>
+      <div class='card-head'><h3 class='section-title'>${d.hostname || d.ipAddress}</h3>${telemetryBadge(d)}</div>
+      <div class='small'>${d.ipAddress} • Reachable: ${d.reachable ? 'Yes' : 'No'}</div>
+      <div class='insight-grid'>
+        <div class='insight-item'><div class='insight-label'>CPU</div><div class='insight-value'>${d.cpuUsagePercent != null ? `${Number(d.cpuUsagePercent).toFixed(1)}%` : 'N/A'}</div></div>
+        <div class='insight-item'><div class='insight-label'>Memory</div><div class='insight-value'>${d.memoryUsagePercent != null ? `${Number(d.memoryUsagePercent).toFixed(1)}%` : 'N/A'}</div></div>
+      </div>
+    </article>`).join('');
+}
+
+function renderMonitorTable(devices) {
+  const rows = document.getElementById('monitorTableRows');
+  if (!rows) return;
+
+  if (!devices.length) {
+    rows.innerHTML = `<tr><td colspan='7' class='small'>No LAN devices discovered yet.</td></tr>`;
+    return;
+  }
+
+  rows.innerHTML = devices.map(d => `<tr>
+    <td>${d.hostname || '-'}</td>
+    <td>${d.ipAddress}</td>
+    <td>${d.telemetrySourceType || '-'}</td>
+    <td>${d.reachable ? 'Online' : 'Offline'}</td>
+    <td>${d.cpuUsagePercent != null ? `${Number(d.cpuUsagePercent).toFixed(1)}%` : '-'}</td>
+    <td>${d.memoryUsagePercent != null ? `${Number(d.memoryUsagePercent).toFixed(1)}%` : '-'}</td>
+    <td><span class='badge ${statusBadge(d.telemetryAvailable ? 'online' : 'unavailable')}'>${d.telemetryAvailable ? 'Telemetry' : 'No telemetry'}</span></td>
+  </tr>`).join('');
+}
+
+async function refreshDiscovery() {
+  const res = await fetch('/api/monitoring/refresh-discovery', { method: 'POST', headers: authHeaders() });
+  const data = await res.json();
+  if (!res.ok) {
+    alert(data.error || 'Failed to refresh discovery');
+    return;
+  }
+  await loadMonitoring();
+}
+
+async function loadMonitoring() {
+  const [summaryRes, devicesRes] = await Promise.all([
+    fetch('/api/monitoring/summary', { headers: authHeaders() }),
+    fetch('/api/monitoring/lan-devices', { headers: authHeaders() })
+  ]);
+
+  const summary = await summaryRes.json();
+  const devices = await devicesRes.json();
+  const safeDevices = Array.isArray(devices) ? devices : [];
+
+  renderMonitorSummary(summaryRes.ok ? summary : null);
+  renderMonitoringHealthPanel(summaryRes.ok ? summary : null, safeDevices);
+  renderMonitorCards(safeDevices);
+  renderMonitorTable(safeDevices);
 }
 
 async function registerDevice() {
@@ -19,18 +119,25 @@ async function registerDevice() {
     assignedUser: assignedUser.value.trim(),
     status: status.value
   };
-  const res = await fetch('/api/devices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const res = await fetch('/api/devices', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
   const data = await res.json();
   if (!res.ok) return alert(data.error || 'Failed to register device (LAN only policy).');
   deviceName.value = ipAddress.value = department.value = assignedUser.value = '';
   await loadDevices();
+  await loadMonitoring();
 }
 
 async function loadDevices() {
-  const list = document.getElementById('deviceList');
-  if (!list) return;
-  const devices = await fetch('/api/devices').then(r => r.json());
-  list.innerHTML = devices.map(d => `<li>${d.deviceName} (${d.ipAddress}) - ${d.assignedUser}</li>`).join('');
+  const rows = document.getElementById('deviceList');
+  if (!rows) return;
+  const devices = await fetch('/api/devices', { headers: authHeaders() }).then(r => r.json());
+  const safe = Array.isArray(devices) ? devices : [];
+
+  rows.innerHTML = safe.map(d => `<tr><td>${d.deviceName}</td><td>${d.ipAddress}</td><td>${d.assignedUser}</td></tr>`).join('')
+    || `<tr><td colspan='3' class='small'>No devices registered yet.</td></tr>`;
 }
 
-document.addEventListener('DOMContentLoaded', () => { loadMonitoring(); loadDevices(); });
+document.addEventListener('DOMContentLoaded', () => {
+  loadMonitoring();
+  loadDevices();
+});

@@ -9,18 +9,29 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
 import java.time.LocalDateTime
 
 class UserRepository {
-    fun create(request: RegisterRequest, passwordHash: String, role: String = "end-user"): User = transaction {
+    fun create(
+        request: RegisterRequest,
+        passwordHash: String,
+        role: String = "end-user",
+        emailVerified: Boolean = false,
+        verificationCode: String? = null,
+        verificationExpiry: LocalDateTime? = null
+    ): User = transaction {
         val now = LocalDateTime.now()
         val id = UsersTable.insert {
             it[fullName] = request.fullName
-            it[email] = request.email
+            it[email] = request.email.lowercase()
             it[company] = request.company
             it[department] = request.department
             it[UsersTable.passwordHash] = passwordHash
             it[UsersTable.role] = role
+            it[UsersTable.emailVerified] = emailVerified
+            it[UsersTable.verificationCode] = verificationCode
+            it[UsersTable.verificationExpiresAt] = verificationExpiry
             it[createdAt] = now
         }[UsersTable.id]
 
@@ -29,13 +40,104 @@ class UserRepository {
             it[eulaVersion] = request.eulaVersion
             it[acceptedAt] = now
         }
-        findById(id)!!
+
+        UsersTable.selectAll().where { UsersTable.id eq id }.single().let(::toUser)
+    }
+
+    fun ensureSuperAdmin(
+        email: String,
+        passwordHash: String,
+        fullName: String = "System Super Admin",
+        company: String = "AITSM",
+        department: String = "Platform"
+    ): User = transaction {
+        val normalized = email.lowercase()
+        val existing = UsersTable.selectAll().where { UsersTable.email eq normalized }.singleOrNull()
+        if (existing == null) {
+            val now = LocalDateTime.now()
+            val id = UsersTable.insert {
+                it[UsersTable.fullName] = fullName
+                it[UsersTable.email] = normalized
+                it[UsersTable.company] = company
+                it[UsersTable.department] = department
+                it[UsersTable.passwordHash] = passwordHash
+                it[UsersTable.role] = "superadmin"
+                it[UsersTable.emailVerified] = true
+                it[UsersTable.verificationCode] = null
+                it[UsersTable.verificationExpiresAt] = null
+                it[UsersTable.createdAt] = now
+            }[UsersTable.id]
+            return@transaction UsersTable.selectAll().where { UsersTable.id eq id }.single().let(::toUser)
+        }
+
+        val userId = existing[UsersTable.id]
+        UsersTable.update({ UsersTable.id eq userId }) {
+            it[UsersTable.passwordHash] = passwordHash
+            it[UsersTable.role] = "superadmin"
+            it[UsersTable.emailVerified] = true
+            it[UsersTable.verificationCode] = null
+            it[UsersTable.verificationExpiresAt] = null
+        }
+        UsersTable.selectAll().where { UsersTable.id eq userId }.single().let(::toUser)
     }
 
     fun findByEmail(email: String): Pair<User, String>? = transaction {
-        UsersTable.selectAll().where { UsersTable.email eq email }.singleOrNull()?.let {
+        UsersTable.selectAll().where { UsersTable.email eq email.lowercase() }.singleOrNull()?.let {
             toUser(it) to it[UsersTable.passwordHash]
         }
+    }
+
+    fun findHashById(userId: Int): String? = transaction {
+        UsersTable.selectAll().where { UsersTable.id eq userId }.singleOrNull()?.get(UsersTable.passwordHash)
+    }
+
+    fun findByEmailOnly(email: String): User? = transaction {
+        UsersTable.selectAll().where { UsersTable.email eq email.lowercase() }.singleOrNull()?.let(::toUser)
+    }
+
+    fun verifyEmail(email: String, code: String): User? = transaction {
+        val row = UsersTable.selectAll().where { UsersTable.email eq email.lowercase() }.singleOrNull() ?: return@transaction null
+        val expectedCode = row[UsersTable.verificationCode]
+        val expiry = row[UsersTable.verificationExpiresAt]
+        if (expectedCode != code || expiry == null || expiry.isBefore(LocalDateTime.now())) return@transaction null
+
+        UsersTable.update({ UsersTable.id eq row[UsersTable.id] }) {
+            it[emailVerified] = true
+            it[verificationCode] = null
+            it[verificationExpiresAt] = null
+        }
+        UsersTable.selectAll().where { UsersTable.id eq row[UsersTable.id] }.single().let(::toUser)
+    }
+
+    fun regenerateVerificationCode(email: String, code: String, expiresAt: LocalDateTime): Boolean = transaction {
+        val row = UsersTable.selectAll().where { UsersTable.email eq email.lowercase() }.singleOrNull() ?: return@transaction false
+        if (row[UsersTable.emailVerified]) return@transaction false
+
+        UsersTable.update({ UsersTable.id eq row[UsersTable.id] }) {
+            it[verificationCode] = code
+            it[verificationExpiresAt] = expiresAt
+        }
+        true
+    }
+
+    fun listUsers(): List<User> = transaction {
+        UsersTable.selectAll().orderBy(UsersTable.createdAt).map(::toUser)
+    }
+
+    fun updateRoleByEmail(email: String, role: String): User? = transaction {
+        val row = UsersTable.selectAll().where { UsersTable.email eq email.lowercase() }.singleOrNull() ?: return@transaction null
+        if (row[UsersTable.role] == "superadmin") return@transaction null
+
+        UsersTable.update({ UsersTable.id eq row[UsersTable.id] }) { it[UsersTable.role] = role }
+        UsersTable.selectAll().where { UsersTable.id eq row[UsersTable.id] }.singleOrNull()?.let(::toUser)
+    }
+
+    fun updateRole(userId: Int, role: String): User? = transaction {
+        val row = UsersTable.selectAll().where { UsersTable.id eq userId }.singleOrNull() ?: return@transaction null
+        if (row[UsersTable.role] == "superadmin") return@transaction null
+
+        UsersTable.update({ UsersTable.id eq userId }) { it[UsersTable.role] = role }
+        UsersTable.selectAll().where { UsersTable.id eq userId }.singleOrNull()?.let(::toUser)
     }
 
     fun findById(id: Int): User? = transaction {
@@ -49,6 +151,7 @@ class UserRepository {
         company = row[UsersTable.company],
         department = row[UsersTable.department],
         role = row[UsersTable.role],
+        emailVerified = row[UsersTable.emailVerified],
         createdAt = row[UsersTable.createdAt].toString()
     )
 }
