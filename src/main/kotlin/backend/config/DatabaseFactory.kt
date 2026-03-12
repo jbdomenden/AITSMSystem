@@ -16,6 +16,9 @@ object UsersTable : Table("users") {
     val department = varchar("department", 120)
     val passwordHash = varchar("password_hash", 255)
     val role = varchar("role", 20)
+    val emailVerified = bool("email_verified").default(false)
+    val verificationCode = varchar("verification_code", 12).nullable()
+    val verificationExpiresAt = datetime("verification_expires_at").nullable()
     val createdAt = datetime("created_at")
     override val primaryKey = PrimaryKey(id)
 }
@@ -114,7 +117,16 @@ object DatabaseFactory {
         }
         Database.connect(HikariDataSource(config))
         transaction {
-            SchemaUtils.create(
+            // Compatibility fix for legacy schemas where `devices.assigned_user`
+            // was created as an integer FK to `users.id`.
+            // Current model expects a VARCHAR username/owner field.
+            exec("ALTER TABLE IF EXISTS devices DROP CONSTRAINT IF EXISTS devices_assigned_user_fkey")
+            // Compatibility fix for legacy schemas where `ticket_history.updated_by`
+            // was created as an integer FK to `users.id`.
+            // Current model expects a VARCHAR audit actor field.
+            exec("ALTER TABLE IF EXISTS ticket_history DROP CONSTRAINT IF EXISTS ticket_history_updated_by_fkey")
+
+            SchemaUtils.createMissingTablesAndColumns(
                 UsersTable,
                 EulaAcceptanceTable,
                 DevicesTable,

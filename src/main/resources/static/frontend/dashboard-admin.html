@@ -1,29 +1,62 @@
 <!doctype html>
-<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Admin Dashboard | AITSM</title><link rel='stylesheet' href='/css/styles.css'></head>
+<html>
+<head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Admin Dashboard | AITSM</title><link rel='stylesheet' href='/css/styles.css'></head>
 <body>
 <div class='app-layout'>
-  <aside class='sidebar'>
-    <div class='brand'>AITSM Admin</div>
-    <nav class='nav-group'>
-      <a class='nav-item' data-page='dashboard-admin.html' href='/dashboard-admin.html'>Dashboard</a>
-      <a class='nav-item' data-page='tickets.html' href='/tickets.html'>Tickets</a>
-      <a class='nav-item' data-page='monitoring.html' href='/monitoring.html'>Monitoring</a>
-      <a class='nav-item' data-page='assets.html' href='/assets.html'>Assets</a>
-      <a class='nav-item' data-page='knowledge.html' href='/knowledge.html'>Knowledge Base</a>
-      <a class='nav-item' data-page='settings.html' href='/settings.html'>Settings</a>
-    </nav>
-  </aside>
+  <aside id='adminSidebar' class='sidebar'></aside>
   <main class='content'>
+    <section id='utilityHeader' class='utility-bar card'></section>
+
     <div class='topbar'>
-      <div><h1 class='page-title'>Dashboard</h1><p class='page-subtitle'>Modern AI-powered IT service overview.</p></div>
-      <div class='inline-actions'><a class='btn btn-primary' href='/create-ticket.html'>+ New Ticket</a><button class='btn btn-ghost' onclick='logout()'>Logout</button></div>
+      <div>
+        <h1 class='page-title'>Dashboard</h1>
+        <p class='page-subtitle'>Live service overview, actionable analytics, and user access controls.</p>
+      </div>
+      <div class='inline-actions'><button class='btn btn-ghost' onclick='logout()'>Logout</button></div>
     </div>
+
     <section id='summaryCards' class='grid stats'></section>
-    <section class='grid' style='margin-top:18px;grid-template-columns:1fr 1fr'>
-      <article class='card'><h3>Ticket Trend</h3><p class='small'>Open vs resolved pattern and AI insights</p><pre id='ticketTrend' class='chart-placeholder' style='margin:0;white-space:pre-wrap'></pre></article>
-      <article class='card'><h3>System Health</h3><p class='small'>CPU analytics and health score</p><pre id='systemHealth' class='chart-placeholder' style='margin:0;white-space:pre-wrap'></pre></article>
+
+    <section class='grid admin-panels'>
+      <article class='card'>
+        <div class='card-head'>
+          <div>
+            <h3 class='section-title'>Ticket Trend</h3>
+            <p class='section-subtitle'>Ticket flow in a compact trend view.</p>
+          </div>
+          <span class='card-icon'>↗</span>
+        </div>
+        <div id='ticketTrend' class='chart-placeholder chart-panel'></div>
+      </article>
+      <article class='card'>
+        <div class='card-head'>
+          <div>
+            <h3 class='section-title'>System Health</h3>
+            <p class='section-subtitle'>LAN-only CPU and stability indicators.</p>
+          </div>
+          <span class='card-icon'>❤</span>
+        </div>
+        <div id='systemHealth' class='chart-placeholder chart-panel'></div>
+        <div id='systemHealthInsights' class='insight-grid'></div>
+      </article>
+    </section>
+
+    <section class='card' style='margin-top:16px'>
+      <div class='card-head'>
+        <div>
+          <h3 class='section-title'>User Access Management</h3>
+          <p class='section-subtitle'>Grant or revoke admin privileges with clear role visibility.</p>
+        </div>
+        <span class='card-icon'>👤</span>
+      </div>
+      <div class='table-wrap'>
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Email Verified</th><th>Action</th></tr></thead>
+          <tbody id='userRows'></tbody>
+        </table>
+      </div>
     </section>
   </main>
 </div>
-<script src='/js/app.js'></script><script src='/js/dashboard.js'></script>
+<script src='/js/admin-shell.js'></script><script src='/js/app.js'></script><script src='/js/dashboard.js'></script>
 </body></html>
