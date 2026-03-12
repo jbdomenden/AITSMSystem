@@ -11,7 +11,6 @@ import io.ktor.server.routing.*
 
 fun Route.monitoringRoutes(service: MonitoringService, deviceRepository: DeviceRepository) {
     route("/api/monitoring") {
-        // Client agents on the same LAN can post their current metrics.
         post("/client-metrics") {
             val remoteHost = call.request.local.remoteHost
             if (!isLanIp(remoteHost)) {
@@ -25,6 +24,23 @@ fun Route.monitoringRoutes(service: MonitoringService, deviceRepository: DeviceR
 
             val saved = deviceRepository.upsertClientMetrics(req)
             call.respond(HttpStatusCode.Accepted, saved)
+        }
+
+        get("/host-telemetry") {
+            if (!call.requireRole("admin")) return@get
+            call.respond(service.hostTelemetry())
+        }
+        get("/lan-devices") {
+            if (!call.requireRole("admin")) return@get
+            call.respond(service.lanDevices())
+        }
+        get("/summary") {
+            if (!call.requireRole("admin")) return@get
+            call.respond(service.summary())
+        }
+        post("/refresh-discovery") {
+            if (!call.requireRole("admin")) return@post
+            call.respond(service.refreshDiscovery())
         }
 
         get("/devices") {

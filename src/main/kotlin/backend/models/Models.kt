@@ -33,6 +33,13 @@ data class RegisterRequest(
 @Serializable data class ResendVerificationRequest(val email: String)
 @Serializable data class RoleUpdateRequest(val role: String)
 
+@Serializable data class AdminEligibilityRequest(val targetEmail: String)
+@Serializable data class AdminEligibilityResponse(val found: Boolean, val eligible: Boolean, val alreadyAdmin: Boolean, val targetUserId: Int? = null, val message: String)
+@Serializable data class AdminSensitiveVerifyRequest(val password: String)
+@Serializable data class AdminSensitiveVerifyResponse(val verified: Boolean, val verificationToken: String? = null, val expiresAt: String? = null, val message: String)
+@Serializable data class AdminGrantRequest(val targetEmail: String, val verificationToken: String)
+@Serializable data class AdminGrantResponse(val success: Boolean, val user: User? = null, val message: String)
+
 @Serializable
 data class Ticket(
     val id: Int,
@@ -69,6 +76,38 @@ data class Device(
 @Serializable data class DeviceRequest(val deviceName: String, val ipAddress: String, val department: String, val assignedUser: String, val status: String)
 @Serializable data class ClientMetricsRequest(val deviceName: String, val ipAddress: String, val department: String, val assignedUser: String, val cpuUsage: Int, val memoryUsage: Int, val status: String)
 
+@Serializable
+ data class HostTelemetryDto(
+    val cpuUsagePercent: Double,
+    val memoryUsagePercent: Double,
+    val totalMemoryBytes: Long,
+    val usedMemoryBytes: Long,
+    val hostname: String,
+    val ipAddress: String,
+    val timestamp: String
+)
+
+@Serializable
+ data class LanDeviceDto(
+    val id: String,
+    val hostname: String,
+    val ipAddress: String,
+    val reachable: Boolean,
+    val telemetryAvailable: Boolean,
+    val telemetrySourceType: String,
+    val cpuUsagePercent: Double? = null,
+    val memoryUsagePercent: Double? = null,
+    val lastSeen: String
+)
+
+@Serializable
+ data class MonitoringSummaryDto(
+    val totalDiscovered: Int,
+    val monitoredDevices: Int,
+    val telemetryAvailableDevices: Int,
+    val hostTelemetry: HostTelemetryDto,
+    val timestamp: String
+)
 
 @Serializable data class Notification(val id: Int, val userId: Int, val message: String, val type: String, val createdAt: String)
 @Serializable data class SLA(val id: Int, val priority: String, val responseTime: Int, val resolutionTime: Int)

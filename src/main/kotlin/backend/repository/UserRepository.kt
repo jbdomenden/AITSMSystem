@@ -88,6 +88,14 @@ class UserRepository {
         }
     }
 
+    fun findHashById(userId: Int): String? = transaction {
+        UsersTable.selectAll().where { UsersTable.id eq userId }.singleOrNull()?.get(UsersTable.passwordHash)
+    }
+
+    fun findByEmailOnly(email: String): User? = transaction {
+        UsersTable.selectAll().where { UsersTable.email eq email.lowercase() }.singleOrNull()?.let(::toUser)
+    }
+
     fun verifyEmail(email: String, code: String): User? = transaction {
         val row = UsersTable.selectAll().where { UsersTable.email eq email.lowercase() }.singleOrNull() ?: return@transaction null
         val expectedCode = row[UsersTable.verificationCode]
@@ -115,6 +123,14 @@ class UserRepository {
 
     fun listUsers(): List<User> = transaction {
         UsersTable.selectAll().orderBy(UsersTable.createdAt).map(::toUser)
+    }
+
+    fun updateRoleByEmail(email: String, role: String): User? = transaction {
+        val row = UsersTable.selectAll().where { UsersTable.email eq email.lowercase() }.singleOrNull() ?: return@transaction null
+        if (row[UsersTable.role] == "superadmin") return@transaction null
+
+        UsersTable.update({ UsersTable.id eq row[UsersTable.id] }) { it[UsersTable.role] = role }
+        UsersTable.selectAll().where { UsersTable.id eq row[UsersTable.id] }.singleOrNull()?.let(::toUser)
     }
 
     fun updateRole(userId: Int, role: String): User? = transaction {

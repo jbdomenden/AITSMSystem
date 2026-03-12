@@ -47,7 +47,10 @@
           <h3 class='section-title'>User Access Management</h3>
           <p class='section-subtitle'>Grant or revoke admin privileges with clear role visibility.</p>
         </div>
-        <span class='card-icon'>👤</span>
+        <div class='inline-actions'>
+          <button id='openAddAdminBtn' class='btn btn-primary'>Add Admin</button>
+          <span class='card-icon'>👤</span>
+        </div>
       </div>
       <div class='table-wrap'>
         <table>
@@ -56,6 +59,38 @@
         </table>
       </div>
     </section>
+
+    <div id='addAdminModal' class='modal-overlay hidden'>
+      <div class='modal-card'>
+        <div class='card-head'>
+          <div>
+            <h3 class='section-title'>Add Admin</h3>
+            <p class='section-subtitle'>Promote a verified end-user to admin access.</p>
+          </div>
+        </div>
+        <form id='addAdminEligibilityForm' class='form-grid single-col'>
+          <div class='form-group'>
+            <label for='adminTargetEmail'>Target user email</label>
+            <input id='adminTargetEmail' type='email' placeholder='user@company.com' required>
+          </div>
+          <div class='inline-actions'>
+            <button type='button' class='btn btn-ghost' onclick='closeAddAdminModal()'>Cancel</button>
+            <button type='submit' class='btn btn-primary'>Check eligibility</button>
+          </div>
+        </form>
+        <form id='addAdminVerifyForm' class='form-grid single-col hidden' style='margin-top:12px'>
+          <div class='form-group'>
+            <label for='adminVerifyPassword'>Verify your password</label>
+            <input id='adminVerifyPassword' type='password' placeholder='Enter your password' required>
+          </div>
+          <div class='inline-actions'>
+            <button type='button' class='btn btn-ghost' onclick='closeAddAdminModal()'>Cancel</button>
+            <button type='submit' class='btn btn-primary'>Verify & grant admin</button>
+          </div>
+        </form>
+        <p id='addAdminMessage' class='small' style='margin-top:12px'></p>
+      </div>
+    </div>
   </main>
 </div>
 <script src='/js/admin-shell.js'></script><script src='/js/app.js'></script><script src='/js/dashboard.js'></script>

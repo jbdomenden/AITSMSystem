@@ -1,5 +1,7 @@
 package backend.services
 
+import backend.models.AdminEligibilityResponse
+import backend.models.AdminGrantResponse
 import backend.models.AuthResponse
 import backend.models.LoginRequest
 import backend.models.RegisterRequest
@@ -9,12 +11,18 @@ import backend.repository.AuditRepository
 import backend.repository.UserRepository
 import backend.security.PasswordHasher
 import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Base64
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 class AuthService(
     private val userRepository: UserRepository,
     private val auditRepository: AuditRepository
 ) {
+    private data class SensitiveVerification(val userId: Int, val expiresAt: LocalDateTime)
+    private val sensitiveVerifications = ConcurrentHashMap<String, SensitiveVerification>()
+
     fun register(request: RegisterRequest): RegistrationResponse {
         require(request.password == request.confirmPassword) { "Passwords do not match." }
         require(request.eulaAccepted) { "EULA acceptance is required." }
@@ -71,12 +79,53 @@ class AuthService(
 
     fun updateUserRole(targetUserId: Int, role: String, actorUserId: Int?): User {
         require(role in setOf("admin", "end-user")) { "Unsupported role" }
+        if (role == "admin") error("Direct admin grant disabled. Use secure admin-grant flow.")
+
         val updated = userRepository.updateRole(targetUserId, role) ?: error("User not found or cannot be modified")
         auditRepository.log(actorUserId, "Updated role for user ${updated.email} to $role", "users")
         return updated
     }
 
-    private fun generateVerificationCode(): String = (100000..999999).random().toString()
+    fun adminGrantEligibility(targetEmail: String): AdminEligibilityResponse {
+        val user = userRepository.findByEmailOnly(targetEmail)
+            ?: return AdminEligibilityResponse(found = false, eligible = false, alreadyAdmin = false, message = "User not found")
 
+        if (user.role == "admin" || user.role == "superadmin") {
+            return AdminEligibilityResponse(found = true, eligible = false, alreadyAdmin = true, targetUserId = user.id, message = "Target already has admin rights")
+        }
+
+        return AdminEligibilityResponse(found = true, eligible = true, alreadyAdmin = false, targetUserId = user.id, message = "Target is eligible for admin role")
+    }
+
+    fun verifySensitiveAction(actorUserId: Int, password: String): Triple<Boolean, String?, String> {
+        val hash = userRepository.findHashById(actorUserId) ?: return Triple(false, null, "Acting admin not found")
+        if (!PasswordHasher.verify(password, hash)) return Triple(false, null, "Verification failed: password incorrect")
+
+        val token = UUID.randomUUID().toString()
+        val expiresAt = LocalDateTime.now().plusMinutes(3)
+        sensitiveVerifications[token] = SensitiveVerification(actorUserId, expiresAt)
+        return Triple(true, token, expiresAt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
+    }
+
+    fun grantAdminByEmail(targetEmail: String, actorUserId: Int, verificationToken: String): AdminGrantResponse {
+        val verified = sensitiveVerifications[verificationToken]
+        if (verified == null || verified.userId != actorUserId || verified.expiresAt.isBefore(LocalDateTime.now())) {
+            sensitiveVerifications.remove(verificationToken)
+            return AdminGrantResponse(false, null, "Sensitive-action verification expired or invalid")
+        }
+
+        val eligibility = adminGrantEligibility(targetEmail)
+        if (!eligibility.found) return AdminGrantResponse(false, null, "Target email not found")
+        if (!eligibility.eligible) return AdminGrantResponse(false, null, eligibility.message)
+
+        val updated = userRepository.updateRoleByEmail(targetEmail, "admin")
+            ?: return AdminGrantResponse(false, null, "Unable to grant admin role")
+
+        sensitiveVerifications.remove(verificationToken)
+        auditRepository.log(actorUserId, "Granted admin role to ${updated.email}", "users")
+        return AdminGrantResponse(true, updated, "Admin role granted successfully")
+    }
+
+    private fun generateVerificationCode(): String = (100000..999999).random().toString()
     private fun tokenFor(userId: Int, role: String): String = Base64.getEncoder().encodeToString("$userId:$role".toByteArray())
 }

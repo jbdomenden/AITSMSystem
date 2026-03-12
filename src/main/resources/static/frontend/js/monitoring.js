@@ -1,53 +1,47 @@
 function statusBadge(status) {
   const s = String(status || '').toLowerCase();
   if (s === 'critical') return 'open';
-  if (s === 'offline') return 'warning';
+  if (s === 'offline' || s === 'unavailable') return 'warning';
   return 'resolved';
 }
 
-function renderMonitorSummary(devices) {
-  const summary = document.getElementById('monitorSummary');
-  if (!summary) return;
-
-  const total = devices.length;
-  const online = devices.filter(d => String(d.status).toLowerCase() === 'online').length;
-  const offline = devices.filter(d => String(d.status).toLowerCase() === 'offline').length;
-  const avgCpu = Math.round(devices.reduce((acc, d) => acc + Number(d.cpuUsage || 0), 0) / (total || 1));
-
-  const chips = [
-    ['Total Devices', total],
-    ['Online', online],
-    ['Offline', offline],
-    ['Network Health', `${Math.max(0, 100 - avgCpu)}%`]
-  ];
-
-  summary.innerHTML = chips.map(([label, value]) => `<div class='kpi-chip'><div class='kpi-label'>${label}</div><div class='kpi-value'>${value}</div></div>`).join('');
+function telemetryBadge(device) {
+  if (device.telemetryAvailable) return `<span class='badge resolved'>${device.telemetrySourceType}</span>`;
+  return `<span class='badge warning'>UNAVAILABLE</span>`;
 }
 
-function renderMonitoringHealthPanel(devices) {
+function renderMonitorSummary(summary) {
+  const wrap = document.getElementById('monitorSummary');
+  if (!wrap) return;
+
+  const host = summary?.hostTelemetry || {};
+  const chips = [
+    ['Discovered Devices', summary?.totalDiscovered ?? 0],
+    ['Monitored Devices', summary?.monitoredDevices ?? 0],
+    ['Telemetry Available', summary?.telemetryAvailableDevices ?? 0],
+    ['Host CPU', `${Number(host.cpuUsagePercent ?? 0).toFixed(1)}%`]
+  ];
+
+  wrap.innerHTML = chips.map(([label, value]) => `<div class='kpi-chip'><div class='kpi-label'>${label}</div><div class='kpi-value'>${value}</div></div>`).join('');
+}
+
+function renderMonitoringHealthPanel(summary, devices) {
   const panel = document.getElementById('monitorHealthPanel');
   if (!panel) return;
 
-  if (!devices.length) {
-    panel.innerHTML = `
-      <div class='empty-state'>
-        <h3>No LAN telemetry yet</h3>
-        <p>Once LAN clients start reporting metrics, this panel will show scan freshness, health trends, and risk indicators.</p>
-        <button class='btn btn-primary' onclick='loadMonitoring()'>Retry Scan</button>
-      </div>`;
+  const host = summary?.hostTelemetry;
+  if (!host) {
+    panel.innerHTML = `<div class='empty-state'><h3>Monitoring unavailable</h3><p>Unable to load host telemetry right now.</p></div>`;
     return;
   }
 
-  const lastSeen = devices.map(d => d.lastSeen).filter(Boolean).sort().reverse()[0] || 'N/A';
-  const critical = devices.filter(d => String(d.status).toLowerCase() === 'critical').length;
-  const avgMem = Math.round(devices.reduce((acc, d) => acc + Number(d.memoryUsage || 0), 0) / devices.length);
-
+  const available = devices.filter(d => d.telemetryAvailable).length;
   panel.innerHTML = `
     <div class='insight-grid'>
-      <div class='insight-item'><div class='insight-label'>Last scan</div><div class='insight-value'>${lastSeen}</div></div>
-      <div class='insight-item'><div class='insight-label'>Critical devices</div><div class='insight-value'>${critical}</div></div>
-      <div class='insight-item'><div class='insight-label'>Average memory</div><div class='insight-value'>${avgMem}%</div></div>
-      <div class='insight-item'><div class='insight-label'>Monitoring mode</div><div class='insight-value'>LAN Only</div></div>
+      <div class='insight-item'><div class='insight-label'>Host</div><div class='insight-value'>${host.hostname}</div></div>
+      <div class='insight-item'><div class='insight-label'>Host Memory</div><div class='insight-value'>${Number(host.memoryUsagePercent ?? 0).toFixed(1)}%</div></div>
+      <div class='insight-item'><div class='insight-label'>Telemetry coverage</div><div class='insight-value'>${available}/${devices.length}</div></div>
+      <div class='insight-item'><div class='insight-label'>Last updated</div><div class='insight-value'>${summary.timestamp || host.timestamp || 'N/A'}</div></div>
     </div>`;
 }
 
@@ -56,17 +50,17 @@ function renderMonitorCards(devices) {
   if (!wrap) return;
 
   if (!devices.length) {
-    wrap.innerHTML = `<div class='empty-state'><h3>No LAN devices found</h3><p>Register assets or send LAN client metrics to populate real-time monitoring.</p><a href='/assets.html' class='btn btn-primary'>Open Asset Management</a></div>`;
+    wrap.innerHTML = `<div class='empty-state'><h3>No LAN devices found</h3><p>Run discovery refresh or wait for LAN telemetry ingestion from clients.</p><button class='btn btn-primary' onclick='refreshDiscovery()'>Refresh discovery</button></div>`;
     return;
   }
 
   wrap.innerHTML = devices.map(d => `
     <article class='card'>
-      <div class='card-head'><h3 class='section-title'>${d.deviceName}</h3><span class='badge ${statusBadge(d.status)}'>${d.status}</span></div>
-      <div class='small'>${d.ipAddress} • ${d.department} • ${d.assignedUser}</div>
+      <div class='card-head'><h3 class='section-title'>${d.hostname || d.ipAddress}</h3>${telemetryBadge(d)}</div>
+      <div class='small'>${d.ipAddress} • Reachable: ${d.reachable ? 'Yes' : 'No'}</div>
       <div class='insight-grid'>
-        <div class='insight-item'><div class='insight-label'>CPU</div><div class='insight-value'>${d.cpuUsage}%</div></div>
-        <div class='insight-item'><div class='insight-label'>Memory</div><div class='insight-value'>${d.memoryUsage}%</div></div>
+        <div class='insight-item'><div class='insight-label'>CPU</div><div class='insight-value'>${d.cpuUsagePercent != null ? `${Number(d.cpuUsagePercent).toFixed(1)}%` : 'N/A'}</div></div>
+        <div class='insight-item'><div class='insight-label'>Memory</div><div class='insight-value'>${d.memoryUsagePercent != null ? `${Number(d.memoryUsagePercent).toFixed(1)}%` : 'N/A'}</div></div>
       </div>
     </article>`).join('');
 }
@@ -76,29 +70,45 @@ function renderMonitorTable(devices) {
   if (!rows) return;
 
   if (!devices.length) {
-    rows.innerHTML = `<tr><td colspan='7' class='small'>No LAN devices available. Add assets or wait for client metrics ingestion.</td></tr>`;
+    rows.innerHTML = `<tr><td colspan='7' class='small'>No LAN devices discovered yet.</td></tr>`;
     return;
   }
 
   rows.innerHTML = devices.map(d => `<tr>
-    <td>${d.deviceName}</td>
+    <td>${d.hostname || '-'}</td>
     <td>${d.ipAddress}</td>
-    <td>${d.department}</td>
-    <td>${d.assignedUser}</td>
-    <td>${d.cpuUsage}%</td>
-    <td>${d.memoryUsage}%</td>
-    <td><span class='badge ${statusBadge(d.status)}'>${d.status}</span></td>
+    <td>${d.telemetrySourceType || '-'}</td>
+    <td>${d.reachable ? 'Online' : 'Offline'}</td>
+    <td>${d.cpuUsagePercent != null ? `${Number(d.cpuUsagePercent).toFixed(1)}%` : '-'}</td>
+    <td>${d.memoryUsagePercent != null ? `${Number(d.memoryUsagePercent).toFixed(1)}%` : '-'}</td>
+    <td><span class='badge ${statusBadge(d.telemetryAvailable ? 'online' : 'unavailable')}'>${d.telemetryAvailable ? 'Telemetry' : 'No telemetry'}</span></td>
   </tr>`).join('');
 }
 
-async function loadMonitoring() {
-  const devices = await fetch('/api/monitoring/devices', { headers: authHeaders() }).then(r => r.json());
-  const safe = Array.isArray(devices) ? devices : [];
+async function refreshDiscovery() {
+  const res = await fetch('/api/monitoring/refresh-discovery', { method: 'POST', headers: authHeaders() });
+  const data = await res.json();
+  if (!res.ok) {
+    alert(data.error || 'Failed to refresh discovery');
+    return;
+  }
+  await loadMonitoring();
+}
 
-  renderMonitorSummary(safe);
-  renderMonitoringHealthPanel(safe);
-  renderMonitorCards(safe);
-  renderMonitorTable(safe);
+async function loadMonitoring() {
+  const [summaryRes, devicesRes] = await Promise.all([
+    fetch('/api/monitoring/summary', { headers: authHeaders() }),
+    fetch('/api/monitoring/lan-devices', { headers: authHeaders() })
+  ]);
+
+  const summary = await summaryRes.json();
+  const devices = await devicesRes.json();
+  const safeDevices = Array.isArray(devices) ? devices : [];
+
+  renderMonitorSummary(summaryRes.ok ? summary : null);
+  renderMonitoringHealthPanel(summaryRes.ok ? summary : null, safeDevices);
+  renderMonitorCards(safeDevices);
+  renderMonitorTable(safeDevices);
 }
 
 async function registerDevice() {
@@ -127,4 +137,7 @@ async function loadDevices() {
     || `<tr><td colspan='3' class='small'>No devices registered yet.</td></tr>`;
 }
 
-document.addEventListener('DOMContentLoaded', () => { loadMonitoring(); loadDevices(); });
+document.addEventListener('DOMContentLoaded', () => {
+  loadMonitoring();
+  loadDevices();
+});

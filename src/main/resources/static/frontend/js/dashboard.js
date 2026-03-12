@@ -33,15 +33,49 @@ function renderHealthInsights(items) {
   el.innerHTML = safe.map(i => `<div class='insight-item'><div class='insight-label'>${Object.values(i)[0] || 'Insight'}</div><div class='insight-value'>${Object.values(i)[1] || '-'}</div></div>`).join('');
 }
 
+function setAddAdminMessage(message, tone = 'info') {
+  const el = document.getElementById('addAdminMessage');
+  if (!el) return;
+  el.textContent = message || '';
+  el.classList.remove('text-success', 'text-danger');
+  if (tone === 'success') el.classList.add('text-success');
+  if (tone === 'danger') el.classList.add('text-danger');
+}
+
+function openAddAdminModal() {
+  const modal = document.getElementById('addAdminModal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  modal.classList.add('show');
+  document.getElementById('adminTargetEmail')?.focus();
+  setAddAdminMessage('');
+}
+
+function closeAddAdminModal() {
+  const modal = document.getElementById('addAdminModal');
+  if (!modal) return;
+  modal.classList.remove('show');
+  modal.classList.add('hidden');
+
+  document.getElementById('addAdminEligibilityForm')?.reset();
+  document.getElementById('addAdminVerifyForm')?.reset();
+  document.getElementById('addAdminVerifyForm')?.classList.add('hidden');
+  document.getElementById('addAdminEligibilityForm')?.classList.remove('hidden');
+  window.__pendingTargetEmail = null;
+  setAddAdminMessage('');
+}
+
 async function loadAdminDashboard() {
   const summary = document.getElementById('summaryCards');
   if (!summary) return;
 
-  const [tickets, cpu, trends, health] = await Promise.all([
+const [tickets, cpu, trends, health, hostTelemetry, monitorSummary] = await Promise.all([
     fetch('/api/tickets', { headers: authHeaders() }).then(r => r.json()),
     fetch('/api/monitoring/cpu', { headers: authHeaders() }).then(r => r.json()),
     fetch('/api/analytics/ticket-trends', { headers: authHeaders() }).then(r => r.json()),
-    fetch('/api/analytics/system-health', { headers: authHeaders() }).then(r => r.json())
+    fetch('/api/analytics/system-health', { headers: authHeaders() }).then(r => r.json()),
+    fetch('/api/monitoring/host-telemetry', { headers: authHeaders() }).then(r => r.json()),
+    fetch('/api/monitoring/summary', { headers: authHeaders() }).then(r => r.json())
   ]);
 
   if (tickets.error || cpu.error || trends.error || health.error) {
@@ -52,13 +86,19 @@ async function loadAdminDashboard() {
     return;
   }
 
+  const hostCpu = Number(hostTelemetry.cpuUsagePercent ?? 0).toFixed(1);
+  const hostMem = Number(hostTelemetry.memoryUsagePercent ?? 0).toFixed(1);
+  const criticalAlerts = Array.isArray(cpu) ? cpu.filter(c => Number(c.cpu) > 85).length : 0;
+  const telemetryDevices = Number(monitorSummary.telemetryAvailableDevices ?? 0);
+
   const cards = [
     ['◧', 'Total Tickets', tickets.length, 'All incidents'],
     ['◍', 'Open', tickets.filter(t => t.status === 'Open').length, 'Awaiting action'],
     ['◔', 'In Progress', tickets.filter(t => t.status === 'In Progress').length, 'Currently handled'],
     ['✓', 'Resolved', tickets.filter(t => t.status === 'Resolved').length, 'Closed successfully'],
-    ['⚙', 'LAN CPU Avg', `${Math.round((cpu.reduce((a, c) => a + Number(c.cpu), 0) / (cpu.length || 1)) * 10) / 10}%`, 'LAN-only infrastructure load'],
-    ['⚠', 'Critical Alerts', cpu.filter(c => Number(c.cpu) > 85).length, 'Needs immediate attention']
+    ['⚙', 'Host CPU Usage', `${hostCpu}%`, `Host ${hostTelemetry.hostname || 'local'} (${hostTelemetry.ipAddress || 'n/a'})`],
+    ['🧠', 'Host Memory', `${hostMem}%`, `${telemetryDevices} telemetry-enabled devices`],
+    ['⚠', 'Critical Alerts', criticalAlerts, 'Needs immediate attention']
   ];
 
   summary.innerHTML = cards.map(([icon, label, value, hint]) => `
@@ -89,7 +129,7 @@ async function loadUsers() {
     const canChange = u.role !== 'superadmin';
     const action = u.role === 'admin'
       ? `<button class='btn btn-ghost' ${canChange ? '' : 'disabled'} onclick='changeRole(${u.id}, "end-user")'>Set End-User</button>`
-      : `<button class='btn btn-primary' ${canChange ? '' : 'disabled'} onclick='changeRole(${u.id}, "admin")'>Make Admin</button>`;
+      : `<button class='btn btn-primary' ${canChange ? '' : 'disabled'} onclick='openAddAdminModalFor("${u.email}")'>Make Admin</button>`;
 
     return `<tr>
       <td>${u.fullName}</td>
@@ -99,6 +139,12 @@ async function loadUsers() {
       <td>${action}</td>
     </tr>`;
   }).join('');
+}
+
+function openAddAdminModalFor(email) {
+  openAddAdminModal();
+  const input = document.getElementById('adminTargetEmail');
+  if (input) input.value = email || '';
 }
 
 async function changeRole(userId, role) {
@@ -112,7 +158,75 @@ async function changeRole(userId, role) {
   await loadUsers();
 }
 
+async function submitAdminEligibility(event) {
+  event.preventDefault();
+  const targetEmail = document.getElementById('adminTargetEmail')?.value?.trim();
+  if (!targetEmail) return;
+
+  setAddAdminMessage('Checking eligibility...');
+  const res = await fetch('/api/users/admin/eligibility', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ targetEmail })
+  });
+  const data = await res.json();
+
+  if (!res.ok || !data.eligible) {
+    setAddAdminMessage(data.message || data.error || 'Target is not eligible.', 'danger');
+    return;
+  }
+
+  window.__pendingTargetEmail = targetEmail;
+  document.getElementById('addAdminEligibilityForm')?.classList.add('hidden');
+  document.getElementById('addAdminVerifyForm')?.classList.remove('hidden');
+  setAddAdminMessage('Target eligible. Verify your own password to continue.');
+  document.getElementById('adminVerifyPassword')?.focus();
+}
+
+async function submitAdminVerifyAndGrant(event) {
+  event.preventDefault();
+  const password = document.getElementById('adminVerifyPassword')?.value || '';
+  const targetEmail = window.__pendingTargetEmail;
+  if (!targetEmail || !password) return;
+
+  setAddAdminMessage('Verifying acting admin...');
+  const verifyRes = await fetch('/api/users/admin/verify', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ password })
+  });
+  const verifyData = await verifyRes.json();
+  if (!verifyRes.ok || !verifyData.verified || !verifyData.verificationToken) {
+    setAddAdminMessage(verifyData.message || verifyData.error || 'Verification failed', 'danger');
+    return;
+  }
+
+  setAddAdminMessage('Granting admin role...');
+  const grantRes = await fetch('/api/users/admin/grant', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ targetEmail, verificationToken: verifyData.verificationToken })
+  });
+  const grantData = await grantRes.json();
+
+  if (!grantRes.ok || !grantData.success) {
+    setAddAdminMessage(grantData.message || grantData.error || 'Unable to grant admin role', 'danger');
+    return;
+  }
+
+  setAddAdminMessage(grantData.message || 'Admin role granted successfully', 'success');
+  await loadUsers();
+  setTimeout(() => closeAddAdminModal(), 900);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   loadAdminDashboard();
   loadUsers();
+
+  document.getElementById('openAddAdminBtn')?.addEventListener('click', openAddAdminModal);
+  document.getElementById('addAdminEligibilityForm')?.addEventListener('submit', submitAdminEligibility);
+  document.getElementById('addAdminVerifyForm')?.addEventListener('submit', submitAdminVerifyAndGrant);
+  document.getElementById('addAdminModal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'addAdminModal') closeAddAdminModal();
+  });
 });

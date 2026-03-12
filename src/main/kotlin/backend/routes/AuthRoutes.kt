@@ -1,5 +1,8 @@
 package backend.routes
 
+import backend.models.AdminEligibilityRequest
+import backend.models.AdminGrantRequest
+import backend.models.AdminSensitiveVerifyRequest
 import backend.models.LoginRequest
 import backend.models.RegisterRequest
 import backend.models.ResendVerificationRequest
@@ -47,6 +50,30 @@ fun Route.authRoutes(authService: AuthService) {
             val id = call.parameters["id"]?.toIntOrNull() ?: return@put call.respond(HttpStatusCode.BadRequest)
             val req = call.receive<RoleUpdateRequest>()
             call.respond(authService.updateUserRole(id, req.role, call.userId()))
+        }
+
+        route("/admin") {
+            post("/eligibility") {
+                if (!call.requireRole("admin")) return@post
+                val req = call.receive<AdminEligibilityRequest>()
+                call.respond(authService.adminGrantEligibility(req.targetEmail))
+            }
+            post("/verify") {
+                if (!call.requireRole("admin")) return@post
+                val actor = call.userId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+                val req = call.receive<AdminSensitiveVerifyRequest>()
+                val (ok, token, meta) = authService.verifySensitiveAction(actor, req.password)
+                if (!ok) return@post call.respond(HttpStatusCode.Forbidden, mapOf("verified" to false, "message" to meta))
+                call.respond(mapOf("verified" to true, "verificationToken" to token, "expiresAt" to meta, "message" to "Verification successful"))
+            }
+            post("/grant") {
+                if (!call.requireRole("admin")) return@post
+                val actor = call.userId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+                val req = call.receive<AdminGrantRequest>()
+                val result = authService.grantAdminByEmail(req.targetEmail, actor, req.verificationToken)
+                if (!result.success) return@post call.respond(HttpStatusCode.BadRequest, result)
+                call.respond(result)
+            }
         }
     }
 }

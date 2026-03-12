@@ -13,7 +13,7 @@
         <p class='page-subtitle'>Device health and utilization for clients connected to your internal network.</p>
       </div>
       <div class='inline-actions'>
-        <button class='btn btn-ghost' onclick='loadMonitoring()'>Refresh</button>
+        <button class='btn btn-ghost' onclick='refreshDiscovery()'>Refresh Discovery</button>
       </div>
     </div>
 
@@ -56,7 +56,7 @@
       </div>
       <div class='table-wrap'>
         <table>
-          <thead><tr><th>Device</th><th>IP Address</th><th>Department</th><th>Assigned User</th><th>CPU</th><th>Memory</th><th>Status</th></tr></thead>
+          <thead><tr><th>Device</th><th>IP Address</th><th>Telemetry Source</th><th>Reachability</th><th>CPU</th><th>Memory</th><th>Telemetry State</th></tr></thead>
           <tbody id='monitorTableRows'></tbody>
         </table>
       </div>
