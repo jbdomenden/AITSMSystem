@@ -84,7 +84,7 @@ fun Application.module() {
         staticResources("/", "static/frontend")
         authRoutes(authService)
         ticketRoutes(ticketService)
-        monitoringRoutes(monitoringService)
+        monitoringRoutes(monitoringService, deviceRepo)
         analyticsRoutes(ticketService, monitoringService, aiService)
         deviceRoutes(deviceRepo)
         notificationRoutes(notificationService)

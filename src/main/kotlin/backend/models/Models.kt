@@ -67,6 +67,8 @@ data class Device(
 )
 
 @Serializable data class DeviceRequest(val deviceName: String, val ipAddress: String, val department: String, val assignedUser: String, val status: String)
+@Serializable data class ClientMetricsRequest(val deviceName: String, val ipAddress: String, val department: String, val assignedUser: String, val cpuUsage: Int, val memoryUsage: Int, val status: String)
+
 
 @Serializable data class Notification(val id: Int, val userId: Int, val message: String, val type: String, val createdAt: String)
 @Serializable data class SLA(val id: Int, val priority: String, val responseTime: Int, val resolutionTime: Int)

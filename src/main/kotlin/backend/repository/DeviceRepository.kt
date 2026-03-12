@@ -1,6 +1,7 @@
 package backend.repository
 
 import backend.config.DevicesTable
+import backend.models.ClientMetricsRequest
 import backend.models.Device
 import backend.models.DeviceRequest
 import org.jetbrains.exposed.sql.ResultRow
@@ -30,6 +31,39 @@ class DeviceRepository {
     }
 
     fun list(): List<Device> = transaction { DevicesTable.selectAll().map(::toDevice) }
+
+
+    fun upsertClientMetrics(req: ClientMetricsRequest): Device = transaction {
+        require(privateNetworks.any { req.ipAddress.startsWith(it) }) { "Only LAN devices are monitorable." }
+
+        val existing = DevicesTable.selectAll().where { DevicesTable.ipAddress eq req.ipAddress }.singleOrNull()
+        if (existing == null) {
+            val id = DevicesTable.insert {
+                it[deviceName] = req.deviceName
+                it[ipAddress] = req.ipAddress
+                it[department] = req.department
+                it[assignedUser] = req.assignedUser
+                it[cpuUsage] = req.cpuUsage.coerceIn(0, 100)
+                it[memoryUsage] = req.memoryUsage.coerceIn(0, 100)
+                it[status] = req.status
+                it[lastSeen] = LocalDateTime.now()
+            }[DevicesTable.id]
+            return@transaction list().first { it.id == id }
+        }
+
+        DevicesTable.update({ DevicesTable.id eq existing[DevicesTable.id] }) {
+            it[deviceName] = req.deviceName
+            it[department] = req.department
+            it[assignedUser] = req.assignedUser
+            it[cpuUsage] = req.cpuUsage.coerceIn(0, 100)
+            it[memoryUsage] = req.memoryUsage.coerceIn(0, 100)
+            it[status] = req.status
+            it[lastSeen] = LocalDateTime.now()
+        }
+
+        DevicesTable.selectAll().where { DevicesTable.id eq existing[DevicesTable.id] }.single().let(::toDevice)
+    }
+
 
     fun update(id: Int, req: DeviceRequest): Device? = transaction {
         require(privateNetworks.any { req.ipAddress.startsWith(it) }) { "Only LAN devices are monitorable." }

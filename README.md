@@ -68,3 +68,26 @@ End-user sign up now requires email verification before first login.
 ## Admin role management
 
 Admins and superadmins can manage user roles from the Admin Dashboard (User Access Management) or via API: `PUT /api/users/{id}/role` with role `admin` or `end-user`.
+
+
+## LAN client metrics ingestion
+
+Admins can see CPU analytics based on real LAN client reports.
+
+- Clients post metrics to `POST /api/monitoring/client-metrics` from the same LAN only.
+- The endpoint accepts device metadata + CPU/memory values and upserts by LAN IP.
+- Admin analytics (`/api/monitoring/cpu`, `/api/analytics/system-health`) use these stored LAN metrics.
+
+Example payload:
+
+```json
+{
+  "deviceName": "Client-PC-01",
+  "ipAddress": "192.168.1.24",
+  "department": "Finance",
+  "assignedUser": "alice",
+  "cpuUsage": 58,
+  "memoryUsage": 72,
+  "status": "Online"
+}
+```
