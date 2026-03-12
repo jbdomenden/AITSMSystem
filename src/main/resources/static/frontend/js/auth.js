@@ -1,3 +1,8 @@
+function saveSession(data) {
+  localStorage.setItem('userId', data.user.id);
+  localStorage.setItem('role', data.user.role);
+}
+
 async function signup() {
   const body = {
     fullName: fullName.value.trim(),
@@ -9,12 +14,17 @@ async function signup() {
     eulaAccepted: eula.checked
   };
   if (!body.eulaAccepted) return alert('Please accept the EULA to continue registration.');
-  const res = await fetch('/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
+  const res = await fetch('/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
   const data = await res.json();
   if (!res.ok) return alert(data.error || 'Registration failed');
-  localStorage.setItem('userId', data.user.id);
-  localStorage.setItem('role', data.user.role);
-  location.href = data.user.role === 'admin' ? '/dashboard-admin.html' : '/dashboard-user.html';
+
+  saveSession(data);
+  location.href = '/dashboard-user.html';
 }
 
 async function login() {
@@ -25,7 +35,8 @@ async function login() {
   });
   const data = await res.json();
   if (!res.ok) return alert(data.error || 'Login failed');
-  localStorage.setItem('userId', data.user.id);
-  localStorage.setItem('role', data.user.role);
-  location.href = data.user.role === 'admin' ? '/dashboard-admin.html' : '/dashboard-user.html';
+
+
+  saveSession(data);
+  location.href = ['admin', 'superadmin'].includes(data.user.role) ? '/dashboard-admin.html' : '/dashboard-user.html';
 }

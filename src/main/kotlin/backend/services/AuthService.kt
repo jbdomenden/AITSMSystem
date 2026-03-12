@@ -15,7 +15,7 @@ class AuthService(
     fun register(request: RegisterRequest): AuthResponse {
         require(request.password == request.confirmPassword) { "Passwords do not match." }
         require(request.eulaAccepted) { "EULA acceptance is required." }
-        val user = userRepository.create(request, PasswordHasher.hash(request.password))
+        val user = userRepository.create(request, PasswordHasher.hash(request.password), role = "end-user")
         auditRepository.log(user.id, "User registration", "users")
         return AuthResponse(token = tokenFor(user.id, user.role), user = user)
     }

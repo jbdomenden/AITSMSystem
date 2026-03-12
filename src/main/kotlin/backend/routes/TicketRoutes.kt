@@ -2,6 +2,7 @@ package backend.routes
 
 import backend.models.TicketRequest
 import backend.models.TicketStatusUpdate
+import backend.security.requireRole
 import backend.security.userId
 import backend.security.userRole
 import backend.services.TicketService
@@ -14,12 +15,13 @@ import io.ktor.server.routing.*
 fun Route.ticketRoutes(ticketService: TicketService) {
     route("/api/tickets") {
         post {
+            if (!call.requireRole("end-user")) return@post
             val userId = call.userId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             call.respond(HttpStatusCode.Created, ticketService.create(userId, call.receive<TicketRequest>()))
         }
         get {
             val uid = call.userId()
-            val admin = call.userRole() == "admin"
+            val admin = setOf("admin", "superadmin").contains(call.userRole())
             call.respond(ticketService.list(uid, admin))
         }
         get("/{id}") {

@@ -8,6 +8,7 @@ import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.update
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.LocalDateTime
 
@@ -30,6 +31,38 @@ class UserRepository {
             it[acceptedAt] = now
         }
         findById(id)!!
+    }
+
+
+
+    fun ensureSuperAdmin(
+        email: String,
+        passwordHash: String,
+        fullName: String = "System Super Admin",
+        company: String = "AITSM",
+        department: String = "Platform"
+    ): User = transaction {
+        val existing = UsersTable.selectAll().where { UsersTable.email eq email }.singleOrNull()
+        if (existing == null) {
+            val now = LocalDateTime.now()
+            val id = UsersTable.insert {
+                it[UsersTable.fullName] = fullName
+                it[UsersTable.email] = email
+                it[UsersTable.company] = company
+                it[UsersTable.department] = department
+                it[UsersTable.passwordHash] = passwordHash
+                it[UsersTable.role] = "superadmin"
+                it[UsersTable.createdAt] = now
+            }[UsersTable.id]
+            return@transaction findById(id)!!
+        }
+
+        val userId = existing[UsersTable.id]
+        UsersTable.update({ UsersTable.id eq userId }) {
+            it[UsersTable.passwordHash] = passwordHash
+            it[UsersTable.role] = "superadmin"
+        }
+        findById(userId)!!
     }
 
     fun findByEmail(email: String): Pair<User, String>? = transaction {
