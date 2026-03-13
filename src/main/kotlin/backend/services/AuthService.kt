@@ -4,6 +4,7 @@ import backend.models.AdminEligibilityResponse
 import backend.models.AdminGrantResponse
 import backend.models.AuthResponse
 import backend.models.LoginRequest
+import backend.models.ProfileUpdateRequest
 import backend.models.RegisterRequest
 import backend.models.RegistrationResponse
 import backend.models.User
@@ -47,25 +48,27 @@ class AuthService(
     }
 
     fun verifyEmail(email: String, code: String): AuthResponse {
-        val user = userRepository.verifyEmail(email, code) ?: error("Invalid or expired verification code")
+        val user = userRepository.verifyEmail(email.trim(), code.trim()) ?: error("Invalid or expired verification code")
         auditRepository.log(user.id, "Email verified", "users")
         return AuthResponse(token = tokenFor(user.id, user.role), user = user)
     }
 
     fun resendVerification(email: String): RegistrationResponse {
+        val normalizedEmail = email.trim()
         val code = generateVerificationCode()
-        val updated = userRepository.regenerateVerificationCode(email, code, LocalDateTime.now().plusMinutes(15))
+        val updated = userRepository.regenerateVerificationCode(normalizedEmail, code, LocalDateTime.now().plusMinutes(15))
         require(updated) { "Unable to resend verification code. Email may already be verified or missing." }
 
         return RegistrationResponse(
             message = "Verification code regenerated.",
-            email = email.lowercase(),
+            email = normalizedEmail.lowercase(),
             devVerificationCode = code
         )
     }
 
     fun login(request: LoginRequest): AuthResponse {
-        val (user, hash) = userRepository.findByEmail(request.email) ?: error("Invalid credentials")
+        val normalizedEmail = request.email.trim()
+        val (user, hash) = userRepository.findByEmail(normalizedEmail) ?: error("Invalid credentials")
         require(PasswordHasher.verify(request.password, hash)) { "Invalid credentials" }
         require(user.emailVerified || user.role == "admin" || user.role == "superadmin") {
             "Please verify your email before logging in."
@@ -76,6 +79,36 @@ class AuthService(
     }
 
     fun listUsers(): List<User> = userRepository.listUsers()
+
+    fun currentUser(userId: Int): User = userRepository.findById(userId) ?: error("User not found")
+
+    fun updateOwnProfile(userId: Int, req: ProfileUpdateRequest): User {
+        require(req.fullName.isNotBlank()) { "Full name is required" }
+        require(req.company.isNotBlank()) { "Company is required" }
+        require(req.department.isNotBlank()) { "Department is required" }
+
+        val updated = userRepository.updateProfile(userId, req.fullName.trim(), req.company.trim(), req.department.trim())
+            ?: error("Unable to update profile")
+        auditRepository.log(userId, "Updated own profile", "users")
+        return updated
+    }
+
+    fun resetUserPassword(targetUserId: Int, newPassword: String, confirmPassword: String, actorUserId: Int?): User {
+        require(newPassword == confirmPassword) { "Passwords do not match" }
+        require(newPassword.length >= 8) { "Password must be at least 8 characters" }
+
+        val updated = userRepository.updatePassword(targetUserId, PasswordHasher.hash(newPassword))
+            ?: error("User not found or cannot be modified")
+        auditRepository.log(actorUserId, "Reset password for ${updated.email}", "users")
+        return updated
+    }
+
+    fun deleteUserAccount(targetUserId: Int, actorUserId: Int?): User {
+        require(actorUserId != targetUserId) { "You cannot delete your own account" }
+        val deleted = userRepository.deleteUser(targetUserId) ?: error("User not found or cannot be deleted")
+        auditRepository.log(actorUserId, "Deleted user ${deleted.email}", "users")
+        return deleted
+    }
 
     fun updateUserRole(targetUserId: Int, role: String, actorUserId: Int?): User {
         require(role in setOf("admin", "end-user")) { "Unsupported role" }
