@@ -33,6 +33,9 @@ data class RegisterRequest(
 @Serializable data class ResendVerificationRequest(val email: String)
 @Serializable data class RoleUpdateRequest(val role: String)
 
+@Serializable data class ProfileUpdateRequest(val fullName: String, val company: String, val department: String)
+@Serializable data class PasswordResetRequest(val newPassword: String, val confirmPassword: String)
+@Serializable data class EmailVerificationUpdateRequest(val emailVerified: Boolean)
 @Serializable data class AdminEligibilityRequest(val targetEmail: String)
 @Serializable data class AdminEligibilityResponse(val found: Boolean, val eligible: Boolean, val alreadyAdmin: Boolean, val targetUserId: Int? = null, val message: String)
 @Serializable data class AdminSensitiveVerifyRequest(val password: String)
