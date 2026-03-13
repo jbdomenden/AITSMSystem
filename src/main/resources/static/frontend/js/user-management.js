@@ -16,6 +16,22 @@ async function changeRoleFromUserManagement(userId, role) {
   await loadUserManagement();
 }
 
+
+async function setEmailVerificationFromUserManagement(userId, email, emailVerified) {
+  const action = emailVerified ? 'mark as verified' : 'mark as unverified';
+  const confirmed = confirm(`Are you sure you want to ${action} for ${email}?`);
+  if (!confirmed) return;
+
+  const res = await fetch(`/api/users/${userId}/email-verification`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({ emailVerified })
+  });
+  const data = await res.json();
+  if (!res.ok) return alert(data.error || 'Unable to update email verification');
+  await loadUserManagement();
+}
+
 async function resetUserPasswordFromUserManagement(userId, email) {
   const newPassword = prompt(`Set a temporary password for ${email}:`);
   if (!newPassword) return;
@@ -86,6 +102,9 @@ async function loadUserManagement() {
       const roleBtn = u.role === 'admin'
         ? `<button class='btn btn-ghost' ${canChange ? '' : 'disabled'} onclick='changeRoleFromUserManagement(${u.id}, "end-user")'>Set End-User</button>`
         : `<button class='btn btn-primary' ${canChange ? '' : 'disabled'} onclick='openAddAdminFromUserManagement("${u.email}")'>Make Admin</button>`;
+      const verificationBtn = u.emailVerified
+        ? `<button class='btn btn-ghost' ${canChange ? '' : 'disabled'} onclick='setEmailVerificationFromUserManagement(${u.id}, "${u.email}", false)'>Set Unverified</button>`
+        : `<button class='btn btn-primary' ${canChange ? '' : 'disabled'} onclick='setEmailVerificationFromUserManagement(${u.id}, "${u.email}", true)'>Set Verified</button>`;
       const resetBtn = `<button class='btn btn-ghost' ${canChange ? '' : 'disabled'} onclick='resetUserPasswordFromUserManagement(${u.id}, "${u.email}")'>Reset Password</button>`;
       const deleteBtn = `<button class='btn btn-ghost' ${canChange ? '' : 'disabled'} onclick='deleteUserFromUserManagement(${u.id}, "${u.email}")'>Delete</button>`;
 
@@ -94,7 +113,7 @@ async function loadUserManagement() {
         <td>${u.email}</td>
         <td><span class='badge ${u.role === 'admin' || u.role === 'superadmin' ? 'in-progress' : 'resolved'}'>${u.role}</span></td>
         <td>${u.emailVerified ? '<span class="badge resolved">Verified</span>' : '<span class="badge warning">Pending</span>'}</td>
-        <td><div class='inline-actions'>${roleBtn}${resetBtn}${deleteBtn}</div></td>
+        <td><div class='inline-actions'>${roleBtn}${verificationBtn}${resetBtn}${deleteBtn}</div></td>
       </tr>`;
     }).join('');
   } catch (error) {

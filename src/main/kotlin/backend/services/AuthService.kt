@@ -91,6 +91,13 @@ class AuthService(
         return updated
     }
 
+    fun updateUserEmailVerification(targetUserId: Int, emailVerified: Boolean, actorUserId: Int?): User {
+        val updated = userRepository.updateEmailVerified(targetUserId, emailVerified)
+            ?: error("User not found")
+        auditRepository.log(actorUserId, "Set email verification for ${updated.email} to $emailVerified", "users")
+        return updated
+    }
+
     fun resetUserPassword(targetUserId: Int, newPassword: String, confirmPassword: String, actorUserId: Int?): User {
         require(newPassword == confirmPassword) { "Passwords do not match" }
         require(newPassword.length >= 8) { "Password must be at least 8 characters" }
