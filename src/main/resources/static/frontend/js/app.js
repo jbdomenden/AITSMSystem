@@ -51,3 +51,50 @@ document.addEventListener('DOMContentLoaded', () => {
   enforcePageAccess();
   markActiveNav();
 });
+
+
+function ensureAppAlertModal() {
+  if (document.getElementById('appAlertModal')) return;
+  const modal = document.createElement('div');
+  modal.id = 'appAlertModal';
+  modal.className = 'modal-overlay hidden';
+  modal.innerHTML = `
+    <div class='modal-card app-alert-card'>
+      <div class='card-head'>
+        <h3 class='section-title'>Notice</h3>
+      </div>
+      <p id='appAlertMessage' class='small app-alert-message'></p>
+      <div class='inline-actions' style='justify-content:flex-end'>
+        <button id='appAlertOkBtn' class='btn btn-primary' type='button'>OK</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  document.getElementById('appAlertOkBtn')?.addEventListener('click', closeAppAlert);
+  modal.addEventListener('click', (event) => {
+    if (event.target?.id === 'appAlertModal') closeAppAlert();
+  });
+}
+
+function showAppAlert(message) {
+  ensureAppAlertModal();
+  const modal = document.getElementById('appAlertModal');
+  const messageEl = document.getElementById('appAlertMessage');
+  if (messageEl) messageEl.textContent = String(message ?? '');
+  modal?.classList.remove('hidden');
+  modal?.classList.add('show');
+  document.getElementById('appAlertOkBtn')?.focus();
+}
+
+function closeAppAlert() {
+  const modal = document.getElementById('appAlertModal');
+  modal?.classList.remove('show');
+  modal?.classList.add('hidden');
+}
+
+if (!window.__aitsmAlertPatched) {
+  window.__aitsmAlertPatched = true;
+  window.alert = (message = '') => {
+    showAppAlert(message);
+  };
+}

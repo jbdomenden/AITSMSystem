@@ -83,7 +83,8 @@ async function loadUserManagement() {
   try {
     const users = await fetchJsonOrThrow('/api/users');
     rows.innerHTML = users.map(u => {
-      const canChange = u.role !== 'superadmin';
+      const currentUserId = Number(localStorage.getItem('userId') || 0);
+      const canChange = u.role !== 'superadmin' && u.id !== currentUserId;
       const roleBtn = u.role === 'admin'
         ? `<button class='btn btn-ghost' ${canChange ? '' : 'disabled'} onclick='changeRoleFromUserManagement(${u.id}, "end-user")'>Set End-User</button>`
         : `<button class='btn btn-primary' ${canChange ? '' : 'disabled'} onclick='openAddAdminFromUserManagement("${u.email}")'>Make Admin</button>`;
