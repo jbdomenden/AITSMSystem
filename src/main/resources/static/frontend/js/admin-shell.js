@@ -7,7 +7,8 @@ function adminNavItems() {
       { page: 'knowledge.html', href: '/knowledge.html', icon: '📚', label: 'Knowledge Base' }
     ]},
     { section: 'System', items: [
-      { page: 'settings.html', href: '/settings.html', icon: '⚙', label: 'Settings' }
+      { page: 'settings.html', href: '/settings.html', icon: '⚙', label: 'Settings' },
+      { page: 'user-management.html', href: '/user-management.html', icon: '👥', label: 'User Management' }
     ]}
   ];
 }
