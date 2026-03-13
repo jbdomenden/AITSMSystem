@@ -354,9 +354,12 @@ async function loadUsers() {
     const users = await fetchJsonOrThrow('/api/users');
     rows.innerHTML = users.map(u => {
       const canChange = u.role !== 'superadmin';
-      const action = u.role === 'admin'
+      const roleBtn = u.role === 'admin'
         ? `<button class='btn btn-ghost' ${canChange ? '' : 'disabled'} onclick='changeRole(${u.id}, "end-user")'>Set End-User</button>`
         : `<button class='btn btn-primary' ${canChange ? '' : 'disabled'} onclick='openAddAdminModalFor("${u.email}")'>Make Admin</button>`;
+      const resetBtn = `<button class='btn btn-ghost' ${canChange ? '' : 'disabled'} onclick='resetUserPassword(${u.id}, "${u.email}")'>Reset Password</button>`;
+      const deleteBtn = `<button class='btn btn-ghost' ${canChange ? '' : 'disabled'} onclick='deleteUserAccount(${u.id}, "${u.email}")'>Delete</button>`;
+      const action = `<div class='inline-actions'>${roleBtn}${resetBtn}${deleteBtn}</div>`;
 
       return `<tr>
         <td>${u.fullName}</td>
@@ -461,3 +464,35 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target.id === 'addAdminModal') closeAddAdminModal();
   });
 });
+
+
+async function resetUserPassword(userId, email) {
+  const newPassword = prompt(`Set a temporary password for ${email}:`);
+  if (!newPassword) return;
+  const confirmPassword = prompt('Confirm the temporary password:');
+  if (confirmPassword == null) return;
+
+  const res = await fetch(`/api/users/${userId}/reset-password`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({ newPassword, confirmPassword })
+  });
+  const data = await res.json();
+  if (!res.ok) return alert(data.error || 'Unable to reset password');
+  alert(data.message || 'Password reset successful');
+}
+
+async function deleteUserAccount(userId, email) {
+  const confirmed = confirm(`Delete account ${email}? This also removes the user tickets and notifications.`);
+  if (!confirmed) return;
+
+  const res = await fetch(`/api/users/${userId}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  });
+  const data = await res.json();
+  if (!res.ok) return alert(data.error || 'Unable to delete user');
+
+  alert(data.message || 'User deleted');
+  await Promise.all([loadUsers(), loadAdminDashboard()]);
+}

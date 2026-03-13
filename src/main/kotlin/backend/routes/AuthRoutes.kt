@@ -4,6 +4,8 @@ import backend.models.AdminEligibilityRequest
 import backend.models.AdminGrantRequest
 import backend.models.AdminSensitiveVerifyRequest
 import backend.models.LoginRequest
+import backend.models.PasswordResetRequest
+import backend.models.ProfileUpdateRequest
 import backend.models.RegisterRequest
 import backend.models.ResendVerificationRequest
 import backend.models.RoleUpdateRequest
@@ -41,6 +43,16 @@ fun Route.authRoutes(authService: AuthService) {
     }
 
     route("/api/users") {
+        get("/me") {
+            val actor = call.userId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
+            call.respond(authService.currentUser(actor))
+        }
+        put("/me") {
+            val actor = call.userId() ?: return@put call.respond(HttpStatusCode.Unauthorized)
+            val req = call.receive<ProfileUpdateRequest>()
+            call.respond(authService.updateOwnProfile(actor, req))
+        }
+
         get {
             if (!call.requireRole("admin")) return@get
             call.respond(authService.listUsers())
@@ -50,6 +62,19 @@ fun Route.authRoutes(authService: AuthService) {
             val id = call.parameters["id"]?.toIntOrNull() ?: return@put call.respond(HttpStatusCode.BadRequest)
             val req = call.receive<RoleUpdateRequest>()
             call.respond(authService.updateUserRole(id, req.role, call.userId()))
+        }
+        put("/{id}/reset-password") {
+            if (!call.requireRole("admin")) return@put
+            val id = call.parameters["id"]?.toIntOrNull() ?: return@put call.respond(HttpStatusCode.BadRequest)
+            val req = call.receive<PasswordResetRequest>()
+            val updated = authService.resetUserPassword(id, req.newPassword, req.confirmPassword, call.userId())
+            call.respond(mapOf("message" to "Password reset successful", "user" to updated))
+        }
+        delete("/{id}") {
+            if (!call.requireRole("admin")) return@delete
+            val id = call.parameters["id"]?.toIntOrNull() ?: return@delete call.respond(HttpStatusCode.BadRequest)
+            val deleted = authService.deleteUserAccount(id, call.userId())
+            call.respond(mapOf("message" to "User deleted", "user" to deleted))
         }
 
         route("/admin") {

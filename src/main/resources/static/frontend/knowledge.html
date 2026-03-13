@@ -1,16 +1,52 @@
 <!doctype html>
-<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Knowledge Base | AITSM</title><link rel='stylesheet' href='/css/styles.css'></head>
+<html>
+<head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Knowledge Base | AITSM</title><link rel='stylesheet' href='/css/styles.css'></head>
 <body>
 <div class='app-layout'>
-  <aside class='sidebar'><div class='brand'>AITSM</div><nav class='nav-group'>
-    <a class='nav-item' data-page='dashboard-admin.html' href='/dashboard-admin.html'>Dashboard</a>
-    <a class='nav-item' data-page='knowledge.html' href='/knowledge.html'>Knowledge Base</a>
-  </nav></aside>
+  <aside id='adminSidebar' class='sidebar'></aside>
   <main class='content'>
-    <div class='topbar'><div><h1 class='page-title'>Knowledge Base</h1><p class='page-subtitle'>FAQ, troubleshooting guides, and AI-suggested references.</p></div></div>
-    <section class='card'><input id='search' placeholder='Search knowledge articles...' oninput='loadKnowledge()'></section>
+    <section id='utilityHeader' class='utility-bar card'></section>
+
+    <div class='topbar'>
+      <div>
+        <h1 class='page-title'>Knowledge Base</h1>
+        <p class='page-subtitle'>FAQ, troubleshooting guides, and searchable references from backend articles.</p>
+      </div>
+    </div>
+
+    <section class='card'>
+      <div class='form-grid'>
+        <div class='form-group'>
+          <label>Search articles</label>
+          <input id='search' placeholder='Search knowledge articles...' oninput='loadKnowledge()'>
+        </div>
+        <div class='form-group'>
+          <label>Category filter</label>
+          <select id='knowledgeCategory' onchange='loadKnowledge()'>
+            <option value=''>All Categories</option>
+            <option>Hardware</option>
+            <option>Software</option>
+            <option>Network</option>
+            <option>Security</option>
+            <option>Database</option>
+            <option>General</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
     <section id='knowledgeCards' class='grid stats' style='margin-top:16px'></section>
+
+    <section class='card' style='margin-top:16px'>
+      <div class='card-head'><h3 class='section-title'>Create Article</h3></div>
+      <div class='form-grid'>
+        <div class='form-group'><label>Title</label><input id='articleTitle'></div>
+        <div class='form-group'><label>Category</label><input id='articleCategory' placeholder='General'></div>
+        <div class='form-group' style='grid-column:1/-1'><label>Content</label><textarea id='articleContent' placeholder='Write article content'></textarea></div>
+      </div>
+      <div class='inline-actions' style='margin-top:12px'><button class='btn btn-primary' onclick='createArticle()'>Publish Article</button></div>
+    </section>
   </main>
 </div>
-<script src='/js/app.js'></script><script src='/js/dashboard.js'></script>
+<script src='/js/admin-shell.js'></script><script src='/js/app.js'></script><script src='/js/knowledge.js'></script>
 </body></html>
