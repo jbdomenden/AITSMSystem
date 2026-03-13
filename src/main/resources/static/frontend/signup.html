@@ -6,14 +6,14 @@
   <title>End-User Sign Up | AITSM</title>
   <link rel='stylesheet' href='/css/styles.css'>
 </head>
-<body class='auth-shell'>
-<section class='card auth-card'>
-  <p class='eyebrow'>End-User Portal</p>
-  <h2>Create your ticketing account</h2>
-  <p class='page-subtitle'>Self-registration is available for end users only. Admin accounts are provisioned by system owners.</p>
+<body class='auth-shell auth-dark'>
+<section class='auth-panel auth-panel-wide'>
+  <p class='eyebrow auth-eyebrow'>End-User Portal</p>
+  <h2 class='auth-heading'>Create your ticketing account</h2>
+  <p class='auth-subtitle auth-subtitle-left'>Self-registration is available for end users only. Admin accounts are provisioned by system owners.</p>
 
   <div id='registrationStep'>
-    <div class='form-grid'>
+    <div class='form-grid signup-grid'>
       <div class='form-group'><label>Full Name</label><input id='fullName'></div>
       <div class='form-group'><label>Email Address</label><input id='email' type='email'></div>
       <div class='form-group'><label>Company</label><input id='company'></div>
@@ -21,25 +21,53 @@
       <div class='form-group'><label>Password</label><input id='password' type='password'></div>
       <div class='form-group'><label>Confirm Password</label><input id='confirmPassword' type='password'></div>
     </div>
-    <h4>EULA</h4>
-    <div class='eula-box'>By using AITSM, you agree to enterprise IT service terms, audit logging, and security controls required for managed support workflows.</div>
-    <label style='display:flex;gap:8px;margin-top:12px'><input id='eula' type='checkbox' style='width:auto'> I have read and agree to the End-User License Agreement.</label>
-    <div class='inline-actions' style='margin-top:14px'><button class='btn btn-primary' onclick='signup()'>Register End-User Account</button></div>
+
+    <div class='signup-eula-wrap'>
+      <input id='eula' type='checkbox' aria-label='I agree to the End-User License Agreement'>
+      <button type='button' class='eula-link-btn' onclick='openEulaModal()'>I have read and agree to the End-User License Agreement.</button>
+    </div>
+
+    <div class='inline-actions auth-actions'><button class='btn btn-primary auth-login-btn' onclick='signup()'>Register End-User Account</button></div>
+    <p class='small auth-links'>Already have an account? <a href='/login.html' class='text-primary'>Back to login</a>.</p>
   </div>
 
   <div id='verificationStep' style='display:none'>
-    <h3>Email Verification</h3>
+    <h3 class='auth-section-title'>Email Verification</h3>
     <p class='small'>Enter the verification code sent to your email address.</p>
-    <div class='form-grid' style='grid-template-columns:1fr'>
+    <div class='form-grid signup-grid'>
       <div class='form-group'><label>Email</label><input id='verifyEmail' type='email'></div>
       <div class='form-group'><label>Verification Code</label><input id='verificationCode' maxlength='6' placeholder='6-digit code'></div>
     </div>
-    <div class='inline-actions'>
-      <button class='btn btn-ghost' onclick='resendVerificationCode()'>Resend Code</button>
-      <button class='btn btn-primary' onclick='verifyEmailCode()'>Verify & Continue</button>
+    <div class='inline-actions auth-actions'>
+      <button class='btn btn-ghost auth-ghost-btn' onclick='resendVerificationCode()'>Resend Code</button>
+      <button class='btn btn-primary auth-login-btn' onclick='verifyEmailCode()'>Verify & Continue</button>
     </div>
   </div>
 </section>
+
+<div id='eulaModal' class='modal-overlay hidden' onclick='closeEulaModalOnOverlay(event)'>
+  <section class='modal-card eula-modal-card'>
+    <div class='eula-modal-head'>
+      <p class='eyebrow eula-modal-eyebrow'>Legal Agreement</p>
+      <h3 class='section-title'>End-User License Agreement (EULA)</h3>
+      <p class='small eula-modal-subtitle'>Please review these terms before completing your registration.</p>
+    </div>
+    <div class='eula-box'>
+      <ul class='eula-points'>
+        <li>By using AITSM, you agree to enterprise IT service terms, audit logging, and security controls required for managed support workflows.</li>
+        <li>You confirm that submitted account details are accurate and belong to your organization.</li>
+        <li>You consent to operational logs and service telemetry being collected for troubleshooting, incident response, and compliance reporting.</li>
+        <li>Access may be suspended for misuse, unauthorized access attempts, or policy violations.</li>
+      </ul>
+    </div>
+    <div class='eula-modal-actions'>
+      <button class='btn btn-ghost auth-ghost-btn' type='button' onclick='closeEulaModal()'>Close</button>
+      <button class='btn btn-primary' type='button' onclick='acceptEulaFromModal()'>I Agree</button>
+    </div>
+  </section>
+</div>
+
+<script src='/js/app.js'></script>
 <script src='/js/auth.js'></script>
 </body>
 </html>
