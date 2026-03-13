@@ -3,10 +3,12 @@ function adminNavItems() {
     { section: 'Operations', items: [
       { page: 'dashboard-admin.html', href: '/dashboard-admin.html', icon: '▦', label: 'Overview' },
       { page: 'monitoring.html', href: '/monitoring.html', icon: '◉', label: 'LAN Monitoring' },
-      { page: 'assets.html', href: '/assets.html', icon: '◫', label: 'Asset Management' }
+      { page: 'assets.html', href: '/assets.html', icon: '◫', label: 'Asset Management' },
+      { page: 'knowledge.html', href: '/knowledge.html', icon: '📚', label: 'Knowledge Base' }
     ]},
     { section: 'System', items: [
-      { page: 'settings.html', href: '/settings.html', icon: '⚙', label: 'Settings' }
+      { page: 'settings.html', href: '/settings.html', icon: '⚙', label: 'Settings' },
+      { page: 'user-management.html', href: '/user-management.html', icon: '👥', label: 'User Management' }
     ]}
   ];
 }
