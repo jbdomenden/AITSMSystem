@@ -1,4 +1,4 @@
-package com.example
+package com.aitsm
 
 import backend.config.DatabaseFactory
 import backend.repository.AuditRepository
