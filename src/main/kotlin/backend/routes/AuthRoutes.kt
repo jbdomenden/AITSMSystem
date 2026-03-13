@@ -3,6 +3,7 @@ package backend.routes
 import backend.models.AdminEligibilityRequest
 import backend.models.AdminGrantRequest
 import backend.models.AdminSensitiveVerifyRequest
+import backend.models.EmailVerificationUpdateRequest
 import backend.models.LoginRequest
 import backend.models.PasswordResetRequest
 import backend.models.ProfileUpdateRequest
