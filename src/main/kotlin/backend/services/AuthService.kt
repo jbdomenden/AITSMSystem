@@ -48,25 +48,27 @@ class AuthService(
     }
 
     fun verifyEmail(email: String, code: String): AuthResponse {
-        val user = userRepository.verifyEmail(email, code) ?: error("Invalid or expired verification code")
+        val user = userRepository.verifyEmail(email.trim(), code.trim()) ?: error("Invalid or expired verification code")
         auditRepository.log(user.id, "Email verified", "users")
         return AuthResponse(token = tokenFor(user.id, user.role), user = user)
     }
 
     fun resendVerification(email: String): RegistrationResponse {
+        val normalizedEmail = email.trim()
         val code = generateVerificationCode()
-        val updated = userRepository.regenerateVerificationCode(email, code, LocalDateTime.now().plusMinutes(15))
+        val updated = userRepository.regenerateVerificationCode(normalizedEmail, code, LocalDateTime.now().plusMinutes(15))
         require(updated) { "Unable to resend verification code. Email may already be verified or missing." }
 
         return RegistrationResponse(
             message = "Verification code regenerated.",
-            email = email.lowercase(),
+            email = normalizedEmail.lowercase(),
             devVerificationCode = code
         )
     }
 
     fun login(request: LoginRequest): AuthResponse {
-        val (user, hash) = userRepository.findByEmail(request.email) ?: error("Invalid credentials")
+        val normalizedEmail = request.email.trim()
+        val (user, hash) = userRepository.findByEmail(normalizedEmail) ?: error("Invalid credentials")
         require(PasswordHasher.verify(request.password, hash)) { "Invalid credentials" }
         require(user.emailVerified || user.role == "admin" || user.role == "superadmin") {
             "Please verify your email before logging in."
@@ -88,13 +90,6 @@ class AuthService(
         val updated = userRepository.updateProfile(userId, req.fullName.trim(), req.company.trim(), req.department.trim())
             ?: error("Unable to update profile")
         auditRepository.log(userId, "Updated own profile", "users")
-        return updated
-    }
-
-    fun updateUserEmailVerification(targetUserId: Int, emailVerified: Boolean, actorUserId: Int?): User {
-        val updated = userRepository.updateEmailVerified(targetUserId, emailVerified)
-            ?: error("User not found")
-        auditRepository.log(actorUserId, "Set email verification for ${updated.email} to $emailVerified", "users")
         return updated
     }
 

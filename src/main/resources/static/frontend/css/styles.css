@@ -413,6 +413,9 @@ textarea { resize: vertical; min-height: 120px; }
   box-shadow: var(--shadow-md);
   padding: 20px;
 }
+
+.app-alert-card { width: min(420px, 100%); }
+.app-alert-message { white-space: pre-wrap; margin: 4px 0 14px; color: #334155; }
 .hidden { display: none !important; }
 .show { display: grid; }
 .single-col { grid-template-columns: 1fr; }

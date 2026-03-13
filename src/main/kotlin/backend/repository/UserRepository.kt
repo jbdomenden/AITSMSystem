@@ -155,12 +155,6 @@ class UserRepository {
         UsersTable.selectAll().where { UsersTable.id eq row[UsersTable.id] }.singleOrNull()?.let(::toUser)
     }
 
-    fun updateEmailVerified(userId: Int, emailVerified: Boolean): User? = transaction {
-        val row = UsersTable.selectAll().where { UsersTable.id eq userId }.singleOrNull() ?: return@transaction null
-        UsersTable.update({ UsersTable.id eq userId }) { it[UsersTable.emailVerified] = emailVerified }
-        UsersTable.selectAll().where { UsersTable.id eq userId }.singleOrNull()?.let(::toUser)
-    }
-
     fun updatePassword(userId: Int, passwordHash: String): User? = transaction {
         val row = UsersTable.selectAll().where { UsersTable.id eq userId }.singleOrNull() ?: return@transaction null
         if (row[UsersTable.role] == "superadmin") return@transaction null

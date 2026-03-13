@@ -71,13 +71,6 @@ fun Route.authRoutes(authService: AuthService) {
             val updated = authService.resetUserPassword(id, req.newPassword, req.confirmPassword, call.userId())
             call.respond(mapOf("message" to "Password reset successful", "user" to updated))
         }
-        put("/{id}/email-verification") {
-            if (!call.requireRole("admin")) return@put
-            val id = call.parameters["id"]?.toIntOrNull() ?: return@put call.respond(HttpStatusCode.BadRequest)
-            val req = call.receive<EmailVerificationUpdateRequest>()
-            val updated = authService.updateUserEmailVerification(id, req.emailVerified, call.userId())
-            call.respond(mapOf("message" to "Email verification updated", "user" to updated))
-        }
         delete("/{id}") {
             if (!call.requireRole("admin")) return@delete
             val id = call.parameters["id"]?.toIntOrNull() ?: return@delete call.respond(HttpStatusCode.BadRequest)
