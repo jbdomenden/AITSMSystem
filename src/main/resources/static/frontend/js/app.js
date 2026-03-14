@@ -40,6 +40,50 @@ function enforcePageAccess() {
   }
 }
 
+function injectGlobalHeader() {
+  const role = currentRole();
+  if (!role) return;
+  const content = document.querySelector('main.content');
+  if (!content || document.getElementById('globalAppHeader') || document.getElementById('utilityHeader')) return;
+
+  const userEmail = localStorage.getItem('email') || '';
+  const roleLabel = role === 'superadmin' ? 'Super Admin' : (role === 'admin' ? 'Admin' : 'End User');
+
+  const header = document.createElement('header');
+  header.id = 'globalAppHeader';
+  header.className = 'global-header card';
+  header.innerHTML = `
+    <div>
+      <h2 class='section-title'>AITSM Portal</h2>
+      <p class='small'>${roleLabel}${userEmail ? ` • ${userEmail}` : ''}</p>
+    </div>
+    <button class='btn btn-ghost icon-btn' type='button' onclick='logout()' aria-label='Logout' title='Logout'>⎋</button>`;
+
+  content.prepend(header);
+}
+
+
+function ensurePageSplash() {
+  if (document.getElementById('pageSplash')) return;
+  const splash = document.createElement('div');
+  splash.id = 'pageSplash';
+  splash.className = 'page-splash';
+  splash.innerHTML = `
+    <div class='page-splash-card'>
+      <div class='page-splash-spinner' aria-hidden='true'></div>
+      <h3>Loading AITSM</h3>
+      <p class='small'>Preparing page and buffering analytics...</p>
+    </div>`;
+  document.body.appendChild(splash);
+}
+
+function hidePageSplash() {
+  const splash = document.getElementById('pageSplash');
+  if (!splash) return;
+  splash.classList.add('page-splash-hidden');
+  window.setTimeout(() => splash.remove(), 220);
+}
+
 function markActiveNav() {
   const path = location.pathname.split('/').pop();
   document.querySelectorAll('.nav-item[data-page]').forEach(el => {
@@ -48,8 +92,11 @@ function markActiveNav() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  ensurePageSplash();
   enforcePageAccess();
+  injectGlobalHeader();
   markActiveNav();
+  window.setTimeout(hidePageSplash, 450);
 });
 
 

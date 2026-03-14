@@ -346,6 +346,7 @@ async function loadAdminDashboard() {
   }
 }
 
+
 async function loadUsers() {
   const rows = document.getElementById('userRows');
   if (!rows) return;
