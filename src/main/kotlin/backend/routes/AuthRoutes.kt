@@ -3,7 +3,7 @@ package backend.routes
 import backend.models.AdminEligibilityRequest
 import backend.models.AdminGrantRequest
 import backend.models.AdminSensitiveVerifyRequest
-import backend.models.EmailVerificationUpdateRequest
+import backend.models.EmailApprovalRequest
 import backend.models.LoginRequest
 import backend.models.PasswordResetRequest
 import backend.models.ProfileUpdateRequest
@@ -70,6 +70,13 @@ fun Route.authRoutes(authService: AuthService) {
             val req = call.receive<PasswordResetRequest>()
             val updated = authService.resetUserPassword(id, req.newPassword, req.confirmPassword, call.userId())
             call.respond(mapOf("message" to "Password reset successful", "user" to updated))
+        }
+        put("/{id}/email-approval") {
+            if (!call.requireRole("admin")) return@put
+            val id = call.parameters["id"]?.toIntOrNull() ?: return@put call.respond(HttpStatusCode.BadRequest)
+            val req = call.receive<EmailApprovalRequest>()
+            val updated = authService.updateUserEmailApproval(id, req.approved, call.userId())
+            call.respond(mapOf("message" to if (req.approved) "User approved for login" else "User marked as pending", "user" to updated))
         }
         delete("/{id}") {
             if (!call.requireRole("admin")) return@delete

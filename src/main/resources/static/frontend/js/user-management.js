@@ -48,6 +48,17 @@ async function deleteUserFromUserManagement(userId, email) {
   await loadUserManagement();
 }
 
+async function setUserEmailApprovalFromUserManagement(userId, approved) {
+  const res = await fetch(`/api/users/${userId}/email-approval`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({ approved })
+  });
+  const data = await res.json();
+  if (!res.ok) return alert(data.error || 'Unable to update email approval');
+  await loadUserManagement();
+}
+
 async function openAddAdminFromUserManagement(targetEmail) {
   const password = prompt(`Verify your password to grant admin role to ${targetEmail}:`);
   if (!password) return;
@@ -86,17 +97,18 @@ async function loadUserManagement() {
       const currentUserId = Number(localStorage.getItem('userId') || 0);
       const canChange = u.role !== 'superadmin' && u.id !== currentUserId;
       const roleBtn = u.role === 'admin'
-        ? `<button class='btn btn-ghost' ${canChange ? '' : 'disabled'} onclick='changeRoleFromUserManagement(${u.id}, "end-user")'>Set End-User</button>`
-        : `<button class='btn btn-primary' ${canChange ? '' : 'disabled'} onclick='openAddAdminFromUserManagement("${u.email}")'>Make Admin</button>`;
-      const resetBtn = `<button class='btn btn-ghost' ${canChange ? '' : 'disabled'} onclick='resetUserPasswordFromUserManagement(${u.id}, "${u.email}")'>Reset Password</button>`;
-      const deleteBtn = `<button class='btn btn-ghost' ${canChange ? '' : 'disabled'} onclick='deleteUserFromUserManagement(${u.id}, "${u.email}")'>Delete</button>`;
+        ? `<button class='btn btn-ghost icon-btn' ${canChange ? '' : 'disabled'} onclick='changeRoleFromUserManagement(${u.id}, "end-user")' title='Set as end-user' aria-label='Set as end-user'>👤</button>`
+        : `<button class='btn btn-primary icon-btn' ${canChange ? '' : 'disabled'} onclick='openAddAdminFromUserManagement("${u.email}")' title='Grant admin role' aria-label='Grant admin role'>🛡️</button>`;
+      const approvalBtn = `<button class='btn btn-ghost icon-btn' ${canChange ? '' : 'disabled'} onclick='setUserEmailApprovalFromUserManagement(${u.id}, ${u.emailVerified ? 'false' : 'true'})' title='${u.emailVerified ? 'Mark email as pending' : 'Approve email for login'}' aria-label='${u.emailVerified ? 'Mark email as pending' : 'Approve email for login'}'>${u.emailVerified ? '✉️' : '✅'}</button>`;
+      const resetBtn = `<button class='btn btn-ghost icon-btn' ${canChange ? '' : 'disabled'} onclick='resetUserPasswordFromUserManagement(${u.id}, "${u.email}")' title='Reset password' aria-label='Reset password'>🔑</button>`;
+      const deleteBtn = `<button class='btn btn-ghost icon-btn' ${canChange ? '' : 'disabled'} onclick='deleteUserFromUserManagement(${u.id}, "${u.email}")' title='Delete account' aria-label='Delete account'>🗑️</button>`;
 
       return `<tr>
         <td>${u.fullName}</td>
         <td>${u.email}</td>
         <td><span class='badge ${u.role === 'admin' || u.role === 'superadmin' ? 'in-progress' : 'resolved'}'>${u.role}</span></td>
         <td>${u.emailVerified ? '<span class="badge resolved">Verified</span>' : '<span class="badge warning">Pending</span>'}</td>
-        <td><div class='inline-actions'>${roleBtn}${resetBtn}${deleteBtn}</div></td>
+        <td><div class='inline-actions'>${roleBtn}${approvalBtn}${resetBtn}${deleteBtn}</div></td>
       </tr>`;
     }).join('');
   } catch (error) {

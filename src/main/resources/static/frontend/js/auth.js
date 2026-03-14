@@ -1,6 +1,8 @@
 function saveSession(data) {
   localStorage.setItem('userId', data.user.id);
   localStorage.setItem('role', data.user.role);
+  localStorage.setItem('email', data.user.email || '');
+  localStorage.setItem('fullName', data.user.fullName || '');
 }
 
 function toggleVerificationStep(email) {

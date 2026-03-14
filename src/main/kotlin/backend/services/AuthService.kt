@@ -23,6 +23,7 @@ class AuthService(
 ) {
     private data class SensitiveVerification(val userId: Int, val expiresAt: LocalDateTime)
     private val sensitiveVerifications = ConcurrentHashMap<String, SensitiveVerification>()
+    private val exposeDevVerificationCode = ((System.getenv("AUTH_EXPOSE_DEV_VERIFICATION_CODE") ?: "false").lowercase() == "true")
 
     fun register(request: RegisterRequest): RegistrationResponse {
         require(request.password == request.confirmPassword) { "Passwords do not match." }
@@ -43,7 +44,7 @@ class AuthService(
         return RegistrationResponse(
             message = "Account created. Verify your email before logging in.",
             email = user.email,
-            devVerificationCode = verificationCode
+            devVerificationCode = if (exposeDevVerificationCode) verificationCode else null
         )
     }
 
@@ -62,7 +63,7 @@ class AuthService(
         return RegistrationResponse(
             message = "Verification code regenerated.",
             email = normalizedEmail.lowercase(),
-            devVerificationCode = code
+            devVerificationCode = if (exposeDevVerificationCode) code else null
         )
     }
 
@@ -116,6 +117,14 @@ class AuthService(
 
         val updated = userRepository.updateRole(targetUserId, role) ?: error("User not found or cannot be modified")
         auditRepository.log(actorUserId, "Updated role for user ${updated.email} to $role", "users")
+        return updated
+    }
+
+    fun updateUserEmailApproval(targetUserId: Int, approved: Boolean, actorUserId: Int?): User {
+        val updated = userRepository.updateEmailVerified(targetUserId, approved)
+            ?: error("User not found or cannot be modified")
+        val state = if (approved) "approved" else "set to pending verification"
+        auditRepository.log(actorUserId, "Email $state for ${updated.email}", "users")
         return updated
     }
 
