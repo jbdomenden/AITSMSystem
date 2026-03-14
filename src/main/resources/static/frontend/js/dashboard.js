@@ -272,39 +272,9 @@ function renderHealthInsights(items) {
   el.innerHTML = safe.map(i => `<div class='insight-item'><div class='insight-label'>${i.label || 'Insight'}</div><div class='insight-value'>${i.value || '-'}</div></div>`).join('');
 }
 
-
-function setAnalyticsBuffering(isLoading) {
-  const summary = document.getElementById('summaryCards');
-  const trend = document.getElementById('ticketTrendChart');
-  const priority = document.getElementById('priorityDistributionChart');
-  const perf = document.getElementById('systemPerformanceChart');
-
-  if (isLoading) {
-    if (summary) {
-      summary.innerHTML = Array.from({ length: 4 }).map(() => `
-        <article class='card metric-card analytics-skeleton'>
-          <div class='metric-label'>Buffering...</div>
-          <div class='metric-value'>--</div>
-          <div class='metric-hint'>Loading metrics</div>
-        </article>`).join('');
-    }
-
-    [trend, priority, perf].forEach((el) => {
-      if (!el) return;
-      el.classList.add('analytics-buffering');
-      el.innerHTML = `<div class='analytics-buffer-msg'><span class='page-splash-spinner' aria-hidden='true'></span><span>Buffering analytics...</span></div>`;
-    });
-    return;
-  }
-
-  [trend, priority, perf].forEach((el) => el?.classList.remove('analytics-buffering'));
-}
-
 async function loadAdminDashboard() {
   const summary = document.getElementById('summaryCards');
   if (!summary) return;
-
-  setAnalyticsBuffering(true);
 
   try {
     const [tickets, monitorSummary, lanDevices, notifications] = await Promise.all([
@@ -373,8 +343,6 @@ async function loadAdminDashboard() {
     renderHealthInsights([]);
     renderRecentAdminTickets([]);
     renderAdminOpsFeed([], []);
-  } finally {
-    setAnalyticsBuffering(false);
   }
 }
 
@@ -389,12 +357,11 @@ async function loadUsers() {
       const currentUserId = Number(localStorage.getItem('userId') || 0);
       const canChange = u.role !== 'superadmin' && u.id !== currentUserId;
       const roleBtn = u.role === 'admin'
-        ? `<button class='btn btn-ghost icon-btn' ${canChange ? '' : 'disabled'} onclick='changeRole(${u.id}, "end-user")' title='Set as end-user' aria-label='Set as end-user'>👤</button>`
-        : `<button class='btn btn-primary icon-btn' ${canChange ? '' : 'disabled'} onclick='openAddAdminModalFor("${u.email}")' title='Grant admin role' aria-label='Grant admin role'>🛡️</button>`;
-      const approvalBtn = `<button class='btn btn-ghost icon-btn' ${canChange ? '' : 'disabled'} onclick='setUserEmailApproval(${u.id}, ${u.emailVerified ? 'false' : 'true'})' title='${u.emailVerified ? 'Mark email as pending' : 'Approve email for login'}' aria-label='${u.emailVerified ? 'Mark email as pending' : 'Approve email for login'}'>${u.emailVerified ? '✉️' : '✅'}</button>`;
-      const resetBtn = `<button class='btn btn-ghost icon-btn' ${canChange ? '' : 'disabled'} onclick='resetUserPassword(${u.id}, "${u.email}")' title='Reset password' aria-label='Reset password'>🔑</button>`;
-      const deleteBtn = `<button class='btn btn-ghost icon-btn' ${canChange ? '' : 'disabled'} onclick='deleteUserAccount(${u.id}, "${u.email}")' title='Delete account' aria-label='Delete account'>🗑️</button>`;
-      const action = `<div class='inline-actions'>${roleBtn}${approvalBtn}${resetBtn}${deleteBtn}</div>`;
+        ? `<button class='btn btn-ghost' ${canChange ? '' : 'disabled'} onclick='changeRole(${u.id}, "end-user")'>Set End-User</button>`
+        : `<button class='btn btn-primary' ${canChange ? '' : 'disabled'} onclick='openAddAdminModalFor("${u.email}")'>Make Admin</button>`;
+      const resetBtn = `<button class='btn btn-ghost' ${canChange ? '' : 'disabled'} onclick='resetUserPassword(${u.id}, "${u.email}")'>Reset Password</button>`;
+      const deleteBtn = `<button class='btn btn-ghost' ${canChange ? '' : 'disabled'} onclick='deleteUserAccount(${u.id}, "${u.email}")'>Delete</button>`;
+      const action = `<div class='inline-actions'>${roleBtn}${resetBtn}${deleteBtn}</div>`;
 
       return `<tr>
         <td>${u.fullName}</td>
@@ -425,17 +392,6 @@ async function changeRole(userId, role) {
   if (!res.ok) return alert(data.error || 'Unable to update role');
   await loadUsers();
   await loadAdminDashboard();
-}
-
-async function setUserEmailApproval(userId, approved) {
-  const res = await fetch(`/api/users/${userId}/email-approval`, {
-    method: 'PUT',
-    headers: authHeaders(),
-    body: JSON.stringify({ approved })
-  });
-  const data = await res.json();
-  if (!res.ok) return alert(data.error || 'Unable to update email approval');
-  await Promise.all([loadUsers(), loadAdminDashboard()]);
 }
 
 async function submitAdminEligibility(event) {

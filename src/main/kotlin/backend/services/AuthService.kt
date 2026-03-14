@@ -63,7 +63,7 @@ class AuthService(
         return RegistrationResponse(
             message = "Verification code regenerated.",
             email = normalizedEmail.lowercase(),
-            devVerificationCode = if (exposeDevVerificationCode) code else null
+            devVerificationCode = code
         )
     }
 

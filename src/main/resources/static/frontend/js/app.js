@@ -99,8 +99,6 @@ document.addEventListener('DOMContentLoaded', () => {
   window.setTimeout(hidePageSplash, 450);
 });
 
-window.addEventListener('load', hidePageSplash);
-
 
 function ensureAppAlertModal() {
   if (document.getElementById('appAlertModal')) return;
