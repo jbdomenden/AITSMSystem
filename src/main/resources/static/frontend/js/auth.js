@@ -1,6 +1,8 @@
 function saveSession(data) {
   localStorage.setItem('userId', data.user.id);
   localStorage.setItem('role', data.user.role);
+  localStorage.setItem('email', data.user.email || '');
+  localStorage.setItem('fullName', data.user.fullName || '');
 }
 
 function toggleVerificationStep(email) {
@@ -78,4 +80,27 @@ async function login() {
 
   saveSession(data);
   location.href = ['admin', 'superadmin'].includes(data.user.role) ? '/dashboard-admin.html' : '/dashboard-user.html';
+}
+
+
+function openEulaModal() {
+  const modal = document.getElementById('eulaModal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+}
+
+function closeEulaModal() {
+  const modal = document.getElementById('eulaModal');
+  if (!modal) return;
+  modal.classList.add('hidden');
+}
+
+function closeEulaModalOnOverlay(event) {
+  if (event.target?.id === 'eulaModal') closeEulaModal();
+}
+
+function acceptEulaFromModal() {
+  const checkbox = document.getElementById('eula');
+  if (checkbox) checkbox.checked = true;
+  closeEulaModal();
 }

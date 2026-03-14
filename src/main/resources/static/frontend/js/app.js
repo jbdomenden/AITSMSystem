@@ -22,7 +22,7 @@ function redirectForRole(role) {
 function enforcePageAccess() {
   const role = currentRole();
   const page = location.pathname.split('/').pop() || 'index.html';
-  const adminOnlyPages = ['dashboard-admin.html', 'monitoring.html', 'assets.html', 'settings.html'];
+  const adminOnlyPages = ['dashboard-admin.html', 'monitoring.html', 'assets.html', 'settings.html', 'user-management.html', 'knowledge.html'];
   const endUserOnlyPages = ['dashboard-user.html', 'create-ticket.html', 'tickets.html', 'signup.html'];
 
   if (!role && page !== 'login.html' && page !== 'index.html' && page !== 'signup.html') {
@@ -40,6 +40,50 @@ function enforcePageAccess() {
   }
 }
 
+function injectGlobalHeader() {
+  const role = currentRole();
+  if (!role) return;
+  const content = document.querySelector('main.content');
+  if (!content || document.getElementById('globalAppHeader') || document.getElementById('utilityHeader')) return;
+
+  const userEmail = localStorage.getItem('email') || '';
+  const roleLabel = role === 'superadmin' ? 'Super Admin' : (role === 'admin' ? 'Admin' : 'End User');
+
+  const header = document.createElement('header');
+  header.id = 'globalAppHeader';
+  header.className = 'global-header card';
+  header.innerHTML = `
+    <div>
+      <h2 class='section-title'>AITSM Portal</h2>
+      <p class='small'>${roleLabel}${userEmail ? ` • ${userEmail}` : ''}</p>
+    </div>
+    <button class='btn btn-ghost icon-btn' type='button' onclick='logout()' aria-label='Logout' title='Logout'>⎋</button>`;
+
+  content.prepend(header);
+}
+
+
+function ensurePageSplash() {
+  if (document.getElementById('pageSplash')) return;
+  const splash = document.createElement('div');
+  splash.id = 'pageSplash';
+  splash.className = 'page-splash';
+  splash.innerHTML = `
+    <div class='page-splash-card'>
+      <div class='page-splash-spinner' aria-hidden='true'></div>
+      <h3>Loading AITSM</h3>
+      <p class='small'>Preparing page and buffering analytics...</p>
+    </div>`;
+  document.body.appendChild(splash);
+}
+
+function hidePageSplash() {
+  const splash = document.getElementById('pageSplash');
+  if (!splash) return;
+  splash.classList.add('page-splash-hidden');
+  window.setTimeout(() => splash.remove(), 220);
+}
+
 function markActiveNav() {
   const path = location.pathname.split('/').pop();
   document.querySelectorAll('.nav-item[data-page]').forEach(el => {
@@ -48,6 +92,58 @@ function markActiveNav() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  ensurePageSplash();
   enforcePageAccess();
+  injectGlobalHeader();
   markActiveNav();
+  window.setTimeout(hidePageSplash, 450);
 });
+
+window.addEventListener('load', hidePageSplash);
+
+
+function ensureAppAlertModal() {
+  if (document.getElementById('appAlertModal')) return;
+  const modal = document.createElement('div');
+  modal.id = 'appAlertModal';
+  modal.className = 'modal-overlay hidden';
+  modal.innerHTML = `
+    <div class='modal-card app-alert-card'>
+      <div class='card-head'>
+        <h3 class='section-title'>Notice</h3>
+      </div>
+      <p id='appAlertMessage' class='small app-alert-message'></p>
+      <div class='inline-actions' style='justify-content:flex-end'>
+        <button id='appAlertOkBtn' class='btn btn-primary' type='button'>OK</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  document.getElementById('appAlertOkBtn')?.addEventListener('click', closeAppAlert);
+  modal.addEventListener('click', (event) => {
+    if (event.target?.id === 'appAlertModal') closeAppAlert();
+  });
+}
+
+function showAppAlert(message) {
+  ensureAppAlertModal();
+  const modal = document.getElementById('appAlertModal');
+  const messageEl = document.getElementById('appAlertMessage');
+  if (messageEl) messageEl.textContent = String(message ?? '');
+  modal?.classList.remove('hidden');
+  modal?.classList.add('show');
+  document.getElementById('appAlertOkBtn')?.focus();
+}
+
+function closeAppAlert() {
+  const modal = document.getElementById('appAlertModal');
+  modal?.classList.remove('show');
+  modal?.classList.add('hidden');
+}
+
+if (!window.__aitsmAlertPatched) {
+  window.__aitsmAlertPatched = true;
+  window.alert = (message = '') => {
+    showAppAlert(message);
+  };
+}

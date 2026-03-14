@@ -1,3 +1,6 @@
+const LAN_AUTO_REFRESH_MS = 5 * 60 * 1000;
+let monitoringAutoRefreshTimer = null;
+
 function statusBadge(status) {
   const s = String(status || '').toLowerCase();
   if (s === 'critical') return 'open';
@@ -137,7 +140,24 @@ async function loadDevices() {
     || `<tr><td colspan='3' class='small'>No devices registered yet.</td></tr>`;
 }
 
+function startMonitoringAutoRefresh() {
+  if (monitoringAutoRefreshTimer) return;
+  monitoringAutoRefreshTimer = window.setInterval(() => {
+    loadMonitoring();
+    loadDevices();
+  }, LAN_AUTO_REFRESH_MS);
+}
+
+function stopMonitoringAutoRefresh() {
+  if (!monitoringAutoRefreshTimer) return;
+  window.clearInterval(monitoringAutoRefreshTimer);
+  monitoringAutoRefreshTimer = null;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   loadMonitoring();
   loadDevices();
+  startMonitoringAutoRefresh();
 });
+
+window.addEventListener('beforeunload', stopMonitoringAutoRefresh);
