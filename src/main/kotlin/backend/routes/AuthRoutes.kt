@@ -5,6 +5,7 @@ import backend.models.AdminGrantRequest
 import backend.models.AdminSensitiveVerifyRequest
 import backend.models.EmailApprovalRequest
 import backend.models.LoginRequest
+import backend.models.InternalUserCreateRequest
 import backend.models.PasswordResetRequest
 import backend.models.ProfileUpdateRequest
 import backend.models.RegisterRequest
@@ -83,6 +84,12 @@ fun Route.authRoutes(authService: AuthService) {
             val id = call.parameters["id"]?.toIntOrNull() ?: return@delete call.respond(HttpStatusCode.BadRequest)
             val deleted = authService.deleteUserAccount(id, call.userId())
             call.respond(mapOf("message" to "User deleted", "user" to deleted))
+        }
+        post {
+            if (!call.requireRole("admin")) return@post
+            val req = call.receive<InternalUserCreateRequest>()
+            val created = authService.createUserInternally(req, call.userId())
+            call.respond(HttpStatusCode.Created, mapOf("message" to "User account created", "user" to created))
         }
 
         route("/admin") {

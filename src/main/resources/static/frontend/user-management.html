@@ -10,7 +10,10 @@
     <div class='topbar'>
       <div>
         <h1 class='page-title'>User Management</h1>
-        <p class='page-subtitle'>Manage roles, reset passwords, and delete user accounts from one dedicated page.</p>
+        <p class='page-subtitle'>Manage roles, reset passwords, delete user accounts, and create internal accounts from one dedicated page.</p>
+      </div>
+      <div class='inline-actions'>
+        <button id='openCreateUserBtn' class='btn btn-primary'>Create User Account</button>
       </div>
     </div>
 
@@ -28,6 +31,58 @@
         </table>
       </div>
     </section>
+
+    <div id='createUserModal' class='modal-overlay hidden'>
+      <div class='modal-card'>
+        <div class='card-head'>
+          <div>
+            <h3 class='section-title'>Create Internal User</h3>
+            <p class='section-subtitle'>Provision an account without self-signup.</p>
+          </div>
+        </div>
+        <form id='createUserForm' class='form-grid signup-grid'>
+          <div class='form-group'>
+            <label for='internalFullName'>Full name</label>
+            <input id='internalFullName' type='text' required>
+          </div>
+          <div class='form-group'>
+            <label for='internalEmail'>Email</label>
+            <input id='internalEmail' type='email' required>
+          </div>
+          <div class='form-group'>
+            <label for='internalCompany'>Company</label>
+            <input id='internalCompany' type='text' required>
+          </div>
+          <div class='form-group'>
+            <label for='internalDepartment'>Department</label>
+            <input id='internalDepartment' type='text' required>
+          </div>
+          <div class='form-group'>
+            <label for='internalPassword'>Temporary password</label>
+            <input id='internalPassword' type='password' minlength='8' required>
+          </div>
+          <div class='form-group'>
+            <label for='internalConfirmPassword'>Confirm password</label>
+            <input id='internalConfirmPassword' type='password' minlength='8' required>
+          </div>
+          <div class='form-group'>
+            <label for='internalRole'>Role</label>
+            <select id='internalRole'>
+              <option value='end-user'>End-user</option>
+              <option value='admin'>Admin</option>
+            </select>
+          </div>
+          <div class='form-group'>
+            <label><input id='internalEmailVerified' type='checkbox' checked> Mark email as verified</label>
+          </div>
+          <div class='inline-actions' style='grid-column: 1 / -1;'>
+            <button type='button' class='btn btn-ghost' onclick='closeCreateUserModal()'>Cancel</button>
+            <button type='submit' class='btn btn-primary'>Create account</button>
+          </div>
+        </form>
+        <p id='createUserMessage' class='small' style='margin-top:12px'></p>
+      </div>
+    </div>
   </main>
 </div>
 <script src='/js/admin-shell.js'></script><script src='/js/app.js'></script><script src='/js/user-management.js'></script>
