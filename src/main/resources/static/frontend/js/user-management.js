@@ -116,4 +116,71 @@ async function loadUserManagement() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', loadUserManagement);
+document.addEventListener('DOMContentLoaded', () => {
+  loadUserManagement();
+  document.getElementById('openCreateUserBtn')?.addEventListener('click', openCreateUserModal);
+  document.getElementById('createUserForm')?.addEventListener('submit', submitCreateUser);
+  document.getElementById('createUserModal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'createUserModal') closeCreateUserModal();
+  });
+});
+
+
+function setCreateUserMessage(message, tone = 'info') {
+  const el = document.getElementById('createUserMessage');
+  if (!el) return;
+  el.textContent = message || '';
+  el.classList.remove('text-success', 'text-danger');
+  if (tone === 'success') el.classList.add('text-success');
+  if (tone === 'danger') el.classList.add('text-danger');
+}
+
+function openCreateUserModal() {
+  const modal = document.getElementById('createUserModal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  modal.classList.add('show');
+  setCreateUserMessage('');
+  document.getElementById('internalFullName')?.focus();
+}
+
+function closeCreateUserModal() {
+  const modal = document.getElementById('createUserModal');
+  if (!modal) return;
+  modal.classList.remove('show');
+  modal.classList.add('hidden');
+  document.getElementById('createUserForm')?.reset();
+  const verified = document.getElementById('internalEmailVerified');
+  if (verified) verified.checked = true;
+  setCreateUserMessage('');
+}
+
+async function submitCreateUser(event) {
+  event.preventDefault();
+  const payload = {
+    fullName: document.getElementById('internalFullName')?.value?.trim() || '',
+    email: document.getElementById('internalEmail')?.value?.trim() || '',
+    company: document.getElementById('internalCompany')?.value?.trim() || '',
+    department: document.getElementById('internalDepartment')?.value?.trim() || '',
+    password: document.getElementById('internalPassword')?.value || '',
+    confirmPassword: document.getElementById('internalConfirmPassword')?.value || '',
+    role: document.getElementById('internalRole')?.value || 'end-user',
+    emailVerified: Boolean(document.getElementById('internalEmailVerified')?.checked)
+  };
+
+  setCreateUserMessage('Creating account...');
+  const res = await fetch('/api/users', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    setCreateUserMessage(data.error || 'Unable to create account', 'danger');
+    return;
+  }
+
+  setCreateUserMessage(data.message || 'User account created', 'success');
+  await loadUserManagement();
+  setTimeout(() => closeCreateUserModal(), 900);
+}
