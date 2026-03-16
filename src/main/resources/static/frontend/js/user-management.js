@@ -1,14 +1,37 @@
+
+function ensureActionMenuBackdrop() {
+  if (document.getElementById('actionMenuBackdrop')) return;
+  const backdrop = document.createElement('div');
+  backdrop.id = 'actionMenuBackdrop';
+  backdrop.className = 'action-menu-backdrop hidden';
+  backdrop.addEventListener('click', () => {
+    document.querySelectorAll('.row-action-menu').forEach((el) => el.classList.add('hidden'));
+  document.getElementById('actionMenuBackdrop')?.classList.add('hidden');
+    backdrop.classList.add('hidden');
+  });
+  document.body.appendChild(backdrop);
+}
+
 function closeUserMgmtMenus() {
   document.querySelectorAll('.row-action-menu').forEach((el) => el.classList.add('hidden'));
+  document.getElementById('actionMenuBackdrop')?.classList.add('hidden');
 }
 
 function toggleUserMgmtMenu(event, id) {
   event.stopPropagation();
   const menu = document.getElementById(`userMgmtMenu-${id}`);
   if (!menu) return;
+  const trigger = event.currentTarget;
   const open = menu.classList.contains('hidden');
   closeUserMgmtMenus();
-  if (open) menu.classList.remove('hidden');
+  if (!open) return;
+  ensureActionMenuBackdrop();
+  document.getElementById('actionMenuBackdrop')?.classList.remove('hidden');
+  const rect = trigger.getBoundingClientRect();
+  menu.style.position = 'fixed';
+  menu.style.top = `${rect.bottom + 4}px`;
+  menu.style.left = `${Math.max(8, rect.right - 200)}px`;
+  menu.classList.remove('hidden');
 }
 
 async function fetchJsonOrThrow(url, options = {}) {

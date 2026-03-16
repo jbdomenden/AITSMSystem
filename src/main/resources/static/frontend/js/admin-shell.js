@@ -30,6 +30,10 @@ function toggleAdminHeaderMenu(){ document.getElementById('adminHeaderMenu')?.cl
 function toggleAdminNotifMenu(){ document.getElementById('adminNotifMenu')?.classList.toggle('hidden'); }
 function toggleAdminSidebar(){ document.body.classList.toggle('sidebar-hidden'); }
 
+function openAdminHelp() {
+  alert('How to use AITSM Admin:\n1) Monitor LAN/asset telemetry.\n2) Manage ticket statuses in Ticket Management.\n3) Manage users in User Management.\n4) Use Settings for profile and SLA review.');
+}
+
 async function loadHeaderNotifications(){
   const list = document.getElementById('adminNotifList');
   const count = document.getElementById('adminNotifCount');
@@ -59,7 +63,7 @@ function renderUtilityHeader() {
       <div id='adminNotifMenu' class='admin-header-menu hidden'><div id='adminNotifList' class='small'>Loading...</div></div>
       <button id='adminMenuTrigger' class='btn btn-ghost icon-btn header-icon-btn' type='button' onclick='toggleAdminHeaderMenu()' aria-label='Open account menu' title='Account menu'>⋮</button>
       <div id='adminHeaderMenu' class='admin-header-menu hidden'>
-        <a href='/knowledge.html'>Help</a>
+        <button type='button' onclick='openAdminHelp()'>Help</button>
         <button type='button' onclick='openPasswordModal()'>Change password</button>
         <button type='button' onclick='logout()'>Logout</button>
       </div>

@@ -121,17 +121,34 @@ async function loadMonitoring() {
 }
 
 async function registerDevice() {
+  const deviceNameEl = document.getElementById('deviceName');
+  const ipAddressEl = document.getElementById('ipAddress');
+  const departmentEl = document.getElementById('department');
+  const assignedUserEl = document.getElementById('assignedUser');
+  const statusEl = document.getElementById('status');
+
   const body = {
-    deviceName: deviceName.value.trim(),
-    ipAddress: ipAddress.value.trim(),
-    department: department.value.trim(),
-    assignedUser: assignedUser.value.trim(),
-    status: status.value
+    deviceName: (deviceNameEl?.value || '').trim(),
+    ipAddress: (ipAddressEl?.value || '').trim(),
+    department: (departmentEl?.value || '').trim(),
+    assignedUser: (assignedUserEl?.value || '').trim(),
+    status: statusEl?.value || 'Online'
   };
+
+  if (!body.deviceName || !body.ipAddress || !body.department || !body.assignedUser || !body.status) {
+    return alert('All device fields are required.');
+  }
+
   const res = await fetch('/api/devices', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
   const data = await res.json();
   if (!res.ok) return alert(data.error || 'Failed to register device (LAN only policy).');
-  deviceName.value = ipAddress.value = department.value = assignedUser.value = '';
+
+  if (deviceNameEl) deviceNameEl.value = '';
+  if (ipAddressEl) ipAddressEl.value = '';
+  if (departmentEl) departmentEl.value = '';
+  if (assignedUserEl) assignedUserEl.value = '';
+  if (statusEl) statusEl.value = 'Online';
+
   await loadDevices();
   await loadMonitoring();
 }

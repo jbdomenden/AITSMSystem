@@ -1,42 +1,91 @@
 package backend.services
 
-class AIService {
+import backend.repository.KnowledgeRepository
+import java.net.URLEncoder
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.nio.charset.StandardCharsets
+import java.time.Duration
+
+class AIService(private val knowledgeRepository: KnowledgeRepository? = null) {
+    private val httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build()
+
     fun troubleshoot(description: String): List<String> {
         val text = description.trim()
         if (text.isBlank()) return listOf("Describe your issue with symptoms, error text, and when it started to receive targeted suggestions.")
 
-        val lower = text.lowercase()
-        val suggestions = mutableListOf<String>()
+        val suggestions = linkedSetOf<String>()
+        suggestions += localHeuristics(text)
+        suggestions += knowledgeBaseSuggestions(text)
+        suggestions += internetSuggestions(text)
 
-        fun add(step: String) {
-            if (suggestions.none { it.equals(step, ignoreCase = true) }) suggestions += step
+        if (suggestions.isEmpty()) {
+            suggestions += "Capture exact error text, reproduce once, and share logs/screenshots in the ticket for faster diagnosis."
         }
+        return suggestions.take(8)
+    }
 
+    private fun localHeuristics(text: String): List<String> {
+        val lower = text.lowercase()
+        val out = linkedSetOf<String>()
         if (Regex("\\b(error|failed|exception|code)\\b").containsMatchIn(lower)) {
-            add("Capture the exact error message/code and timestamp, then compare with known issues in the Knowledge Base.")
-            add("Reproduce once after restarting the affected app/service to confirm whether the issue is persistent.")
+            out += "Record exact error code/message and timestamp, then compare it with known incidents."
         }
         if (Regex("\\b(network|internet|dns|wifi|lan|timeout|connection)\\b").containsMatchIn(lower)) {
-            add("Check LAN connectivity first (gateway ping + DNS resolution) before escalating application-side fixes.")
-            add("Run `ipconfig /flushdns` (Windows) or restart network service and retest access to the target system.")
+            out += "Validate gateway + DNS reachability first, then retest the affected app/service."
         }
         if (Regex("\\b(slow|lag|performance|freeze|hang|cpu|memory)\\b").containsMatchIn(lower)) {
-            add("Collect CPU/RAM usage for 2-3 minutes and identify top processes before restarting the endpoint.")
-            add("Close non-essential background apps and verify whether the slowdown is system-wide or app-specific.")
+            out += "Collect CPU and memory samples for 2-3 minutes and identify top-consuming processes."
         }
         if (Regex("\\b(login|password|account|authentication|unauthorized|forbidden)\\b").containsMatchIn(lower)) {
-            add("Verify account role and password freshness; if recently changed, sign out all sessions and retry.")
-            add("Check whether the account is locked or pending verification/approval in User Management.")
+            out += "Verify account role/approval status and retry after password/session refresh."
         }
-        if (Regex("\\b(printer|usb|keyboard|mouse|monitor|device|driver)\\b").containsMatchIn(lower)) {
-            add("Reconnect hardware and validate driver status in Device Manager; roll back or update driver if recently changed.")
-        }
-
-        add("Document what changed before the incident (updates, new software, policy changes) to speed up root-cause analysis.")
-        add("If unresolved after these steps, submit/update the ticket with findings, logs, and screenshots for faster escalation.")
-
-        return suggestions.take(6)
+        out += "Document recent changes (patches, config updates, installs) before escalation."
+        return out.toList()
     }
+
+    private fun knowledgeBaseSuggestions(text: String): List<String> {
+        val repo = knowledgeRepository ?: return emptyList()
+        val tokens = tokenize(text)
+        if (tokens.isEmpty()) return emptyList()
+
+        val ranked = repo.list()
+            .map { article ->
+                val hay = "${article.title} ${article.content} ${article.category}".lowercase()
+                val score = tokens.count { hay.contains(it) }
+                article to score
+            }
+            .filter { it.second > 0 }
+            .sortedByDescending { it.second }
+            .take(3)
+
+        return ranked.map { (article, _) ->
+            "Knowledge Base match: '${article.title}' (${article.category}). Review it before further troubleshooting."
+        }
+    }
+
+    private fun internetSuggestions(text: String): List<String> {
+        val q = URLEncoder.encode("IT troubleshooting guide $text", StandardCharsets.UTF_8)
+        val url = "https://api.duckduckgo.com/?q=$q&format=json&no_html=1&skip_disambig=1"
+        val req = HttpRequest.newBuilder().uri(java.net.URI.create(url)).timeout(Duration.ofSeconds(4)).GET().build()
+        val body = runCatching { httpClient.send(req, HttpResponse.BodyHandlers.ofString()).body() }.getOrNull() ?: return emptyList()
+
+        val abstractText = Regex("\"AbstractText\"\\s*:\\s*\"(.*?)\"", RegexOption.DOT_MATCHES_ALL)
+            .find(body)?.groupValues?.getOrNull(1)
+            ?.replace("\\\\n", " ")
+            ?.replace("\\\\\"", "\"")
+            ?.trim()
+            .orEmpty()
+
+        if (abstractText.isBlank()) return emptyList()
+        return listOf("Internet troubleshooting reference: $abstractText")
+    }
+
+    private fun tokenize(text: String): List<String> =
+        text.lowercase().split(Regex("[^a-z0-9]+"))
+            .filter { it.length >= 4 }
+            .distinct()
 
     fun ticketTrendInsights(total: Int, open: Int, resolved: Int): List<Map<String, String>> = listOf(
         mapOf("insight" to "peak ticket days", "value" to "Monday and Tuesday spikes observed"),

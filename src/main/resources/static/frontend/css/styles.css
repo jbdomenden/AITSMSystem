@@ -563,3 +563,6 @@ body.sidebar-hidden .sidebar {
 .row-action-menu { position: absolute; right: 0; top: calc(100% + 4px); min-width: 170px; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-md); z-index: 40; display: grid; padding: 6px; }
 .row-action-menu button { border: 0; background: transparent; text-align: left; padding: 8px 10px; border-radius: 8px; cursor: pointer; font: inherit; color: #0f172a; }
 .row-action-menu button:hover { background: #f1f5f9; }
+
+.action-menu-backdrop { position: fixed; inset: 0; background: transparent; z-index: 35; }
+.row-action-menu { z-index: 50; }

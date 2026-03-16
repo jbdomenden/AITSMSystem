@@ -1,17 +1,40 @@
+
+function ensureActionMenuBackdrop() {
+  if (document.getElementById('actionMenuBackdrop')) return;
+  const backdrop = document.createElement('div');
+  backdrop.id = 'actionMenuBackdrop';
+  backdrop.className = 'action-menu-backdrop hidden';
+  backdrop.addEventListener('click', () => {
+    document.querySelectorAll('.row-action-menu').forEach((el) => el.classList.add('hidden'));
+  document.getElementById('actionMenuBackdrop')?.classList.add('hidden');
+    backdrop.classList.add('hidden');
+  });
+  document.body.appendChild(backdrop);
+}
+
 function fmt(v){ const d=new Date(v||''); return Number.isNaN(d.getTime()) ? (v||'-') : d.toLocaleString(); }
 function badge(status){ const s=(status||'').toLowerCase(); if(s==='resolved'||s==='closed') return 'resolved'; if(s==='cancelled') return 'warning'; if(s==='in progress'||s==='follow-up requested') return 'in-progress'; return 'open'; }
 
 function closeAdminRowMenus() {
   document.querySelectorAll('.row-action-menu').forEach((el) => el.classList.add('hidden'));
+  document.getElementById('actionMenuBackdrop')?.classList.add('hidden');
 }
 
 function toggleAdminRowMenu(event, id) {
   event.stopPropagation();
   const menu = document.getElementById(`adminTicketRowMenu-${id}`);
   if (!menu) return;
+  const trigger = event.currentTarget;
   const open = menu.classList.contains('hidden');
   closeAdminRowMenus();
-  if (open) menu.classList.remove('hidden');
+  if (!open) return;
+  ensureActionMenuBackdrop();
+  document.getElementById('actionMenuBackdrop')?.classList.remove('hidden');
+  const rect = trigger.getBoundingClientRect();
+  menu.style.position = 'fixed';
+  menu.style.top = `${rect.bottom + 4}px`;
+  menu.style.left = `${Math.max(8, rect.right - 180)}px`;
+  menu.classList.remove('hidden');
 }
 
 async function updateTicketStatusAdmin(id, status){

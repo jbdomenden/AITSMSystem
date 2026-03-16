@@ -1,3 +1,17 @@
+
+function ensureActionMenuBackdrop() {
+  if (document.getElementById('actionMenuBackdrop')) return;
+  const backdrop = document.createElement('div');
+  backdrop.id = 'actionMenuBackdrop';
+  backdrop.className = 'action-menu-backdrop hidden';
+  backdrop.addEventListener('click', () => {
+    document.querySelectorAll('.row-action-menu').forEach((el) => el.classList.add('hidden'));
+  document.getElementById('actionMenuBackdrop')?.classList.add('hidden');
+    backdrop.classList.add('hidden');
+  });
+  document.body.appendChild(backdrop);
+}
+
 const FOLLOW_UP_HOURS = 24;
 
 function parseDate(v){ const d=new Date(v||''); return Number.isNaN(d.getTime()) ? null : d; }
@@ -5,15 +19,24 @@ function hoursSince(v){ const d=parseDate(v); if(!d) return 999; return (Date.no
 
 function closeAllRowMenus() {
   document.querySelectorAll('.row-action-menu').forEach((el) => el.classList.add('hidden'));
+  document.getElementById('actionMenuBackdrop')?.classList.add('hidden');
 }
 
 function toggleRowActionMenu(event, id) {
   event.stopPropagation();
   const menu = document.getElementById(`ticketRowMenu-${id}`);
   if (!menu) return;
+  const trigger = event.currentTarget;
   const isHidden = menu.classList.contains('hidden');
   closeAllRowMenus();
-  if (isHidden) menu.classList.remove('hidden');
+  if (!isHidden) return;
+  ensureActionMenuBackdrop();
+  document.getElementById('actionMenuBackdrop')?.classList.remove('hidden');
+  const rect = trigger.getBoundingClientRect();
+  menu.style.position = 'fixed';
+  menu.style.top = `${rect.bottom + 4}px`;
+  menu.style.left = `${Math.max(8, rect.right - 180)}px`;
+  menu.classList.remove('hidden');
 }
 
 function actionMenu(ticket){
