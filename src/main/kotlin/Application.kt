@@ -130,7 +130,7 @@ fun Application.module() {
         ticketRoutes(ticketService)
         monitoringRoutes(monitoringService, deviceRepo)
         analyticsRoutes(ticketService, monitoringService, aiService)
-        deviceRoutes(deviceRepo)
+        deviceRoutes(deviceRepo, userRepo)
         notificationRoutes(notificationService)
         knowledgeRoutes(knowledgeService)
         slaRoutes(slaService)

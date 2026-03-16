@@ -32,6 +32,10 @@ class DeviceRepository {
 
     fun list(): List<Device> = transaction { DevicesTable.selectAll().map(::toDevice) }
 
+    fun findByIp(ip: String): Device? = transaction {
+        DevicesTable.selectAll().where { DevicesTable.ipAddress eq ip.trim() }.singleOrNull()?.let(::toDevice)
+    }
+
 
     fun upsertClientMetrics(req: ClientMetricsRequest): Device = transaction {
         require(privateNetworks.any { req.ipAddress.startsWith(it) }) { "Only LAN devices are monitorable." }

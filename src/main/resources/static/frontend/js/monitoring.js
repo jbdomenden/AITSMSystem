@@ -120,6 +120,37 @@ async function loadMonitoring() {
   renderMonitorTable(safeDevices);
 }
 
+
+
+async function autoFillDeviceContextByIp() {
+  const ipInput = document.getElementById('ipAddress');
+  const deviceInput = document.getElementById('deviceName');
+  const assignedInput = document.getElementById('assignedUser');
+  if (!ipInput || !deviceInput || !assignedInput) return;
+
+  const ip = (ipInput.value || '').trim();
+  if (!ip) return;
+
+  try {
+    const res = await fetch(`/api/devices/ip-lookup?ip=${encodeURIComponent(ip)}`, { headers: authHeaders() });
+    const data = await res.json();
+    if (!res.ok) return;
+
+    if (!deviceInput.value.trim() && data.deviceName) deviceInput.value = data.deviceName;
+    if (!assignedInput.value.trim() && data.assignedUser) assignedInput.value = data.assignedUser;
+  } catch {
+    // best-effort enrichment only
+  }
+}
+
+function bindAssetAutoFill() {
+  const ipInput = document.getElementById('ipAddress');
+  if (!ipInput || ipInput.dataset.boundAutofill === '1') return;
+  ipInput.dataset.boundAutofill = '1';
+  ipInput.addEventListener('blur', autoFillDeviceContextByIp);
+  ipInput.addEventListener('change', autoFillDeviceContextByIp);
+}
+
 async function registerDevice() {
   const deviceNameEl = document.getElementById('deviceName');
   const ipAddressEl = document.getElementById('ipAddress');
@@ -194,6 +225,7 @@ function stopMonitoringAutoRefresh() {
 document.addEventListener('DOMContentLoaded', () => {
   loadMonitoring();
   loadDevices();
+  bindAssetAutoFill();
   startMonitoringAutoRefresh();
 });
 
