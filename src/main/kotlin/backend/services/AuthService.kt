@@ -4,6 +4,7 @@ import backend.models.AdminEligibilityResponse
 import backend.models.AdminGrantResponse
 import backend.models.AuthResponse
 import backend.models.LoginRequest
+import backend.models.InternalUserCreateRequest
 import backend.models.ProfileUpdateRequest
 import backend.models.RegisterRequest
 import backend.models.RegistrationResponse
@@ -71,9 +72,6 @@ class AuthService(
         val normalizedEmail = request.email.trim()
         val (user, hash) = userRepository.findByEmail(normalizedEmail) ?: error("Invalid credentials")
         require(PasswordHasher.verify(request.password, hash)) { "Invalid credentials" }
-        require(user.emailVerified || user.role == "admin" || user.role == "superadmin") {
-            "Please verify your email before logging in."
-        }
 
         auditRepository.log(user.id, "User login", "auth")
         return AuthResponse(token = tokenFor(user.id, user.role), user = user)
@@ -91,6 +89,21 @@ class AuthService(
         val updated = userRepository.updateProfile(userId, req.fullName.trim(), req.company.trim(), req.department.trim())
             ?: error("Unable to update profile")
         auditRepository.log(userId, "Updated own profile", "users")
+        return updated
+    }
+
+
+
+    fun changeOwnPassword(userId: Int, currentPassword: String, newPassword: String, confirmPassword: String): User {
+        require(newPassword == confirmPassword) { "Passwords do not match" }
+        require(newPassword.length >= 8) { "Password must be at least 8 characters" }
+
+        val currentHash = userRepository.findHashById(userId) ?: error("User not found")
+        require(PasswordHasher.verify(currentPassword, currentHash)) { "Current password is incorrect" }
+
+        val updated = userRepository.updateOwnPassword(userId, PasswordHasher.hash(newPassword))
+            ?: error("Unable to update password")
+        auditRepository.log(userId, "Changed own password", "users")
         return updated
     }
 
@@ -126,6 +139,31 @@ class AuthService(
         val state = if (approved) "approved" else "set to pending verification"
         auditRepository.log(actorUserId, "Email $state for ${updated.email}", "users")
         return updated
+    }
+
+    fun createUserInternally(request: InternalUserCreateRequest, actorUserId: Int?): User {
+        require(request.fullName.isNotBlank()) { "Full name is required" }
+        require(request.email.isNotBlank()) { "Email is required" }
+        require(request.company.isNotBlank()) { "Company is required" }
+        require(request.department.isNotBlank()) { "Department is required" }
+        require(request.password == request.confirmPassword) { "Passwords do not match" }
+        require(request.password.length >= 8) { "Password must be at least 8 characters" }
+        require(request.role in setOf("end-user", "admin")) { "Unsupported role" }
+
+        val normalizedEmail = request.email.trim().lowercase()
+        require(userRepository.findByEmailOnly(normalizedEmail) == null) { "Email already exists" }
+
+        val created = userRepository.createInternalUser(
+            fullName = request.fullName.trim(),
+            email = normalizedEmail,
+            company = request.company.trim(),
+            department = request.department.trim(),
+            passwordHash = PasswordHasher.hash(request.password),
+            role = request.role,
+            emailVerified = request.emailVerified
+        )
+        auditRepository.log(actorUserId, "Created internal user ${created.email} (${created.role})", "users")
+        return created
     }
 
     fun adminGrantEligibility(targetEmail: String): AdminEligibilityResponse {

@@ -18,6 +18,32 @@ import org.jetbrains.exposed.sql.update
 import java.time.LocalDateTime
 
 class UserRepository {
+    fun createInternalUser(
+        fullName: String,
+        email: String,
+        company: String,
+        department: String,
+        passwordHash: String,
+        role: String = "end-user",
+        emailVerified: Boolean = true
+    ): User = transaction {
+        val now = LocalDateTime.now()
+        val id = UsersTable.insert {
+            it[UsersTable.fullName] = fullName
+            it[UsersTable.email] = email.lowercase()
+            it[UsersTable.company] = company
+            it[UsersTable.department] = department
+            it[UsersTable.passwordHash] = passwordHash
+            it[UsersTable.role] = role
+            it[UsersTable.emailVerified] = emailVerified
+            it[UsersTable.verificationCode] = null
+            it[UsersTable.verificationExpiresAt] = null
+            it[UsersTable.createdAt] = now
+        }[UsersTable.id]
+
+        UsersTable.selectAll().where { UsersTable.id eq id }.single().let(::toUser)
+    }
+
     fun create(
         request: RegisterRequest,
         passwordHash: String,
@@ -171,6 +197,14 @@ class UserRepository {
             it[UsersTable.company] = company
             it[UsersTable.department] = department
         }
+        UsersTable.selectAll().where { UsersTable.id eq row[UsersTable.id] }.singleOrNull()?.let(::toUser)
+    }
+
+
+
+    fun updateOwnPassword(userId: Int, passwordHash: String): User? = transaction {
+        val row = UsersTable.selectAll().where { UsersTable.id eq userId }.singleOrNull() ?: return@transaction null
+        UsersTable.update({ UsersTable.id eq userId }) { it[UsersTable.passwordHash] = passwordHash }
         UsersTable.selectAll().where { UsersTable.id eq row[UsersTable.id] }.singleOrNull()?.let(::toUser)
     }
 
