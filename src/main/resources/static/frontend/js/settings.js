@@ -57,3 +57,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     alert(error.message || 'Unable to load settings data');
   }
 });
+
+
+async function changeMyPassword() {
+  const body = {
+    currentPassword: document.getElementById('currentPassword')?.value || '',
+    newPassword: document.getElementById('newPassword')?.value || '',
+    confirmPassword: document.getElementById('confirmNewPassword')?.value || ''
+  };
+  const res = await fetch('/api/users/me/password', {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if (!res.ok) return alert(data.error || 'Unable to change password');
+  alert(data.message || 'Password changed successfully');
+  document.getElementById('currentPassword').value = '';
+  document.getElementById('newPassword').value = '';
+  document.getElementById('confirmNewPassword').value = '';
+}
