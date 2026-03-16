@@ -4,6 +4,8 @@ import backend.models.HostTelemetryDto
 import backend.models.LanDeviceDto
 import backend.models.MonitoringSummaryDto
 import backend.repository.DeviceRepository
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import java.lang.management.ManagementFactory
 import java.net.InetAddress
 import java.net.NetworkInterface
@@ -36,7 +38,6 @@ class MonitoringService(private val deviceRepository: DeviceRepository) {
     }
 
     fun lanDevices(): List<LanDeviceDto> {
-        val now = LocalDateTime.now().toString()
         val host = hostTelemetry()
         val hostDevice = LanDeviceDto(
             id = "host-${host.ipAddress}",
@@ -50,7 +51,7 @@ class MonitoringService(private val deviceRepository: DeviceRepository) {
             lastSeen = host.timestamp
         )
 
-        val deviceRows = devices().map {
+        val fromAgents = devices().map {
             val hasTelemetry = it.cpuUsage > 0 || it.memoryUsage > 0
             LanDeviceDto(
                 id = "device-${it.id}",
@@ -65,7 +66,23 @@ class MonitoringService(private val deviceRepository: DeviceRepository) {
             )
         }
 
-        return listOf(hostDevice) + deviceRows
+        val discovered = discoverLanPeers().map { peer ->
+            LanDeviceDto(
+                id = "peer-${peer.ipAddress}",
+                hostname = peer.hostname,
+                ipAddress = peer.ipAddress,
+                reachable = true,
+                telemetryAvailable = false,
+                telemetrySourceType = "DISCOVERED",
+                cpuUsagePercent = null,
+                memoryUsagePercent = null,
+                lastSeen = LocalDateTime.now().toString()
+            )
+        }
+
+        return (listOf(hostDevice) + fromAgents + discovered)
+            .distinctBy { it.ipAddress }
+            .sortedBy { it.ipAddress }
     }
 
     fun summary(): MonitoringSummaryDto {
@@ -81,13 +98,34 @@ class MonitoringService(private val deviceRepository: DeviceRepository) {
     }
 
     fun refreshDiscovery(): Map<String, String> {
-        // Honest LAN discovery placeholder: list local active interfaces for now.
-        val interfaces = NetworkInterface.getNetworkInterfaces().toList()
-            .filter { it.isUp && !it.isLoopback }
-            .flatMap { ni -> ni.inetAddresses.toList().map { "${ni.displayName}:${it.hostAddress}" } }
-            .filter { addr -> isLanIp(addr.substringAfterLast(':')) }
+        val peers = discoverLanPeers().joinToString(" | ") { "${it.hostname}:${it.ipAddress}" }
+        return mapOf("message" to "Discovery refresh completed", "interfaces" to peers)
+    }
 
-        return mapOf("message" to "Discovery refresh completed", "interfaces" to interfaces.joinToString(" | "))
+    private data class Peer(val hostname: String, val ipAddress: String)
+
+    private fun discoverLanPeers(): List<Peer> {
+        val ifacePeers = NetworkInterface.getNetworkInterfaces().toList()
+            .filter { it.isUp && !it.isLoopback }
+            .flatMap { ni -> ni.inetAddresses.toList().mapNotNull { addr ->
+                val ip = addr.hostAddress.substringBefore('%')
+                if (!isLanIp(ip)) null else Peer(ni.displayName.ifBlank { "LAN Host" }, ip)
+            }}
+
+        val ipNeighPeers = runCatching {
+            val process = ProcessBuilder("sh", "-c", "ip neigh").start()
+            BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
+                reader.readLines().mapNotNull { line ->
+                    val ip = line.substringBefore(' ').trim()
+                    if (!isLanIp(ip)) return@mapNotNull null
+                    val state = line.substringAfterLast(' ', "")
+                    if (state.equals("FAILED", true)) return@mapNotNull null
+                    Peer("LAN Peer", ip)
+                }
+            }
+        }.getOrElse { emptyList() }
+
+        return (ifacePeers + ipNeighPeers).distinctBy { it.ipAddress }
     }
 
     private fun isLanIp(ip: String): Boolean {

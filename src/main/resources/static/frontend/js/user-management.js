@@ -1,3 +1,16 @@
+function closeUserMgmtMenus() {
+  document.querySelectorAll('.row-action-menu').forEach((el) => el.classList.add('hidden'));
+}
+
+function toggleUserMgmtMenu(event, id) {
+  event.stopPropagation();
+  const menu = document.getElementById(`userMgmtMenu-${id}`);
+  if (!menu) return;
+  const open = menu.classList.contains('hidden');
+  closeUserMgmtMenus();
+  if (open) menu.classList.remove('hidden');
+}
+
 async function fetchJsonOrThrow(url, options = {}) {
   const res = await fetch(url, { headers: authHeaders(), ...options });
   const data = await res.json();
@@ -96,19 +109,25 @@ async function loadUserManagement() {
     rows.innerHTML = users.map(u => {
       const currentUserId = Number(localStorage.getItem('userId') || 0);
       const canChange = u.role !== 'superadmin' && u.id !== currentUserId;
-      const roleBtn = u.role === 'admin'
-        ? `<button class='btn btn-ghost icon-btn' ${canChange ? '' : 'disabled'} onclick='changeRoleFromUserManagement(${u.id}, "end-user")' title='Set as end-user' aria-label='Set as end-user'>👤</button>`
-        : `<button class='btn btn-primary icon-btn' ${canChange ? '' : 'disabled'} onclick='openAddAdminFromUserManagement("${u.email}")' title='Grant admin role' aria-label='Grant admin role'>🛡️</button>`;
-      const approvalBtn = `<button class='btn btn-ghost icon-btn' ${canChange ? '' : 'disabled'} onclick='setUserEmailApprovalFromUserManagement(${u.id}, ${u.emailVerified ? 'false' : 'true'})' title='${u.emailVerified ? 'Mark email as pending' : 'Approve email for login'}' aria-label='${u.emailVerified ? 'Mark email as pending' : 'Approve email for login'}'>${u.emailVerified ? '✉️' : '✅'}</button>`;
-      const resetBtn = `<button class='btn btn-ghost icon-btn' ${canChange ? '' : 'disabled'} onclick='resetUserPasswordFromUserManagement(${u.id}, "${u.email}")' title='Reset password' aria-label='Reset password'>🔑</button>`;
-      const deleteBtn = `<button class='btn btn-ghost icon-btn' ${canChange ? '' : 'disabled'} onclick='deleteUserFromUserManagement(${u.id}, "${u.email}")' title='Delete account' aria-label='Delete account'>🗑️</button>`;
+      const menuItems = [
+        u.role === 'admin'
+          ? `<button type='button' ${canChange ? '' : 'disabled'} onclick='changeRoleFromUserManagement(${u.id}, "end-user")'>Set as end-user</button>`
+          : `<button type='button' ${canChange ? '' : 'disabled'} onclick='openAddAdminFromUserManagement("${u.email}")'>Grant admin role</button>`,
+        `<button type='button' ${canChange ? '' : 'disabled'} onclick='setUserEmailApprovalFromUserManagement(${u.id}, ${u.emailVerified ? 'false' : 'true'})'>${u.emailVerified ? 'Mark email as pending' : 'Approve email for login'}</button>`,
+        `<button type='button' ${canChange ? '' : 'disabled'} onclick='resetUserPasswordFromUserManagement(${u.id}, "${u.email}")'>Reset password</button>`,
+        `<button type='button' ${canChange ? '' : 'disabled'} onclick='deleteUserFromUserManagement(${u.id}, "${u.email}")'>Delete account</button>`
+      ].join('');
+      const actionMenu = `<div class='row-action-wrap'>
+        <button class='btn btn-ghost icon-btn' onclick='toggleUserMgmtMenu(event, ${u.id})' title='Actions' aria-label='Actions'>⋯</button>
+        <div id='userMgmtMenu-${u.id}' class='row-action-menu hidden'>${menuItems}</div>
+      </div>`;
 
       return `<tr>
         <td>${u.fullName}</td>
         <td>${u.email}</td>
         <td><span class='badge ${u.role === 'admin' || u.role === 'superadmin' ? 'in-progress' : 'resolved'}'>${u.role}</span></td>
         <td>${u.emailVerified ? '<span class="badge resolved">Verified</span>' : '<span class="badge warning">Pending</span>'}</td>
-        <td><div class='inline-actions'>${roleBtn}${approvalBtn}${resetBtn}${deleteBtn}</div></td>
+        <td>${actionMenu}</td>
       </tr>`;
     }).join('');
   } catch (error) {
@@ -116,4 +135,73 @@ async function loadUserManagement() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', loadUserManagement);
+document.addEventListener('click', () => closeUserMgmtMenus());
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadUserManagement();
+  document.getElementById('openCreateUserBtn')?.addEventListener('click', openCreateUserModal);
+  document.getElementById('createUserForm')?.addEventListener('submit', submitCreateUser);
+  document.getElementById('createUserModal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'createUserModal') closeCreateUserModal();
+  });
+});
+
+
+function setCreateUserMessage(message, tone = 'info') {
+  const el = document.getElementById('createUserMessage');
+  if (!el) return;
+  el.textContent = message || '';
+  el.classList.remove('text-success', 'text-danger');
+  if (tone === 'success') el.classList.add('text-success');
+  if (tone === 'danger') el.classList.add('text-danger');
+}
+
+function openCreateUserModal() {
+  const modal = document.getElementById('createUserModal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  modal.classList.add('show');
+  setCreateUserMessage('');
+  document.getElementById('internalFullName')?.focus();
+}
+
+function closeCreateUserModal() {
+  const modal = document.getElementById('createUserModal');
+  if (!modal) return;
+  modal.classList.remove('show');
+  modal.classList.add('hidden');
+  document.getElementById('createUserForm')?.reset();
+  const verified = document.getElementById('internalEmailVerified');
+  if (verified) verified.checked = true;
+  setCreateUserMessage('');
+}
+
+async function submitCreateUser(event) {
+  event.preventDefault();
+  const payload = {
+    fullName: document.getElementById('internalFullName')?.value?.trim() || '',
+    email: document.getElementById('internalEmail')?.value?.trim() || '',
+    company: document.getElementById('internalCompany')?.value?.trim() || '',
+    department: document.getElementById('internalDepartment')?.value?.trim() || '',
+    password: document.getElementById('internalPassword')?.value || '',
+    confirmPassword: document.getElementById('internalConfirmPassword')?.value || '',
+    role: document.getElementById('internalRole')?.value || 'end-user',
+    emailVerified: Boolean(document.getElementById('internalEmailVerified')?.checked)
+  };
+
+  setCreateUserMessage('Creating account...');
+  const res = await fetch('/api/users', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    setCreateUserMessage(data.error || 'Unable to create account', 'danger');
+    return;
+  }
+
+  setCreateUserMessage(data.message || 'User account created', 'success');
+  await loadUserManagement();
+  setTimeout(() => closeCreateUserModal(), 900);
+}

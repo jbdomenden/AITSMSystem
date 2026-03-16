@@ -554,3 +554,12 @@ body.sidebar-hidden .sidebar {
   opacity: .92;
   border-style: dashed;
 }
+
+
+.notif-count { font-size: 11px; background: #ef4444; color: #fff; border-radius: 999px; padding: 1px 6px; margin-left: 4px; }
+.help-tip { display:inline-grid; place-items:center; width:16px; height:16px; border-radius:999px; background:#dbeafe; color:#1d4ed8; font-size:11px; font-weight:700; cursor:help; margin-left:6px; }
+
+.row-action-wrap { position: relative; display: inline-flex; justify-content: center; }
+.row-action-menu { position: absolute; right: 0; top: calc(100% + 4px); min-width: 170px; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-md); z-index: 40; display: grid; padding: 6px; }
+.row-action-menu button { border: 0; background: transparent; text-align: left; padding: 8px 10px; border-radius: 8px; cursor: pointer; font: inherit; color: #0f172a; }
+.row-action-menu button:hover { background: #f1f5f9; }
