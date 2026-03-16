@@ -200,6 +200,14 @@ class UserRepository {
         UsersTable.selectAll().where { UsersTable.id eq row[UsersTable.id] }.singleOrNull()?.let(::toUser)
     }
 
+
+
+    fun updateOwnPassword(userId: Int, passwordHash: String): User? = transaction {
+        val row = UsersTable.selectAll().where { UsersTable.id eq userId }.singleOrNull() ?: return@transaction null
+        UsersTable.update({ UsersTable.id eq userId }) { it[UsersTable.passwordHash] = passwordHash }
+        UsersTable.selectAll().where { UsersTable.id eq row[UsersTable.id] }.singleOrNull()?.let(::toUser)
+    }
+
     fun updatePassword(userId: Int, passwordHash: String): User? = transaction {
         val row = UsersTable.selectAll().where { UsersTable.id eq userId }.singleOrNull() ?: return@transaction null
         if (row[UsersTable.role] == "superadmin") return@transaction null

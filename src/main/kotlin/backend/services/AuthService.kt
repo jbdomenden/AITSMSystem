@@ -92,6 +92,21 @@ class AuthService(
         return updated
     }
 
+
+
+    fun changeOwnPassword(userId: Int, currentPassword: String, newPassword: String, confirmPassword: String): User {
+        require(newPassword == confirmPassword) { "Passwords do not match" }
+        require(newPassword.length >= 8) { "Password must be at least 8 characters" }
+
+        val currentHash = userRepository.findHashById(userId) ?: error("User not found")
+        require(PasswordHasher.verify(currentPassword, currentHash)) { "Current password is incorrect" }
+
+        val updated = userRepository.updateOwnPassword(userId, PasswordHasher.hash(newPassword))
+            ?: error("Unable to update password")
+        auditRepository.log(userId, "Changed own password", "users")
+        return updated
+    }
+
     fun resetUserPassword(targetUserId: Int, newPassword: String, confirmPassword: String, actorUserId: Int?): User {
         require(newPassword == confirmPassword) { "Passwords do not match" }
         require(newPassword.length >= 8) { "Password must be at least 8 characters" }

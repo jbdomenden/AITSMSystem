@@ -43,11 +43,16 @@
       </article>
 
       <article class='card'>
-        <div class='card-head'><h3 class='section-title'>Account</h3><span class='card-icon'>🛡</span></div>
-        <p class='small'>User lifecycle controls are now available on the dedicated User Management page in the sidebar.</p>
+        <div class='card-head'><h3 class='section-title'>Account <span class='help-tip' data-help='Change your own password here. Use at least 8 characters.'>?</span></h3><span class='card-icon'>🛡</span></div>
+        <div class='form-grid single-col'>
+          <div class='form-group'><label>Current Password</label><input id='currentPassword' type='password'></div>
+          <div class='form-group'><label>New Password</label><input id='newPassword' type='password'></div>
+          <div class='form-group'><label>Confirm New Password</label><input id='confirmNewPassword' type='password'></div>
+        </div>
+        <div class='inline-actions' style='margin-top:12px'><button class='btn btn-primary' onclick='changeMyPassword()'>Change Password</button></div>
       </article>
     </section>
   </main>
 </div>
-<script src='/js/admin-shell.js'></script><script src='/js/app.js'></script><script src='/js/settings.js'></script>
+<script src='/js/admin-shell.js'></script><script src='/js/app.js'></script><script src='/js/help.js'></script><script src='/js/settings.js'></script>
 </body></html>

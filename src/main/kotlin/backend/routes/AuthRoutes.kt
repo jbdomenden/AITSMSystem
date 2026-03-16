@@ -4,6 +4,7 @@ import backend.models.AdminEligibilityRequest
 import backend.models.AdminGrantRequest
 import backend.models.AdminSensitiveVerifyRequest
 import backend.models.EmailApprovalRequest
+import backend.models.ChangeOwnPasswordRequest
 import backend.models.LoginRequest
 import backend.models.InternalUserCreateRequest
 import backend.models.PasswordResetRequest
@@ -53,6 +54,12 @@ fun Route.authRoutes(authService: AuthService) {
             val actor = call.userId() ?: return@put call.respond(HttpStatusCode.Unauthorized)
             val req = call.receive<ProfileUpdateRequest>()
             call.respond(authService.updateOwnProfile(actor, req))
+        }
+        put("/me/password") {
+            val actor = call.userId() ?: return@put call.respond(HttpStatusCode.Unauthorized)
+            val req = call.receive<ChangeOwnPasswordRequest>()
+            val updated = authService.changeOwnPassword(actor, req.currentPassword, req.newPassword, req.confirmPassword)
+            call.respond(mapOf("message" to "Password changed successfully", "user" to updated))
         }
 
         get {
