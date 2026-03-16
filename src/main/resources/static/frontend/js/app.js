@@ -62,7 +62,6 @@ function injectGlobalHeader() {
   content.prepend(header);
 }
 
-
 function ensurePageSplash() {
   if (document.getElementById('pageSplash')) return;
   const splash = document.createElement('div');
@@ -91,6 +90,67 @@ function markActiveNav() {
   });
 }
 
+function ensurePasswordModal() {
+  if (document.getElementById('passwordModal')) return;
+  const modal = document.createElement('div');
+  modal.id = 'passwordModal';
+  modal.className = 'modal-overlay hidden';
+  modal.innerHTML = `
+    <div class='modal-card'>
+      <div class='card-head'><h3 class='section-title'>Change Password</h3></div>
+      <div class='form-grid single-col'>
+        <div class='form-group'><label>Current Password</label><input id='modalCurrentPassword' type='password'></div>
+        <div class='form-group'><label>New Password</label><input id='modalNewPassword' type='password'></div>
+        <div class='form-group'><label>Confirm New Password</label><input id='modalConfirmPassword' type='password'></div>
+      </div>
+      <div class='inline-actions' style='justify-content:flex-end'>
+        <button type='button' class='btn btn-ghost' onclick='closePasswordModal()'>Cancel</button>
+        <button type='button' class='btn btn-primary' onclick='submitPasswordChange()'>Save</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  modal.addEventListener('click', (event) => {
+    if (event.target?.id === 'passwordModal') closePasswordModal();
+  });
+}
+
+function openPasswordModal() {
+  ensurePasswordModal();
+  const modal = document.getElementById('passwordModal');
+  modal?.classList.remove('hidden');
+  modal?.classList.add('show');
+  document.getElementById('modalCurrentPassword')?.focus();
+}
+
+function closePasswordModal() {
+  const modal = document.getElementById('passwordModal');
+  modal?.classList.remove('show');
+  modal?.classList.add('hidden');
+  ['modalCurrentPassword', 'modalNewPassword', 'modalConfirmPassword'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+}
+
+async function submitPasswordChange() {
+  const body = {
+    currentPassword: document.getElementById('modalCurrentPassword')?.value || '',
+    newPassword: document.getElementById('modalNewPassword')?.value || '',
+    confirmPassword: document.getElementById('modalConfirmPassword')?.value || ''
+  };
+
+  const res = await fetch('/api/users/me/password', {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if (!res.ok) return alert(data.error || 'Unable to change password');
+  alert(data.message || 'Password changed successfully');
+  closePasswordModal();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   ensurePageSplash();
   enforcePageAccess();
@@ -100,7 +160,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 window.addEventListener('load', hidePageSplash);
-
 
 function ensureAppAlertModal() {
   if (document.getElementById('appAlertModal')) return;

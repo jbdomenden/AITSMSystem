@@ -1,3 +1,16 @@
+function closeUserMgmtMenus() {
+  document.querySelectorAll('.row-action-menu').forEach((el) => el.classList.add('hidden'));
+}
+
+function toggleUserMgmtMenu(event, id) {
+  event.stopPropagation();
+  const menu = document.getElementById(`userMgmtMenu-${id}`);
+  if (!menu) return;
+  const open = menu.classList.contains('hidden');
+  closeUserMgmtMenus();
+  if (open) menu.classList.remove('hidden');
+}
+
 async function fetchJsonOrThrow(url, options = {}) {
   const res = await fetch(url, { headers: authHeaders(), ...options });
   const data = await res.json();
@@ -96,25 +109,33 @@ async function loadUserManagement() {
     rows.innerHTML = users.map(u => {
       const currentUserId = Number(localStorage.getItem('userId') || 0);
       const canChange = u.role !== 'superadmin' && u.id !== currentUserId;
-      const roleBtn = u.role === 'admin'
-        ? `<button class='btn btn-ghost icon-btn' ${canChange ? '' : 'disabled'} onclick='changeRoleFromUserManagement(${u.id}, "end-user")' title='Set as end-user' aria-label='Set as end-user'>👤</button>`
-        : `<button class='btn btn-primary icon-btn' ${canChange ? '' : 'disabled'} onclick='openAddAdminFromUserManagement("${u.email}")' title='Grant admin role' aria-label='Grant admin role'>🛡️</button>`;
-      const approvalBtn = `<button class='btn btn-ghost icon-btn' ${canChange ? '' : 'disabled'} onclick='setUserEmailApprovalFromUserManagement(${u.id}, ${u.emailVerified ? 'false' : 'true'})' title='${u.emailVerified ? 'Mark email as pending' : 'Approve email for login'}' aria-label='${u.emailVerified ? 'Mark email as pending' : 'Approve email for login'}'>${u.emailVerified ? '✉️' : '✅'}</button>`;
-      const resetBtn = `<button class='btn btn-ghost icon-btn' ${canChange ? '' : 'disabled'} onclick='resetUserPasswordFromUserManagement(${u.id}, "${u.email}")' title='Reset password' aria-label='Reset password'>🔑</button>`;
-      const deleteBtn = `<button class='btn btn-ghost icon-btn' ${canChange ? '' : 'disabled'} onclick='deleteUserFromUserManagement(${u.id}, "${u.email}")' title='Delete account' aria-label='Delete account'>🗑️</button>`;
+      const menuItems = [
+        u.role === 'admin'
+          ? `<button type='button' ${canChange ? '' : 'disabled'} onclick='changeRoleFromUserManagement(${u.id}, "end-user")'>Set as end-user</button>`
+          : `<button type='button' ${canChange ? '' : 'disabled'} onclick='openAddAdminFromUserManagement("${u.email}")'>Grant admin role</button>`,
+        `<button type='button' ${canChange ? '' : 'disabled'} onclick='setUserEmailApprovalFromUserManagement(${u.id}, ${u.emailVerified ? 'false' : 'true'})'>${u.emailVerified ? 'Mark email as pending' : 'Approve email for login'}</button>`,
+        `<button type='button' ${canChange ? '' : 'disabled'} onclick='resetUserPasswordFromUserManagement(${u.id}, "${u.email}")'>Reset password</button>`,
+        `<button type='button' ${canChange ? '' : 'disabled'} onclick='deleteUserFromUserManagement(${u.id}, "${u.email}")'>Delete account</button>`
+      ].join('');
+      const actionMenu = `<div class='row-action-wrap'>
+        <button class='btn btn-ghost icon-btn' onclick='toggleUserMgmtMenu(event, ${u.id})' title='Actions' aria-label='Actions'>⋯</button>
+        <div id='userMgmtMenu-${u.id}' class='row-action-menu hidden'>${menuItems}</div>
+      </div>`;
 
       return `<tr>
         <td>${u.fullName}</td>
         <td>${u.email}</td>
         <td><span class='badge ${u.role === 'admin' || u.role === 'superadmin' ? 'in-progress' : 'resolved'}'>${u.role}</span></td>
         <td>${u.emailVerified ? '<span class="badge resolved">Verified</span>' : '<span class="badge warning">Pending</span>'}</td>
-        <td><div class='inline-actions'>${roleBtn}${approvalBtn}${resetBtn}${deleteBtn}</div></td>
+        <td>${actionMenu}</td>
       </tr>`;
     }).join('');
   } catch (error) {
     rows.innerHTML = `<tr><td colspan='5' class='small text-danger'>${error.message}</td></tr>`;
   }
 }
+
+document.addEventListener('click', () => closeUserMgmtMenus());
 
 document.addEventListener('DOMContentLoaded', () => {
   loadUserManagement();

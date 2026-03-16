@@ -3,6 +3,33 @@ const FOLLOW_UP_HOURS = 24;
 function parseDate(v){ const d=new Date(v||''); return Number.isNaN(d.getTime()) ? null : d; }
 function hoursSince(v){ const d=parseDate(v); if(!d) return 999; return (Date.now()-d.getTime())/(1000*60*60); }
 
+function closeAllRowMenus() {
+  document.querySelectorAll('.row-action-menu').forEach((el) => el.classList.add('hidden'));
+}
+
+function toggleRowActionMenu(event, id) {
+  event.stopPropagation();
+  const menu = document.getElementById(`ticketRowMenu-${id}`);
+  if (!menu) return;
+  const isHidden = menu.classList.contains('hidden');
+  closeAllRowMenus();
+  if (isHidden) menu.classList.remove('hidden');
+}
+
+function actionMenu(ticket){
+  const status = ticket.status || '';
+  const canFollowUp = !['Resolved','Closed','Cancelled'].includes(status) && hoursSince(ticket.updatedAt) >= FOLLOW_UP_HOURS;
+  const items = [];
+  if(status === 'Resolved') items.push(`<button type='button' onclick='updateMyTicketStatus(${ticket.id}, "Closed")'>Close ticket</button>`);
+  if(['Open','In Progress','Follow-up Requested'].includes(status)) items.push(`<button type='button' onclick='updateMyTicketStatus(${ticket.id}, "Cancelled")'>Cancel ticket</button>`);
+  if(canFollowUp) items.push(`<button type='button' onclick='updateMyTicketStatus(${ticket.id}, "Follow-up Requested")'>Request follow-up</button>`);
+  if (!items.length) return '-';
+  return `<div class='row-action-wrap'>
+    <button class='btn btn-ghost icon-btn' onclick='toggleRowActionMenu(event, ${ticket.id})' title='Actions' aria-label='Actions'>⋯</button>
+    <div id='ticketRowMenu-${ticket.id}' class='row-action-menu hidden'>${items.join('')}</div>
+  </div>`;
+}
+
 async function createTicket() {
   const body = {
     title: title.value.trim(),
@@ -19,22 +46,13 @@ async function createTicket() {
 }
 
 async function updateMyTicketStatus(id, status){
+  closeAllRowMenus();
   const res = await fetch(`/api/tickets/${id}/status`, {
     method:'PUT', headers:authHeaders(), body: JSON.stringify({ status })
   });
   const data = await res.json();
   if(!res.ok) return alert(data.error || 'Unable to update ticket status');
   await loadTickets();
-}
-
-function actionButtons(ticket){
-  const status = ticket.status || '';
-  const canFollowUp = !['Resolved','Closed','Cancelled'].includes(status) && hoursSince(ticket.updatedAt) >= FOLLOW_UP_HOURS;
-  const parts = [];
-  if(status === 'Resolved') parts.push(`<button class='btn btn-primary icon-btn' onclick='updateMyTicketStatus(${ticket.id}, "Closed")' title='Close ticket'>✓</button>`);
-  if(['Open','In Progress','Follow-up Requested'].includes(status)) parts.push(`<button class='btn btn-ghost icon-btn' onclick='updateMyTicketStatus(${ticket.id}, "Cancelled")' title='Cancel ticket'>✕</button>`);
-  if(canFollowUp) parts.push(`<button class='btn btn-ghost icon-btn' onclick='updateMyTicketStatus(${ticket.id}, "Follow-up Requested")' title='Request follow-up'>↻</button>`);
-  return parts.join('');
 }
 
 async function loadTickets() {
@@ -48,7 +66,7 @@ async function loadTickets() {
 
   rows.innerHTML = tickets.map(t => {
     const klass = (t.status || 'Open').toLowerCase().replace(/\s+/g, '-');
-    const actions = role === 'end-user' ? `<td><div class='inline-actions'>${actionButtons(t)}</div></td>` : '';
+    const actions = role === 'end-user' ? `<td>${actionMenu(t)}</td>` : '<td>-</td>';
     return `<tr>
       <td>#${t.id}</td><td>${t.title}</td><td>${t.priority}</td><td><span class='badge ${klass}'>${t.status}</span></td>
       <td style='color:${t.overdue ? "var(--danger)" : "inherit"}'>${t.slaRemainingMinutes ?? '-'} min</td>
@@ -57,4 +75,5 @@ async function loadTickets() {
   }).join('') || `<tr><td colspan='6' class='small'>No tickets found.</td></tr>`;
 }
 
+document.addEventListener('click', () => closeAllRowMenus());
 document.addEventListener('DOMContentLoaded', loadTickets);

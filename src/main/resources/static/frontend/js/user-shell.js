@@ -22,6 +22,10 @@ function renderUserSidebar() {
   host.innerHTML = `<div class='brand'><span class='brand-dot'></span>AITSM Portal</div>${sections}`;
 }
 
+function openUserHelp() {
+  alert('How to use AITSM:\n1) Create a ticket with clear issue details.\n2) Track status in My Tickets.\n3) Close resolved tickets, cancel active tickets, or request follow-up after 24h unresolved.');
+}
+
 function closeUserHeaderMenu() {
   const menu = document.getElementById('userHeaderMenu');
   menu?.classList.add('hidden');
@@ -49,8 +53,8 @@ function renderUserUtilityHeader() {
     <div class='utility-right'>
       <button id='userMenuTrigger' class='btn btn-ghost icon-btn header-icon-btn' type='button' onclick='toggleUserHeaderMenu()' aria-label='Open account menu' title='Account menu'>⋮</button>
       <div id='userHeaderMenu' class='admin-header-menu hidden'>
-        <a href='/dashboard-user.html'>Dashboard</a>
-        <a href='/tickets.html'>My tickets</a>
+        <button type='button' onclick='openUserHelp()'>Help</button>
+        <button type='button' onclick='openPasswordModal()'>Change password</button>
         <button type='button' onclick='logout()'>Logout</button>
       </div>
     </div>`;

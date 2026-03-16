@@ -55,12 +55,12 @@ function renderUtilityHeader() {
       <div class='utility-brand'>AITSM Control</div>
     </div>
     <div class='utility-right'>
-      <button class='btn btn-ghost icon-btn header-icon-btn' type='button' onclick='toggleAdminNotifMenu()' aria-label='Notifications' title='Notifications'>🔔 <span id='adminNotifCount' class='notif-count'>0</span></button>
+      <button id='adminNotifTrigger' class='btn btn-ghost icon-btn header-icon-btn' type='button' onclick='toggleAdminNotifMenu()' aria-label='Notifications' title='Notifications'>🔔 <span id='adminNotifCount' class='notif-count'>0</span></button>
       <div id='adminNotifMenu' class='admin-header-menu hidden'><div id='adminNotifList' class='small'>Loading...</div></div>
       <button id='adminMenuTrigger' class='btn btn-ghost icon-btn header-icon-btn' type='button' onclick='toggleAdminHeaderMenu()' aria-label='Open account menu' title='Account menu'>⋮</button>
       <div id='adminHeaderMenu' class='admin-header-menu hidden'>
         <a href='/knowledge.html'>Help</a>
-        <a href='/settings.html'>Change password</a>
+        <button type='button' onclick='openPasswordModal()'>Change password</button>
         <button type='button' onclick='logout()'>Logout</button>
       </div>
     </div>`;
@@ -68,7 +68,7 @@ function renderUtilityHeader() {
   document.addEventListener('click', (event) => {
     const trigger = document.getElementById('adminMenuTrigger');
     const menu = document.getElementById('adminHeaderMenu');
-    const notifBtn = document.querySelector("button[title='Notifications']");
+    const notifBtn = document.getElementById('adminNotifTrigger');
     const notifMenu = document.getElementById('adminNotifMenu');
     if (menu && trigger && !(menu.contains(event.target) || trigger.contains(event.target))) closeAdminHeaderMenu();
     if (notifMenu && notifBtn && !(notifMenu.contains(event.target) || notifBtn.contains(event.target))) notifMenu.classList.add('hidden');
