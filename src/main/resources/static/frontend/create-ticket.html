@@ -1,34 +1,46 @@
 <!doctype html>
-<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Create Ticket | AITSM</title><link rel='stylesheet' href='/css/styles.css'></head>
+<html>
+<head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Create Ticket | AITSM</title><link rel='stylesheet' href='/css/styles.css'></head>
 <body>
 <div class='app-layout'>
-  <aside class='sidebar'>
-    <div class='brand'>AITSM Tickets</div>
-    <nav class='nav-group'>
-      <a class='nav-item' data-page='dashboard-user.html' href='/dashboard-user.html'>Home</a>
-      <a class='nav-item' data-page='create-ticket.html' href='/create-ticket.html'>Create Ticket</a>
-      <a class='nav-item' data-page='tickets.html' href='/tickets.html'>Tickets</a>
-    </nav>
-  </aside>
+  <aside id='userSidebar' class='sidebar'></aside>
   <main class='content'>
-    <div class='topbar'><div><h1 class='page-title'>Create New Ticket</h1><p class='page-subtitle'>Describe your issue and we'll help you resolve it.</p></div></div>
+    <section id='utilityHeader' class='utility-bar card'></section>
+
+    <div class='topbar'>
+      <div>
+        <h1 class='page-title'>Create New Ticket</h1>
+        <p class='page-subtitle'>Describe your issue and we'll help you resolve it.</p>
+      </div>
+    </div>
+
     <section class='card'>
-      <h3>Ticket Details</h3><p class='small'>Provide clear information about your issue.</p>
+      <div class='card-head'>
+        <div>
+          <h3 class='section-title'>Ticket Details <span class="help-tip" data-help="Add clear title, impact, and exact error details for faster resolution.">?</span></h3>
+          <p class='section-subtitle'>Provide clear information about your issue.</p>
+        </div>
+      </div>
       <div class='form-group'><label>Title *</label><input id='title' maxlength='255' placeholder='Brief summary of your issue'><div class='small'>0/255 characters</div></div>
       <div class='form-group'><label>Description *</label><textarea id='description' placeholder='Provide detailed information including steps and any error messages'></textarea><div class='small'>Minimum 10 characters required</div></div>
       <div class='form-grid'>
         <div class='form-group'><label>Priority *</label><select id='priority'><option>Critical</option><option>High</option><option selected>Medium</option><option>Low</option></select></div>
         <div class='form-group'><label>Category</label><select id='category'><option>Hardware</option><option>Software</option><option>Network</option><option>Database</option><option>Security</option><option>Other</option></select></div>
       </div>
-      <div class='inline-actions'><a href='/tickets.html' class='btn btn-ghost'>Cancel</a><button class='btn btn-primary' onclick='createTicket()'>Create Ticket</button></div>
+      <div class='inline-actions' style='margin-top:12px'><a href='/tickets.html' class='btn btn-ghost'>Cancel</a><button class='btn btn-primary' onclick='createTicket()'>Create Ticket</button></div>
     </section>
+
     <section class='card' style='margin-top:16px'>
-      <h3>AI Troubleshooting Assistant</h3>
-      <p class='small'>Get instant suggestions before submitting or while drafting.</p>
+      <div class='card-head'>
+        <div>
+          <h3 class='section-title'>AI Troubleshooting Assistant</h3>
+          <p class='section-subtitle'>Get instant suggestions before submitting or while drafting.</p>
+        </div>
+      </div>
       <button class='btn btn-primary' style='width:auto' onclick='suggestFixes()'>Generate Suggestions</button>
       <ul id='aiTips' class='tips'></ul>
     </section>
   </main>
 </div>
-<script src='/js/app.js'></script><script src='/js/tickets.js'></script><script src='/js/ai-assistant.js'></script>
+<script src='/js/user-shell.js'></script><script src='/js/app.js'></script><script src='/js/help.js'></script><script src='/js/tickets.js'></script><script src='/js/ai-assistant.js'></script>
 </body></html>

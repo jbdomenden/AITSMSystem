@@ -103,7 +103,7 @@ fun Application.module() {
     val authService = AuthService(userRepo, auditRepo)
     val ticketService = TicketService(ticketRepo, auditRepo)
     val monitoringService = MonitoringService(deviceRepo)
-    val aiService = AIService()
+    val aiService = AIService(knowledgeRepo)
     val slaService = SLAService().also { it.seedDefaults() }
     val notificationService = NotificationService()
     val knowledgeService = KnowledgeService(knowledgeRepo, auditRepo)
@@ -130,7 +130,7 @@ fun Application.module() {
         ticketRoutes(ticketService)
         monitoringRoutes(monitoringService, deviceRepo)
         analyticsRoutes(ticketService, monitoringService, aiService)
-        deviceRoutes(deviceRepo)
+        deviceRoutes(deviceRepo, userRepo, monitoringService)
         notificationRoutes(notificationService)
         knowledgeRoutes(knowledgeService)
         slaRoutes(slaService)

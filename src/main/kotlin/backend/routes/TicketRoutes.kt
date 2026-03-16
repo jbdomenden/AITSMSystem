@@ -38,7 +38,7 @@ fun Route.ticketRoutes(ticketService: TicketService) {
             val id = call.parameters["id"]?.toIntOrNull() ?: return@put call.respond(HttpStatusCode.BadRequest)
             val req = call.receive<TicketStatusUpdate>()
             val actor = "${call.userRole()}-${call.userId() ?: 0}"
-            val ticket = ticketService.updateStatus(id, req.status, actor, call.userId()) ?: return@put call.respond(HttpStatusCode.NotFound)
+            val ticket = ticketService.updateStatus(id, req.status, actor, call.userId(), call.userRole()) ?: return@put call.respond(HttpStatusCode.NotFound)
             call.respond(ticket)
         }
     }
