@@ -1,4 +1,4 @@
-const LAN_AUTO_REFRESH_MS = 5 * 60 * 1000;
+const LAN_AUTO_REFRESH_MS = 3 * 60 * 1000;
 let monitoringAutoRefreshTimer = null;
 
 function statusBadge(status) {
@@ -136,11 +136,30 @@ async function autoFillDeviceContextByIp() {
     const data = await res.json();
     if (!res.ok) return;
 
-    if (!deviceInput.value.trim() && data.deviceName) deviceInput.value = data.deviceName;
+    if (data.deviceName) deviceInput.value = data.deviceName;
     if (!assignedInput.value.trim() && data.assignedUser) assignedInput.value = data.assignedUser;
   } catch {
     // best-effort enrichment only
   }
+}
+
+
+
+function seedAssignedUserFromSession() {
+  const assignedInput = document.getElementById('assignedUser');
+  if (!assignedInput) return;
+  if (assignedInput.value.trim()) return;
+  const fullName = (localStorage.getItem('fullName') || '').trim();
+  const email = (localStorage.getItem('email') || '').trim();
+  assignedInput.value = fullName || email;
+}
+
+async function refreshAssetConnections() {
+  const res = await fetch('/api/devices/sync-from-monitoring', { method: 'POST', headers: authHeaders() });
+  const data = await res.json();
+  if (!res.ok) return alert(data.error || 'Unable to refresh device connections');
+  await Promise.all([loadDevices(), loadMonitoring()]);
+  alert(data.message || 'Asset connections refreshed');
 }
 
 function bindAssetAutoFill() {
@@ -157,6 +176,10 @@ async function registerDevice() {
   const departmentEl = document.getElementById('department');
   const assignedUserEl = document.getElementById('assignedUser');
   const statusEl = document.getElementById('status');
+
+  if (!(deviceNameEl?.value || '').trim() && (ipAddressEl?.value || '').trim()) {
+    await autoFillDeviceContextByIp();
+  }
 
   const body = {
     deviceName: (deviceNameEl?.value || '').trim(),
@@ -226,6 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadMonitoring();
   loadDevices();
   bindAssetAutoFill();
+  seedAssignedUserFromSession();
   startMonitoringAutoRefresh();
 });
 

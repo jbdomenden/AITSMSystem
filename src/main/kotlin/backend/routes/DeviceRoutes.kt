@@ -4,13 +4,14 @@ import backend.models.DeviceRequest
 import backend.repository.DeviceRepository
 import backend.repository.UserRepository
 import backend.security.requireRole
+import backend.services.MonitoringService
 import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import java.net.InetAddress
 
-fun Route.deviceRoutes(deviceRepository: DeviceRepository, userRepository: UserRepository) {
+fun Route.deviceRoutes(deviceRepository: DeviceRepository, userRepository: UserRepository, monitoringService: MonitoringService) {
     route("/api/devices") {
         post {
             if (!call.requireRole("admin")) return@post
@@ -52,6 +53,22 @@ fun Route.deviceRoutes(deviceRepository: DeviceRepository, userRepository: UserR
                     }
                 )
             )
+        }
+
+
+        post("/sync-from-monitoring") {
+            if (!call.requireRole("admin")) return@post
+            val peers = monitoringService.lanDevices()
+                .filter { it.telemetrySourceType != "HOST" }
+                .map {
+                    DeviceRepository.DiscoveredPeer(
+                        ipAddress = it.ipAddress,
+                        hostname = it.hostname,
+                        reachable = it.reachable
+                    )
+                }
+            val synced = deviceRepository.syncDiscoveredDevices(peers)
+            call.respond(mapOf("message" to "Device registry synchronized", "devices" to synced.size))
         }
 
         put("/{id}") {

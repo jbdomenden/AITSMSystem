@@ -13,6 +13,7 @@ import org.jetbrains.exposed.sql.update
 import java.time.LocalDateTime
 
 class DeviceRepository {
+    data class DiscoveredPeer(val ipAddress: String, val hostname: String, val reachable: Boolean)
     private val privateNetworks = listOf("10.", "192.168.", "172.16.", "172.17.", "172.18.", "172.19.", "172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.", "172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.")
 
     fun create(req: DeviceRequest): Device = transaction {
@@ -68,6 +69,22 @@ class DeviceRepository {
         DevicesTable.selectAll().where { DevicesTable.id eq existing[DevicesTable.id] }.single().let(::toDevice)
     }
 
+
+
+
+    fun syncDiscoveredDevices(discovered: List<DiscoveredPeer>): List<Device> = transaction {
+        val now = LocalDateTime.now()
+        discovered.forEach { peer ->
+            if (!privateNetworks.any { peer.ipAddress.startsWith(it) }) return@forEach
+            val row = DevicesTable.selectAll().where { DevicesTable.ipAddress eq peer.ipAddress }.singleOrNull() ?: return@forEach
+            DevicesTable.update({ DevicesTable.id eq row[DevicesTable.id] }) {
+                it[deviceName] = peer.hostname.ifBlank { row[DevicesTable.deviceName] }
+                it[status] = if (peer.reachable) "Online" else "Offline"
+                it[lastSeen] = now
+            }
+        }
+        list()
+    }
 
     fun update(id: Int, req: DeviceRequest): Device? = transaction {
         require(privateNetworks.any { req.ipAddress.startsWith(it) }) { "Only LAN devices are monitorable." }

@@ -12,6 +12,7 @@
         <h1 class='page-title'>Asset Management</h1>
         <p class='page-subtitle'>Register LAN devices and maintain ownership visibility.</p>
       </div>
+      <div class='inline-actions'><button class='btn btn-ghost' onclick='refreshAssetConnections()'>Refresh Connection</button></div>
     </div>
 
     <section class='card'>
@@ -23,7 +24,7 @@
         <span class='card-icon'>＋</span>
       </div>
       <div class='form-grid'>
-        <div class='form-group'><label>Device Name</label><input id='deviceName' placeholder='e.g., Accounting-PC-12'></div>
+        <div class='form-group'><label>Device Name</label><input id='deviceName' placeholder='Auto-detected from IP/hostname' readonly></div>
         <div class='form-group'><label>IP Address (LAN)</label><input id='ipAddress' placeholder='192.168.x.x'></div>
         <div class='form-group'><label>Department</label><input id='department' placeholder='Finance'></div>
         <div class='form-group'><label>Assigned User</label><input id='assignedUser' placeholder='jane.doe'></div>
