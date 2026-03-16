@@ -72,9 +72,6 @@ class AuthService(
         val normalizedEmail = request.email.trim()
         val (user, hash) = userRepository.findByEmail(normalizedEmail) ?: error("Invalid credentials")
         require(PasswordHasher.verify(request.password, hash)) { "Invalid credentials" }
-        require(user.emailVerified || user.role == "admin" || user.role == "superadmin") {
-            "Please verify your email before logging in."
-        }
 
         auditRepository.log(user.id, "User login", "auth")
         return AuthResponse(token = tokenFor(user.id, user.role), user = user)

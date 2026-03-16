@@ -8,16 +8,10 @@
 </head>
 <body>
 <div class='app-layout'>
-  <aside class='sidebar'>
-    <div class='brand'>AITSM Tickets</div>
-    <nav class='nav-group'>
-      <a class='nav-item' data-page='dashboard-user.html' href='/dashboard-user.html'>Home</a>
-      <a class='nav-item' data-page='create-ticket.html' href='/create-ticket.html'>Create Ticket</a>
-      <a class='nav-item' data-page='tickets.html' href='/tickets.html'>My Tickets</a>
-      <a class='nav-item' data-page='knowledge.html' href='/knowledge.html'>Knowledge</a>
-    </nav>
-  </aside>
+  <aside id='userSidebar' class='sidebar'></aside>
   <main class='content'>
+    <section id='utilityHeader' class='utility-bar card'></section>
+
     <div class='topbar'>
       <div>
         <h1 class='page-title'>Ticketing Workspace</h1>
@@ -65,6 +59,7 @@
     </section>
   </main>
 </div>
+<script src='/js/user-shell.js'></script>
 <script src='/js/app.js'></script>
 <script src='/js/user-dashboard.js'></script>
 </body>
