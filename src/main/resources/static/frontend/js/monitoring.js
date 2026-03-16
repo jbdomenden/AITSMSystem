@@ -8,6 +8,12 @@ function statusBadge(status) {
   return 'resolved';
 }
 
+
+function formatLastSeen(value) {
+  const date = new Date(value || '');
+  return Number.isNaN(date.getTime()) ? (value || '-') : date.toLocaleString();
+}
+
 function telemetryBadge(device) {
   if (device.telemetryAvailable) return `<span class='badge resolved'>${device.telemetrySourceType}</span>`;
   return `<span class='badge warning'>UNAVAILABLE</span>`;
@@ -115,17 +121,34 @@ async function loadMonitoring() {
 }
 
 async function registerDevice() {
+  const deviceNameEl = document.getElementById('deviceName');
+  const ipAddressEl = document.getElementById('ipAddress');
+  const departmentEl = document.getElementById('department');
+  const assignedUserEl = document.getElementById('assignedUser');
+  const statusEl = document.getElementById('status');
+
   const body = {
-    deviceName: deviceName.value.trim(),
-    ipAddress: ipAddress.value.trim(),
-    department: department.value.trim(),
-    assignedUser: assignedUser.value.trim(),
-    status: status.value
+    deviceName: (deviceNameEl?.value || '').trim(),
+    ipAddress: (ipAddressEl?.value || '').trim(),
+    department: (departmentEl?.value || '').trim(),
+    assignedUser: (assignedUserEl?.value || '').trim(),
+    status: statusEl?.value || 'Online'
   };
+
+  if (!body.deviceName || !body.ipAddress || !body.department || !body.assignedUser || !body.status) {
+    return alert('All device fields are required.');
+  }
+
   const res = await fetch('/api/devices', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
   const data = await res.json();
   if (!res.ok) return alert(data.error || 'Failed to register device (LAN only policy).');
-  deviceName.value = ipAddress.value = department.value = assignedUser.value = '';
+
+  if (deviceNameEl) deviceNameEl.value = '';
+  if (ipAddressEl) ipAddressEl.value = '';
+  if (departmentEl) departmentEl.value = '';
+  if (assignedUserEl) assignedUserEl.value = '';
+  if (statusEl) statusEl.value = 'Online';
+
   await loadDevices();
   await loadMonitoring();
 }
@@ -133,11 +156,25 @@ async function registerDevice() {
 async function loadDevices() {
   const rows = document.getElementById('deviceList');
   if (!rows) return;
-  const devices = await fetch('/api/devices', { headers: authHeaders() }).then(r => r.json());
-  const safe = Array.isArray(devices) ? devices : [];
 
-  rows.innerHTML = safe.map(d => `<tr><td>${d.deviceName}</td><td>${d.ipAddress}</td><td>${d.assignedUser}</td></tr>`).join('')
-    || `<tr><td colspan='3' class='small'>No devices registered yet.</td></tr>`;
+  const res = await fetch('/api/devices', { headers: authHeaders() });
+  const data = await res.json();
+  if (!res.ok) {
+    rows.innerHTML = `<tr><td colspan='8' class='small text-danger'>${data.error || 'Failed to load devices.'}</td></tr>`;
+    return;
+  }
+
+  const safe = Array.isArray(data) ? data : [];
+  rows.innerHTML = safe.map(d => `<tr>
+    <td>${d.deviceName || '-'}</td>
+    <td>${d.ipAddress || '-'}</td>
+    <td>${d.department || '-'}</td>
+    <td>${d.assignedUser || '-'}</td>
+    <td><span class='badge ${statusBadge(d.status)}'>${d.status || '-'}</span></td>
+    <td>${d.cpuUsage != null ? `${Number(d.cpuUsage).toFixed(0)}%` : '-'}</td>
+    <td>${d.memoryUsage != null ? `${Number(d.memoryUsage).toFixed(0)}%` : '-'}</td>
+    <td>${formatLastSeen(d.lastSeen)}</td>
+  </tr>`).join('') || `<tr><td colspan='8' class='small'>No devices registered yet.</td></tr>`;
 }
 
 function startMonitoringAutoRefresh() {
