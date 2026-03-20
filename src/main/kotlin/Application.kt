@@ -39,7 +39,7 @@ import io.ktor.server.routing.*
 import java.net.URI
 
 fun main() {
-    embeddedServer(Netty, port = System.getenv("PORT")?.toIntOrNull() ?: 8070, module = Application::module).start(wait = true)
+    embeddedServer(Netty, port = System.getenv("PORT")?.toIntOrNull() ?: 8070,host = "0.0.0.0", module = Application::module).start(wait = true)
 }
 
 fun Application.module() {
