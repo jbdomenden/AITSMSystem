@@ -77,5 +77,12 @@ fun Route.deviceRoutes(deviceRepository: DeviceRepository, userRepository: UserR
             val updated = deviceRepository.update(id, call.receive<DeviceRequest>()) ?: return@put call.respond(HttpStatusCode.NotFound)
             call.respond(updated)
         }
+
+        delete("/{id}") {
+            if (!call.requireRole("admin")) return@delete
+            val id = call.parameters["id"]?.toIntOrNull() ?: return@delete call.respond(HttpStatusCode.BadRequest)
+            if (!deviceRepository.delete(id)) return@delete call.respond(HttpStatusCode.NotFound)
+            call.respond(mapOf("message" to "Device deleted"))
+        }
     }
 }

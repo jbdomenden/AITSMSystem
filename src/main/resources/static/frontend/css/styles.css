@@ -160,6 +160,7 @@ a { text-decoration: none; color: inherit; }
 .btn-primary:hover { filter: brightness(.97); transform: translateY(-1px); }
 .btn-ghost { background: #fff; border-color: var(--border); color: #334155; }
 .btn-ghost:hover { border-color: #cbd5e1; background: #f8fafc; }
+.table-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .table-wrap {
   overflow: auto;
