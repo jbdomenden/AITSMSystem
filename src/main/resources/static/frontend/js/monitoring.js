@@ -1,5 +1,7 @@
 const LAN_AUTO_REFRESH_MS = 3 * 60 * 1000;
 let monitoringAutoRefreshTimer = null;
+let editingDeviceId = null;
+let deviceRegistry = [];
 
 function statusBadge(status) {
   const s = String(status || '').toLowerCase();
@@ -170,41 +172,92 @@ function bindAssetAutoFill() {
   ipInput.addEventListener('change', autoFillDeviceContextByIp);
 }
 
+function currentDeviceFormBody() {
+  return {
+    deviceName: (document.getElementById('deviceName')?.value || '').trim(),
+    ipAddress: (document.getElementById('ipAddress')?.value || '').trim(),
+    department: (document.getElementById('department')?.value || '').trim(),
+    assignedUser: (document.getElementById('assignedUser')?.value || '').trim(),
+    status: document.getElementById('status')?.value || 'Online'
+  };
+}
+
+function resetDeviceForm() {
+  editingDeviceId = null;
+  const registerButton = document.querySelector("button[onclick='registerDevice()']");
+  const cancelButton = document.getElementById('cancelDeviceEditBtn');
+  if (registerButton) registerButton.textContent = 'Register Device';
+  cancelButton?.classList.add('hidden');
+  ['deviceName', 'ipAddress', 'department', 'assignedUser'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const statusEl = document.getElementById('status');
+  if (statusEl) statusEl.value = 'Online';
+  seedAssignedUserFromSession();
+}
+
+function startEditDevice(device) {
+  editingDeviceId = device.id;
+  const registerButton = document.querySelector("button[onclick='registerDevice()']");
+  const cancelButton = document.getElementById('cancelDeviceEditBtn');
+  if (registerButton) registerButton.textContent = 'Save Changes';
+  cancelButton?.classList.remove('hidden');
+
+  document.getElementById('deviceName').value = device.deviceName || '';
+  document.getElementById('ipAddress').value = device.ipAddress || '';
+  document.getElementById('department').value = device.department || '';
+  document.getElementById('assignedUser').value = device.assignedUser || '';
+  document.getElementById('status').value = device.status || 'Online';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function startEditDeviceById(id) {
+  const device = deviceRegistry.find((entry) => entry.id === id);
+  if (!device) {
+    alert('Unable to load the selected device.');
+    return;
+  }
+  startEditDevice(device);
+}
+
+async function deleteDevice(id, label) {
+  const confirmed = window.confirm(`Delete asset "${label || `#${id}`}"?`);
+  if (!confirmed) return;
+
+  const res = await fetch(`/api/devices/${id}`, { method: 'DELETE', headers: authHeaders() });
+  const data = await res.json();
+  if (!res.ok) return alert(data.error || 'Failed to delete device.');
+
+  if (editingDeviceId === id) resetDeviceForm();
+  await Promise.all([loadDevices(), loadMonitoring()]);
+  alert(data.message || 'Device deleted');
+}
+
 async function registerDevice() {
   const deviceNameEl = document.getElementById('deviceName');
   const ipAddressEl = document.getElementById('ipAddress');
-  const departmentEl = document.getElementById('department');
-  const assignedUserEl = document.getElementById('assignedUser');
-  const statusEl = document.getElementById('status');
 
   if (!(deviceNameEl?.value || '').trim() && (ipAddressEl?.value || '').trim()) {
     await autoFillDeviceContextByIp();
   }
 
-  const body = {
-    deviceName: (deviceNameEl?.value || '').trim(),
-    ipAddress: (ipAddressEl?.value || '').trim(),
-    department: (departmentEl?.value || '').trim(),
-    assignedUser: (assignedUserEl?.value || '').trim(),
-    status: statusEl?.value || 'Online'
-  };
+  const body = currentDeviceFormBody();
 
   if (!body.deviceName || !body.ipAddress || !body.department || !body.assignedUser || !body.status) {
     return alert('All device fields are required.');
   }
 
-  const res = await fetch('/api/devices', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
+  const endpoint = editingDeviceId ? `/api/devices/${editingDeviceId}` : '/api/devices';
+  const method = editingDeviceId ? 'PUT' : 'POST';
+  const res = await fetch(endpoint, { method, headers: authHeaders(), body: JSON.stringify(body) });
   const data = await res.json();
-  if (!res.ok) return alert(data.error || 'Failed to register device (LAN only policy).');
+  if (!res.ok) return alert(data.error || (editingDeviceId ? 'Failed to update device.' : 'Failed to register device (LAN only policy).'));
 
-  if (deviceNameEl) deviceNameEl.value = '';
-  if (ipAddressEl) ipAddressEl.value = '';
-  if (departmentEl) departmentEl.value = '';
-  if (assignedUserEl) assignedUserEl.value = '';
-  if (statusEl) statusEl.value = 'Online';
-
-  await loadDevices();
-  await loadMonitoring();
+  const wasEditing = Boolean(editingDeviceId);
+  resetDeviceForm();
+  await Promise.all([loadDevices(), loadMonitoring()]);
+  alert(wasEditing ? 'Device updated successfully.' : 'Device registered successfully.');
 }
 
 async function loadDevices() {
@@ -214,11 +267,12 @@ async function loadDevices() {
   const res = await fetch('/api/devices', { headers: authHeaders() });
   const data = await res.json();
   if (!res.ok) {
-    rows.innerHTML = `<tr><td colspan='8' class='small text-danger'>${data.error || 'Failed to load devices.'}</td></tr>`;
+    rows.innerHTML = `<tr><td colspan='9' class='small text-danger'>${data.error || 'Failed to load devices.'}</td></tr>`;
     return;
   }
 
   const safe = Array.isArray(data) ? data : [];
+  deviceRegistry = safe;
   rows.innerHTML = safe.map(d => `<tr>
     <td>${d.deviceName || '-'}</td>
     <td>${d.ipAddress || '-'}</td>
@@ -228,7 +282,13 @@ async function loadDevices() {
     <td>${d.cpuUsage != null ? `${Number(d.cpuUsage).toFixed(0)}%` : '-'}</td>
     <td>${d.memoryUsage != null ? `${Number(d.memoryUsage).toFixed(0)}%` : '-'}</td>
     <td>${formatLastSeen(d.lastSeen)}</td>
-  </tr>`).join('') || `<tr><td colspan='8' class='small'>No devices registered yet.</td></tr>`;
+    <td>
+      <div class='table-actions'>
+        <button class='btn btn-ghost' type='button' onclick='startEditDeviceById(${d.id})'>Edit</button>
+        <button class='btn btn-ghost text-danger' type='button' onclick='deleteDevice(${d.id}, ${JSON.stringify(d.deviceName || '')})'>Delete</button>
+      </div>
+    </td>
+  </tr>`).join('') || `<tr><td colspan='9' class='small'>No devices registered yet.</td></tr>`;
 }
 
 function startMonitoringAutoRefresh() {

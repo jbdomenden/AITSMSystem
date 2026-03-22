@@ -172,9 +172,13 @@ function renderRecentAdminTickets(tickets) {
   if (!rows) return;
 
   const priorityOrder = { Critical: 0, High: 1, Medium: 2, Low: 3 };
-  const relevant = sortByUpdatedDesc(tickets)
-    .filter(t => ['Critical', 'High', 'Medium'].includes(t.priority))
-    .sort((a, b) => (priorityOrder[a.priority] ?? 99) - (priorityOrder[b.priority] ?? 99))
+  const relevant = (Array.isArray(tickets) ? tickets : [])
+    .filter(t => ['Critical', 'High'].includes(t.priority))
+    .sort((a, b) => {
+      const priorityDiff = (priorityOrder[a.priority] ?? 99) - (priorityOrder[b.priority] ?? 99);
+      if (priorityDiff !== 0) return priorityDiff;
+      return new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0);
+    })
     .slice(0, 6);
 
   if (!relevant.length) {
@@ -351,4 +355,3 @@ async function loadAdminDashboard() {
 document.addEventListener('DOMContentLoaded', () => {
   loadAdminDashboard();
 });
-

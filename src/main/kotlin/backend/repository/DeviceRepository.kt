@@ -6,6 +6,7 @@ import backend.models.Device
 import backend.models.DeviceRequest
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -97,6 +98,10 @@ class DeviceRepository {
             it[lastSeen] = LocalDateTime.now()
         }
         DevicesTable.selectAll().where { DevicesTable.id eq id }.singleOrNull()?.let(::toDevice)
+    }
+
+    fun delete(id: Int): Boolean = transaction {
+        DevicesTable.deleteWhere { DevicesTable.id eq id } > 0
     }
 
     private fun toDevice(row: ResultRow) = Device(
