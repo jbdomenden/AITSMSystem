@@ -4,11 +4,11 @@ function adminNavItems() {
       { page: 'dashboard-admin.html', href: '/dashboard-admin.html', icon: '▦', label: 'Overview' },
       { page: 'ticket-management.html', href: '/ticket-management.html', icon: '☰', label: 'Ticket Management' },
       { page: 'monitoring.html', href: '/monitoring.html', icon: '◉', label: 'LAN Monitoring' },
-      { page: 'assets.html', href: '/assets.html', icon: '◫', label: 'Asset Management' },
       { page: 'knowledge.html', href: '/knowledge.html', icon: '📚', label: 'Knowledge Base' }
     ]},
     { section: 'System', items: [
       { page: 'settings.html', href: '/settings.html', icon: '⚙', label: 'Settings' },
+      { page: 'assets.html', href: '/assets.html', icon: '◫', label: 'Asset Management' },
       { page: 'user-management.html', href: '/user-management.html', icon: '👥', label: 'User Management' }
     ]}
   ];
@@ -22,7 +22,7 @@ function renderAdminSidebar() {
       <div class='nav-section-title'>${s.section}</div>
       ${s.items.map(i => `<a class='nav-item' data-page='${i.page}' href='${i.href}'><span class='nav-icon'>${i.icon}</span>${i.label}</a>`).join('')}
     </nav>`).join('');
-  host.innerHTML = `<div class='brand'><span class='brand-dot'></span>AITSM Control</div>${sections}`;
+  host.innerHTML = `${sections}`;
 }
 
 function closeAdminHeaderMenu(){ document.getElementById('adminHeaderMenu')?.classList.add('hidden'); }

@@ -20,9 +20,12 @@
         <input id='password' type='password' placeholder='••••••••'>
       </div>
     </div>
-    <label class='remember-row'><input type='checkbox'> Remember me</label>
+    <label class="remember-row">
+      <input type="checkbox" id="rememberMe" />
+      <span>Remember me</span>
+    </label>
     <button class='btn btn-primary auth-login-btn' onclick='login()'>Login</button>
-    <p class='small auth-links'>Need an account? <a href='/signup.html' class='text-primary'>Only end users can sign up</a>.</p>
+    <p class='small auth-links'>Need an account? <a href='/signup.html' class='text-primary'>sign up</a>.</p>
   </section>
   <script src='/js/app.js'></script>
   <script src='/js/auth.js'></script>

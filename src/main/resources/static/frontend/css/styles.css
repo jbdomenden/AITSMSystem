@@ -567,3 +567,4 @@ body.sidebar-hidden .sidebar {
 
 .action-menu-backdrop { position: fixed; inset: 0; background: transparent; z-index: 35; }
 .row-action-menu { z-index: 50; }
+.remember-row{display:inline-flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;}
