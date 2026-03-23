@@ -13,6 +13,10 @@ function formatDateTime(value) {
   return date.toLocaleString();
 }
 
+function userTicketHref(ticketId) {
+  return `/tickets.html?ticketId=${encodeURIComponent(ticketId)}`;
+}
+
 function renderUserSummary(tickets) {
   const el = document.getElementById('userSummaryCards');
   if (!el) return;
@@ -49,8 +53,8 @@ function renderRecentTickets(tickets) {
 
   rows.innerHTML = safeTickets.slice(0, 5).map(t => `
     <tr>
-      <td>#${t.id}</td>
-      <td>${t.title || '-'}</td>
+      <td><a class='ticket-link' href='${userTicketHref(t.id)}'>#${t.id}</a></td>
+      <td><a class='ticket-link ticket-link-title' href='${userTicketHref(t.id)}' title='${t.title || '-'}'>${t.title || '-'}</a></td>
       <td>${t.priority || '-'}</td>
       <td><span class='badge ${badgeClassForStatus(t.status)}'>${t.status || 'Unknown'}</span></td>
       <td>${formatDateTime(t.updatedAt)}</td>

@@ -19,6 +19,15 @@ class DeviceRepository {
     data class DiscoveredPeer(val ipAddress: String, val hostname: String, val reachable: Boolean)
     private val privateNetworks = listOf("10.", "192.168.", "172.16.", "172.17.", "172.18.", "172.19.", "172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.", "172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.")
 
+    private fun detectReachabilityStatus(ipAddress: String): String {
+        val normalizedIp = ipAddress.trim()
+        if (normalizedIp.isBlank()) return "Not Reachable"
+        return runCatching {
+            val address = InetAddress.getByName(normalizedIp)
+            if (address.isReachable(1500)) "Online" else "Offline"
+        }.getOrElse { "Not Reachable" }
+    }
+
     private fun deriveStatus(fallbackStatus: String = "Online", cpuUsage: Int? = null, memoryUsage: Int? = null): String {
         val cpu = cpuUsage ?: 0
         val memory = memoryUsage ?: 0
@@ -31,7 +40,7 @@ class DeviceRepository {
 
     fun create(req: DeviceRequest): Device = transaction {
         require(privateNetworks.any { req.ipAddress.startsWith(it) }) { "Only LAN devices are monitorable." }
-        val derivedStatus = deriveStatus()
+        val derivedStatus = detectReachabilityStatus(req.ipAddress)
         val id = DevicesTable.insert {
             it[deviceName] = req.deviceName
             it[ipAddress] = req.ipAddress
@@ -122,6 +131,7 @@ class DeviceRepository {
         require(privateNetworks.any { req.ipAddress.startsWith(it) }) { "Only LAN devices are monitorable." }
         val existing = DevicesTable.selectAll().where { DevicesTable.id eq id }.singleOrNull()
         val derivedStatus = deriveStatus(
+            fallbackStatus = detectReachabilityStatus(req.ipAddress),
             cpuUsage = existing?.get(DevicesTable.cpuUsage),
             memoryUsage = existing?.get(DevicesTable.memoryUsage)
         )
