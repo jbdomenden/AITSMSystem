@@ -53,8 +53,9 @@ function updateMonitoringLiveStatus(state = 'idle', message) {
 }
 
 function telemetryBadge(device) {
-  if (device.telemetryAvailable) return `<span class='badge resolved'>${device.telemetrySourceType}</span>`;
-  return `<span class='badge warning'>UNAVAILABLE</span>`;
+  const label = device.telemetryAvailable ? (device.telemetrySourceType || 'Telemetry') : 'Unavailable';
+  const tone = device.telemetryAvailable ? 'resolved' : 'warning';
+  return `<span class='badge ${tone} monitor-telemetry-badge' title='${label}'>${label}</span>`;
 }
 
 function renderMonitorSummary(summary) {
@@ -84,11 +85,11 @@ function renderMonitoringHealthPanel(summary, devices) {
 
   const available = devices.filter(d => d.telemetryAvailable).length;
   panel.innerHTML = `
-    <div class='insight-grid'>
-      <div class='insight-item'><div class='insight-label'>Host</div><div class='insight-value'>${host.hostname}</div></div>
+    <div class='insight-grid monitor-health-grid'>
+      <div class='insight-item'><div class='insight-label'>Host</div><div class='insight-value monitor-text-wrap'>${host.hostname}</div></div>
       <div class='insight-item'><div class='insight-label'>Host Memory</div><div class='insight-value'>${Number(host.memoryUsagePercent ?? 0).toFixed(1)}%</div></div>
       <div class='insight-item'><div class='insight-label'>Telemetry coverage</div><div class='insight-value'>${available}/${devices.length}</div></div>
-      <div class='insight-item'><div class='insight-label'>Last updated</div><div class='insight-value'>${formatLastSeen(summary.timestamp || host.timestamp || monitoringLastUpdatedAt)}</div></div>
+      <div class='insight-item'><div class='insight-label'>Last updated</div><div class='insight-value monitor-text-wrap monitor-updated-at'>${formatLastSeen(summary.timestamp || host.timestamp || monitoringLastUpdatedAt)}</div></div>
     </div>`;
 }
 
@@ -102,10 +103,17 @@ function renderMonitorCards(devices) {
   }
 
   wrap.innerHTML = devices.map(d => `
-    <article class='card'>
-      <div class='card-head'><h3 class='section-title'>${d.hostname || d.ipAddress}</h3>${telemetryBadge(d)}</div>
-      <div class='small'>${d.ipAddress} • Reachable: ${d.reachable ? 'Yes' : 'No'}</div>
-      <div class='insight-grid'>
+    <article class='card monitor-device-card'>
+      <div class='card-head monitor-device-head'>
+        <h3 class='section-title monitor-device-title' title='${d.hostname || d.ipAddress}'>${d.hostname || d.ipAddress}</h3>
+        ${telemetryBadge(d)}
+      </div>
+      <div class='small monitor-device-meta'>
+        <span class='monitor-text-wrap'>${d.ipAddress || '-'}</span>
+        <span class='monitor-meta-separator' aria-hidden='true'>•</span>
+        <span>Reachable: ${d.reachable ? 'Yes' : 'No'}</span>
+      </div>
+      <div class='insight-grid monitor-device-stats'>
         <div class='insight-item'><div class='insight-label'>CPU</div><div class='insight-value'>${d.cpuUsagePercent != null ? `${Number(d.cpuUsagePercent).toFixed(1)}%` : 'N/A'}</div></div>
         <div class='insight-item'><div class='insight-label'>Memory</div><div class='insight-value'>${d.memoryUsagePercent != null ? `${Number(d.memoryUsagePercent).toFixed(1)}%` : 'N/A'}</div></div>
       </div>

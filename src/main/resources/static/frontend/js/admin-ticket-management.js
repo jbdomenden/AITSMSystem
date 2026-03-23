@@ -20,6 +20,26 @@ function closeAdminRowMenus() {
   document.getElementById('actionMenuBackdrop')?.classList.add('hidden');
 }
 
+function adminTicketHref(ticketId) {
+  return `/ticket-management.html?ticketId=${encodeURIComponent(ticketId)}`;
+}
+
+function getRequestedAdminTicketId() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('ticketId');
+}
+
+function focusRequestedAdminTicket() {
+  const requestedId = getRequestedAdminTicketId();
+  if (!requestedId) return;
+
+  const row = document.querySelector(`[data-ticket-id="${CSS.escape(requestedId)}"]`);
+  if (!row) return;
+
+  row.classList.add('ticket-row-focus');
+  row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 function toggleAdminRowMenu(event, id) {
   event.stopPropagation();
   const menu = document.getElementById(`adminTicketRowMenu-${id}`);
@@ -63,12 +83,13 @@ async function loadAdminTicketManagement(){
   const data = await res.json();
   if(!res.ok){ rows.innerHTML=`<tr><td colspan='7' class='small text-danger'>${data.error||'Unable to load tickets'}</td></tr>`; return; }
   const tickets = Array.isArray(data)?data:[];
-  rows.innerHTML = tickets.map(t => `<tr>
-    <td>#${t.id}</td><td>${t.userId}</td><td>${t.title||'-'}</td><td>${t.priority||'-'}</td>
+  rows.innerHTML = tickets.map(t => `<tr data-ticket-id='${t.id}'>
+    <td><a class='ticket-link' href='${adminTicketHref(t.id)}'>#${t.id}</a></td><td>${t.userId}</td><td><a class='ticket-link ticket-link-title' href='${adminTicketHref(t.id)}' title='${t.title || '-'}'>${t.title||'-'}</a></td><td>${t.priority||'-'}</td>
     <td><span class='badge ${badge(t.status)}'>${t.status||'-'}</span></td>
     <td>${fmt(t.updatedAt)}</td>
     <td>${actionMenu(t)}</td>
   </tr>`).join('') || `<tr><td colspan='7' class='small'>No tickets found.</td></tr>`;
+  focusRequestedAdminTicket();
 }
 
 document.addEventListener('click', () => closeAdminRowMenus());
