@@ -6,6 +6,7 @@ import backend.models.KnowledgeRequest
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.batchInsert
+import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -32,6 +33,10 @@ class KnowledgeRepository {
             it[category] = req.category
         }
         KnowledgeArticlesTable.selectAll().where { KnowledgeArticlesTable.id eq id }.singleOrNull()?.let(::toArticle)
+    }
+
+    fun delete(id: Int): Boolean = transaction {
+        KnowledgeArticlesTable.deleteWhere { KnowledgeArticlesTable.id eq id } > 0
     }
 
     fun seedDefaults() = transaction {

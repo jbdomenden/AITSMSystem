@@ -7,12 +7,36 @@
   <main class='content'>
     <section id='utilityHeader' class='utility-bar card'></section>
 
-    <div class='topbar'>
-      <div>
-        <h1 class='page-title'>Dashboard</h1>
-        <p class='page-subtitle'>Live service overview and actionable analytics.</p>
+    <section class='dashboard-hero'>
+      <div class='topbar dashboard-intro'>
+        <div>
+          <p class='hero-eyebrow'>Operations Center</p>
+          <h1 class='page-title'>Dashboard</h1>
+          <p class='page-subtitle'>Live service overview and actionable analytics across tickets, infrastructure, and operational risk.</p>
+        </div>
       </div>
-    </div>
+      <article class='card dashboard-hero-panel'>
+        <div class='hero-panel-head'>
+          <div>
+            <h3 class='section-title'>Command Snapshot</h3>
+            <p class='section-subtitle'>Track service posture and quickly review the signals that need attention.</p>
+          </div>
+          <span class='hero-status-pill'>Live</span>
+        </div>
+        <div class='hero-highlight-grid'>
+          <div class='hero-highlight-item'>
+            <span class='hero-highlight-label'>Ticket queue</span>
+            <strong class='hero-highlight-value'>Realtime</strong>
+            <span class='hero-highlight-meta'>Open, in-progress, and resolved counts stay grouped for quick scanning.</span>
+          </div>
+          <div class='hero-highlight-item'>
+            <span class='hero-highlight-label'>Infrastructure</span>
+            <strong class='hero-highlight-value'>Telemetry</strong>
+            <span class='hero-highlight-meta'>CPU and memory cards remain aligned with system charts below.</span>
+          </div>
+        </div>
+      </article>
+    </section>
 
     <section id='summaryCards' class='grid stats summary-balanced-grid'></section>
 
