@@ -10,7 +10,7 @@
     <div class='topbar'>
       <div>
         <h1 class='page-title'>Knowledge Base</h1>
-        <p class='page-subtitle'>FAQ, troubleshooting guides, and searchable references from backend articles.</p>
+        <p class='page-subtitle'>Browse article titles, open the full article in a modal, and manage the content lifecycle in one place.</p>
       </div>
     </div>
 
@@ -35,16 +35,32 @@
       </div>
     </section>
 
-    <section id='knowledgeCards' class='grid stats' style='margin-top:16px'></section>
+    <section class='card' style='margin-top:16px'>
+      <div class='card-head'>
+        <div>
+          <h3 class='section-title'>Article Library</h3>
+          <p class='section-subtitle'>Click any title to open the full knowledge article.</p>
+        </div>
+      </div>
+      <div class='table-wrap'>
+        <table>
+          <thead><tr><th>Title</th><th>Category</th><th>Created</th><th>Actions</th></tr></thead>
+          <tbody id='knowledgeList'></tbody>
+        </table>
+      </div>
+    </section>
 
     <section class='card' style='margin-top:16px'>
-      <div class='card-head'><h3 class='section-title'>Create Article</h3></div>
+      <div class='card-head'><h3 id='knowledgeFormTitle' class='section-title'>Create Article</h3></div>
       <div class='form-grid'>
         <div class='form-group'><label>Title</label><input id='articleTitle'></div>
         <div class='form-group'><label>Category</label><input id='articleCategory' placeholder='General'></div>
         <div class='form-group' style='grid-column:1/-1'><label>Content</label><textarea id='articleContent' placeholder='Write article content'></textarea></div>
       </div>
-      <div class='inline-actions' style='margin-top:12px'><button class='btn btn-primary' onclick='createArticle()'>Publish Article</button></div>
+      <div class='inline-actions' style='margin-top:12px'>
+        <button id='knowledgeSaveBtn' class='btn btn-primary' onclick='saveArticle()'>Publish Article</button>
+        <button id='knowledgeCancelBtn' class='btn btn-ghost hidden' type='button' onclick='resetKnowledgeForm()'>Cancel Edit</button>
+      </div>
     </section>
   </main>
 </div>
