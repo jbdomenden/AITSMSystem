@@ -9,7 +9,42 @@ import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.Serializable
 import java.net.InetAddress
+
+@Serializable
+private data class DeviceSyncResponse(
+    val message: String,
+    val devices: Int
+)
+
+private fun isLanIp(ip: String): Boolean {
+    val normalizedIp = ip.trim()
+    return normalizedIp.startsWith("10.")
+        || normalizedIp.startsWith("192.168.")
+        || normalizedIp.startsWith("172.16.")
+        || normalizedIp.startsWith("172.17.")
+        || normalizedIp.startsWith("172.18.")
+        || normalizedIp.startsWith("172.19.")
+        || normalizedIp.startsWith("172.20.")
+        || normalizedIp.startsWith("172.21.")
+        || normalizedIp.startsWith("172.22.")
+        || normalizedIp.startsWith("172.23.")
+        || normalizedIp.startsWith("172.24.")
+        || normalizedIp.startsWith("172.25.")
+        || normalizedIp.startsWith("172.26.")
+        || normalizedIp.startsWith("172.27.")
+        || normalizedIp.startsWith("172.28.")
+        || normalizedIp.startsWith("172.29.")
+        || normalizedIp.startsWith("172.30.")
+        || normalizedIp.startsWith("172.31.")
+}
+
+private fun detectDeviceStatus(ip: String): String {
+    val normalizedIp = ip.trim()
+    if (normalizedIp.isBlank()) return "Not Reachable"
+    return if (isLanIp(normalizedIp)) "Online" else "Not Reachable"
+}
 
 fun Route.deviceRoutes(deviceRepository: DeviceRepository, userRepository: UserRepository, monitoringService: MonitoringService) {
     route("/api/devices") {
@@ -50,7 +85,8 @@ fun Route.deviceRoutes(deviceRepository: DeviceRepository, userRepository: UserR
                         existing != null -> "device-registry"
                         signedInUser != null -> "signed-in-user-ip"
                         else -> "dns"
-                    }
+                    },
+                    "suggestedStatus" to (existing?.status ?: detectDeviceStatus(ip))
                 )
             )
         }
@@ -68,7 +104,7 @@ fun Route.deviceRoutes(deviceRepository: DeviceRepository, userRepository: UserR
                     )
                 }
             val synced = deviceRepository.syncDiscoveredDevices(peers)
-            call.respond(mapOf("message" to "Device registry synchronized", "devices" to synced.size))
+            call.respond(DeviceSyncResponse(message = "Device registry synchronized", devices = synced.size))
         }
 
         put("/{id}") {

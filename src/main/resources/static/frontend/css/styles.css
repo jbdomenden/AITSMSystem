@@ -41,7 +41,11 @@ a { text-decoration: none; color: inherit; }
   width: 270px;
   min-width: 0;
   transition: width .3s ease, padding .3s ease, border-color .3s ease, transform .3s ease, opacity .25s ease;
-  overflow: hidden;
+  overflow: auto;
+  position: sticky;
+  top: var(--topbar-height);
+  align-self: start;
+  max-height: calc(100vh - var(--topbar-height));
 }
 .brand {
   display: flex;
@@ -147,7 +151,8 @@ a { text-decoration: none; color: inherit; }
 .grid { display: grid; gap: 16px; }
 .stats { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
 .stats.compact-grid { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
-.admin-panels { grid-template-columns: 1.4fr 1fr; }
+.summary-balanced-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; }
+.admin-panels { grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr); }
 
 .card {
   background: var(--surface);
@@ -177,8 +182,8 @@ a { text-decoration: none; color: inherit; }
 
 .metric-label { font-size: 13px; color: var(--muted); font-weight: 600; }
 .metric-value { font-size: 36px; margin: 6px 0 2px; font-weight: 700; letter-spacing: -.01em; }
-.metric-hint { color: var(--muted); font-size: 13px; }
-.metric-card { position: relative; overflow: hidden; }
+.metric-hint { color: var(--muted); font-size: 13px; line-height: 1.5; }
+.metric-card { position: relative; overflow: hidden; min-height: 190px; display: flex; flex-direction: column; justify-content: space-between; }
 .metric-card::after {
   content: "";
   position: absolute;
@@ -205,6 +210,15 @@ a { text-decoration: none; color: inherit; }
 .btn-ghost { background: linear-gradient(180deg, #fff, #f8fbff); border-color: #d8e1ef; color: #334155; box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05); }
 .btn-ghost:hover { border-color: #cbd5e1; background: #f8fafc; transform: translateY(-1px); box-shadow: 0 10px 22px rgba(15, 23, 42, 0.09); }
 .table-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.icon-only-btn {
+  width: 40px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  font-size: 16px;
+}
+.icon-only-btn.text-danger { color: var(--danger); }
+.icon-only-btn.text-danger:hover { color: #b91c1c; }
 
 .table-wrap {
   overflow: auto;
@@ -294,9 +308,9 @@ textarea { resize: vertical; min-height: 120px; }
 .perf-bar.telemetry { background: linear-gradient(180deg, #8b5cf6, #7c3aed); }
 
 .insight-grid { display: grid; grid-template-columns: repeat(2, minmax(160px, 1fr)); gap: 10px; margin-top: 10px; }
-.insight-item { border: 1px solid var(--border); border-radius: 10px; padding: 10px; background: #fff; }
+.insight-item { border: 1px solid var(--border); border-radius: 10px; padding: 10px; background: #fff; min-width: 0; }
 .insight-label { font-size: 12px; color: var(--muted); }
-.insight-value { font-size: 20px; font-weight: 700; margin-top: 2px; }
+.insight-value { font-size: 20px; font-weight: 700; margin-top: 2px; min-width: 0; }
 
 .empty-state {
   border: 1px dashed #c7d2e6;
@@ -319,6 +333,12 @@ textarea { resize: vertical; min-height: 120px; }
 .notification-item p { margin: 8px 0 0; color: #334155; }
 .notification-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
+.ticket-link { color: #1d4ed8; font-weight: 600; text-decoration: none; }
+.ticket-link:hover { color: #1e40af; text-decoration: underline; }
+.ticket-link-title { display: inline-block; max-width: min(100%, 320px); white-space: normal; overflow-wrap: anywhere; }
+.ticket-row-focus td { background: #eff6ff; }
+.monitor-text-wrap { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
+
 .monitor-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; }
 .device-kpis { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 12px; }
 .kpi-chip {
@@ -329,6 +349,15 @@ textarea { resize: vertical; min-height: 120px; }
 }
 .kpi-chip .kpi-label { color: var(--muted); font-size: 12px; }
 .kpi-chip .kpi-value { font-size: 24px; margin-top: 4px; font-weight: 700; }
+.monitor-device-card { min-width: 0; }
+.monitor-device-head { align-items: flex-start; gap: 12px; }
+.monitor-device-title { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.monitor-telemetry-badge { max-width: 100%; white-space: normal; text-align: center; overflow-wrap: anywhere; }
+.monitor-device-meta { display: flex; flex-wrap: wrap; gap: 6px; line-height: 1.5; }
+.monitor-meta-separator { color: #94a3b8; }
+.monitor-device-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.monitor-health-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.monitor-updated-at { font-size: 17px; line-height: 1.45; }
 
 .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #edf2f7; }
@@ -411,6 +440,7 @@ textarea { resize: vertical; min-height: 120px; }
 
 @media (max-width: 1180px) {
   .admin-panels, .monitor-grid, .settings-grid { grid-template-columns: 1fr; }
+  .summary-balanced-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 980px) {
   .admin-panels { grid-template-columns: 1fr; }
@@ -429,11 +459,11 @@ textarea { resize: vertical; min-height: 120px; }
   body:not(.sidebar-hidden) .content { pointer-events: none; }
   .content { padding: 16px; }
   .page-title { font-size: 30px; }
-  .form-grid, .portal-grid, .device-kpis, .insight-grid { grid-template-columns: 1fr; }
+  .form-grid, .portal-grid, .device-kpis, .insight-grid, .monitor-device-stats, .monitor-health-grid { grid-template-columns: 1fr; }
   .signup-grid { grid-template-columns: 1fr; }
   .perf-grid { grid-template-columns: repeat(3, minmax(80px, 1fr)); height: auto; }
   .perf-bars { height: 160px; }
-  .stats, .stats.compact-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .stats, .stats.compact-grid, .summary-balanced-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   .metric-card { padding: 16px; min-height: 156px; }
   .metric-value { font-size: 30px; }
 }
@@ -448,7 +478,7 @@ textarea { resize: vertical; min-height: 120px; }
   .page-title { font-size: 24px; }
   .page-subtitle { font-size: 15px; line-height: 1.45; }
   .card { padding: 16px; }
-  .stats, .stats.compact-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stats, .stats.compact-grid, .summary-balanced-grid { grid-template-columns: 1fr; }
   .metric-card { min-height: 140px; }
   .metric-label, .metric-hint { font-size: 12px; }
   .metric-value { font-size: 28px; margin-top: 10px; }
@@ -459,7 +489,7 @@ textarea { resize: vertical; min-height: 120px; }
 
 @media (max-width: 420px) {
   .utility-brand { max-width: 132px; }
-  .stats, .stats.compact-grid { gap: 10px; }
+  .stats, .stats.compact-grid, .summary-balanced-grid { gap: 10px; }
   .metric-card { padding: 14px; min-height: 132px; }
   .metric-value { font-size: 24px; }
 }

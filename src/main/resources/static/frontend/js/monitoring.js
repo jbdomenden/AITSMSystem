@@ -9,8 +9,17 @@ let deviceRegistry = [];
 function statusBadge(status) {
   const s = String(status || '').toLowerCase();
   if (s === 'critical') return 'open';
+  if (s === 'high risk') return 'warning';
   if (s === 'offline' || s === 'unavailable') return 'warning';
   return 'resolved';
+}
+
+function setStatusField(status) {
+  const normalized = (status || 'Not Reachable').trim() || 'Not Reachable';
+  const hidden = document.getElementById('status');
+  const display = document.getElementById('statusDisplay');
+  if (hidden) hidden.value = normalized;
+  if (display) display.value = normalized;
 }
 
 function formatLastSeen(value) {
@@ -53,8 +62,9 @@ function updateMonitoringLiveStatus(state = 'idle', message) {
 }
 
 function telemetryBadge(device) {
-  if (device.telemetryAvailable) return `<span class='badge resolved'>${device.telemetrySourceType}</span>`;
-  return `<span class='badge warning'>UNAVAILABLE</span>`;
+  const label = device.telemetryAvailable ? (device.telemetrySourceType || 'Telemetry') : 'Unavailable';
+  const tone = device.telemetryAvailable ? 'resolved' : 'warning';
+  return `<span class='badge ${tone} monitor-telemetry-badge' title='${label}'>${label}</span>`;
 }
 
 function renderMonitorSummary(summary) {
@@ -84,11 +94,11 @@ function renderMonitoringHealthPanel(summary, devices) {
 
   const available = devices.filter(d => d.telemetryAvailable).length;
   panel.innerHTML = `
-    <div class='insight-grid'>
-      <div class='insight-item'><div class='insight-label'>Host</div><div class='insight-value'>${host.hostname}</div></div>
+    <div class='insight-grid monitor-health-grid'>
+      <div class='insight-item'><div class='insight-label'>Host</div><div class='insight-value monitor-text-wrap'>${host.hostname}</div></div>
       <div class='insight-item'><div class='insight-label'>Host Memory</div><div class='insight-value'>${Number(host.memoryUsagePercent ?? 0).toFixed(1)}%</div></div>
       <div class='insight-item'><div class='insight-label'>Telemetry coverage</div><div class='insight-value'>${available}/${devices.length}</div></div>
-      <div class='insight-item'><div class='insight-label'>Last updated</div><div class='insight-value'>${formatLastSeen(summary.timestamp || host.timestamp || monitoringLastUpdatedAt)}</div></div>
+      <div class='insight-item'><div class='insight-label'>Last updated</div><div class='insight-value monitor-text-wrap monitor-updated-at'>${formatLastSeen(summary.timestamp || host.timestamp || monitoringLastUpdatedAt)}</div></div>
     </div>`;
 }
 
@@ -102,10 +112,17 @@ function renderMonitorCards(devices) {
   }
 
   wrap.innerHTML = devices.map(d => `
-    <article class='card'>
-      <div class='card-head'><h3 class='section-title'>${d.hostname || d.ipAddress}</h3>${telemetryBadge(d)}</div>
-      <div class='small'>${d.ipAddress} • Reachable: ${d.reachable ? 'Yes' : 'No'}</div>
-      <div class='insight-grid'>
+    <article class='card monitor-device-card'>
+      <div class='card-head monitor-device-head'>
+        <h3 class='section-title monitor-device-title' title='${d.hostname || d.ipAddress}'>${d.hostname || d.ipAddress}</h3>
+        ${telemetryBadge(d)}
+      </div>
+      <div class='small monitor-device-meta'>
+        <span class='monitor-text-wrap'>${d.ipAddress || '-'}</span>
+        <span class='monitor-meta-separator' aria-hidden='true'>•</span>
+        <span>Reachable: ${d.reachable ? 'Yes' : 'No'}</span>
+      </div>
+      <div class='insight-grid monitor-device-stats'>
         <div class='insight-item'><div class='insight-label'>CPU</div><div class='insight-value'>${d.cpuUsagePercent != null ? `${Number(d.cpuUsagePercent).toFixed(1)}%` : 'N/A'}</div></div>
         <div class='insight-item'><div class='insight-label'>Memory</div><div class='insight-value'>${d.memoryUsagePercent != null ? `${Number(d.memoryUsagePercent).toFixed(1)}%` : 'N/A'}</div></div>
       </div>
@@ -204,12 +221,16 @@ async function autoFillDeviceContextByIp() {
   try {
     const res = await fetch(`/api/devices/ip-lookup?ip=${encodeURIComponent(ip)}`, { headers: authHeaders() });
     const data = await res.json();
-    if (!res.ok) return;
+    if (!res.ok) {
+      setStatusField('Not Reachable');
+      return;
+    }
 
     if (data.deviceName) deviceInput.value = data.deviceName;
     if (!assignedInput.value.trim() && data.assignedUser) assignedInput.value = data.assignedUser;
+    setStatusField(data.suggestedStatus);
   } catch {
-    // best-effort enrichment only
+    setStatusField('Not Reachable');
   }
 }
 
@@ -236,6 +257,11 @@ function bindAssetAutoFill() {
   ipInput.dataset.boundAutofill = '1';
   ipInput.addEventListener('blur', autoFillDeviceContextByIp);
   ipInput.addEventListener('change', autoFillDeviceContextByIp);
+  ipInput.addEventListener('keydown', async (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    await autoFillDeviceContextByIp();
+  });
 }
 
 function currentDeviceFormBody() {
@@ -259,7 +285,8 @@ function resetDeviceForm() {
     if (el) el.value = '';
   });
   const statusEl = document.getElementById('status');
-  if (statusEl) statusEl.value = 'Online';
+  if (statusEl) statusEl.value = 'Not Reachable';
+  setStatusField('Not Reachable');
   seedAssignedUserFromSession();
 }
 
@@ -274,7 +301,7 @@ function startEditDevice(device) {
   document.getElementById('ipAddress').value = device.ipAddress || '';
   document.getElementById('department').value = device.department || '';
   document.getElementById('assignedUser').value = device.assignedUser || '';
-  document.getElementById('status').value = device.status || 'Online';
+  setStatusField(device.status || 'Not Reachable');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -350,8 +377,12 @@ async function loadDevices() {
     <td>${formatLastSeen(d.lastSeen)}</td>
     <td>
       <div class='table-actions'>
-        <button class='btn btn-ghost' type='button' onclick='startEditDeviceById(${d.id})'>Edit</button>
-        <button class='btn btn-ghost text-danger' type='button' onclick='deleteDevice(${d.id}, ${JSON.stringify(d.deviceName || '')})'>Delete</button>
+        <button class='btn btn-ghost icon-only-btn' type='button' onclick='startEditDeviceById(${d.id})' aria-label='Edit ${d.deviceName || 'device'}' title='Edit'>
+          ✎
+        </button>
+        <button class='btn btn-ghost icon-only-btn text-danger' type='button' onclick='deleteDevice(${d.id}, ${JSON.stringify(d.deviceName || '')})' aria-label='Delete ${d.deviceName || 'device'}' title='Delete'>
+          🗑
+        </button>
       </div>
     </td>
   </tr>`).join('') || `<tr><td colspan='9' class='small'>No devices registered yet.</td></tr>`;
