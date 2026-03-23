@@ -37,7 +37,10 @@ fun Route.deviceRoutes(deviceRepository: DeviceRepository, userRepository: UserR
         }
         get {
             if (!call.requireRole("admin")) return@get
-            call.respond(deviceRepository.list())
+            val liveStatuses = monitoringService.lanDevices()
+                .filter { it.telemetrySourceType != "HOST" }
+                .associateBy { it.ipAddress }
+            call.respond(deviceRepository.listWithLiveStatus(liveStatuses))
         }
 
         get("/ip-lookup") {

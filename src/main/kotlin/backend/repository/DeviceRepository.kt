@@ -4,6 +4,7 @@ import backend.config.DevicesTable
 import backend.models.ClientMetricsRequest
 import backend.models.Device
 import backend.models.DeviceRequest
+import backend.models.LanDeviceDto
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.deleteWhere
@@ -54,6 +55,23 @@ class DeviceRepository {
     }
 
     fun list(): List<Device> = transaction { DevicesTable.selectAll().map(::toDevice) }
+
+    fun listWithLiveStatus(liveDevices: Map<String, LanDeviceDto>): List<Device> = transaction {
+        DevicesTable.selectAll().map { row ->
+            val base = toDevice(row)
+            val live = liveDevices[base.ipAddress]
+            if (live == null) {
+                base
+            } else {
+                base.copy(
+                    cpuUsage = live.cpuUsagePercent?.toInt()?.coerceIn(0, 100) ?: base.cpuUsage,
+                    memoryUsage = live.memoryUsagePercent?.toInt()?.coerceIn(0, 100) ?: base.memoryUsage,
+                    status = deriveLiveStatus(live),
+                    lastSeen = live.lastSeen.ifBlank { base.lastSeen }
+                )
+            }
+        }
+    }
 
     fun findByIp(ip: String): Device? = transaction {
         DevicesTable.selectAll().where { DevicesTable.ipAddress eq ip.trim() }.singleOrNull()?.let(::toDevice)
@@ -130,6 +148,19 @@ class DeviceRepository {
 
     fun delete(id: Int): Boolean = transaction {
         DevicesTable.deleteWhere { DevicesTable.id eq id } > 0
+    }
+
+
+    private fun deriveLiveStatus(live: LanDeviceDto): String {
+        if (!live.reachable) return "Not Reachable"
+
+        val cpu = live.cpuUsagePercent ?: 0.0
+        val memory = live.memoryUsagePercent ?: 0.0
+        return when {
+            cpu >= 90.0 || memory >= 90.0 -> "Critical"
+            live.telemetryAvailable -> "Online"
+            else -> "Offline"
+        }
     }
 
     private fun toDevice(row: ResultRow) = Device(
