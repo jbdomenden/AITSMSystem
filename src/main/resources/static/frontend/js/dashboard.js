@@ -245,6 +245,31 @@ function renderHealthInsights(items) {
 }
 
 
+function renderMetricSkeletons(count = 6) {
+  return Array.from({ length: count }).map(() => `
+    <article class='card metric-card analytics-skeleton'>
+      <div class='card-head'>
+        <div class='skeleton skeleton-text skeleton-label'></div>
+        <span class='card-icon skeleton skeleton-icon'></span>
+      </div>
+      <div class='skeleton skeleton-text skeleton-value'></div>
+      <div class='skeleton skeleton-text skeleton-hint'></div>
+    </article>`).join('');
+}
+
+function renderChartSkeleton(label = 'Loading analytics') {
+  return `
+    <div class='analytics-skeleton-panel' aria-hidden='true'>
+      <div class='skeleton skeleton-chart'></div>
+      <div class='skeleton-row'>
+        <span class='skeleton skeleton-pill'></span>
+        <span class='skeleton skeleton-pill'></span>
+        <span class='skeleton skeleton-pill'></span>
+      </div>
+      <div class='analytics-buffer-msg'><span class='page-splash-spinner' aria-hidden='true'></span><span>${label}</span></div>
+    </div>`;
+}
+
 function setAnalyticsBuffering(isLoading) {
   const summary = document.getElementById('summaryCards');
   const trend = document.getElementById('ticketTrendChart');
@@ -253,18 +278,13 @@ function setAnalyticsBuffering(isLoading) {
 
   if (isLoading) {
     if (summary) {
-      summary.innerHTML = Array.from({ length: 4 }).map(() => `
-        <article class='card metric-card analytics-skeleton'>
-          <div class='metric-label'>Buffering...</div>
-          <div class='metric-value'>--</div>
-          <div class='metric-hint'>Loading metrics</div>
-        </article>`).join('');
+      summary.innerHTML = renderMetricSkeletons(window.matchMedia('(max-width: 640px)').matches ? 4 : 6);
     }
 
     [trend, priority, perf].forEach((el) => {
       if (!el) return;
       el.classList.add('analytics-buffering');
-      el.innerHTML = `<div class='analytics-buffer-msg'><span class='page-splash-spinner' aria-hidden='true'></span><span>Buffering analytics...</span></div>`;
+      el.innerHTML = renderChartSkeleton();
     });
     return;
   }
