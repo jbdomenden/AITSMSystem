@@ -54,6 +54,8 @@ data class RegisterRequest(
 @Serializable data class AdminSensitiveVerifyResponse(val verified: Boolean, val verificationToken: String? = null, val expiresAt: String? = null, val message: String)
 @Serializable data class AdminGrantRequest(val targetEmail: String, val verificationToken: String)
 @Serializable data class AdminGrantResponse(val success: Boolean, val user: User? = null, val message: String)
+@Serializable data class UserActionResponse(val message: String, val user: User)
+
 
 @Serializable
 data class Ticket(
