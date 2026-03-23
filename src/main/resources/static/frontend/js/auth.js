@@ -104,3 +104,36 @@ function acceptEulaFromModal() {
   if (checkbox) checkbox.checked = true;
   closeEulaModal();
 }
+
+
+function setPasswordVisibility(inputId, toggleId) {
+  const input = document.getElementById(inputId);
+  const toggle = document.getElementById(toggleId);
+  if (!input || !toggle) return;
+
+  const showIcon = toggle.querySelector('.password-toggle-show');
+  const hideIcon = toggle.querySelector('.password-toggle-hide');
+
+  const sync = () => {
+    const isVisible = input.type === 'text';
+    toggle.setAttribute('aria-label', isVisible ? 'Hide password' : 'Show password');
+    toggle.setAttribute('title', isVisible ? 'Hide password' : 'Show password');
+    toggle.setAttribute('aria-pressed', String(isVisible));
+    showIcon?.classList.toggle('hidden', isVisible);
+    hideIcon?.classList.toggle('hidden', !isVisible);
+  };
+
+  toggle.addEventListener('click', () => {
+    input.type = input.type === 'password' ? 'text' : 'password';
+    sync();
+    input.focus({ preventScroll: true });
+    const end = input.value.length;
+    input.setSelectionRange?.(end, end);
+  });
+
+  sync();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  setPasswordVisibility('password', 'loginPasswordToggle');
+});
