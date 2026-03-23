@@ -98,7 +98,7 @@ fun Application.module() {
     val userRepo = UserRepository()
     val ticketRepo = TicketRepository()
     val deviceRepo = DeviceRepository()
-    val knowledgeRepo = KnowledgeRepository()
+    val knowledgeRepo = KnowledgeRepository().also { it.seedDefaults() }
 
     val authService = AuthService(userRepo, auditRepo)
     val ticketService = TicketService(ticketRepo, auditRepo)
