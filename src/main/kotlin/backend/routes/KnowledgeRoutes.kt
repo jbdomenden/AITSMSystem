@@ -20,5 +20,10 @@ fun Route.knowledgeRoutes(service: KnowledgeService) {
             val updated = service.update(id, call.receive<KnowledgeRequest>(), call.userId()) ?: return@put call.respond(HttpStatusCode.NotFound)
             call.respond(updated)
         }
+        delete("/{id}") {
+            val id = call.parameters["id"]?.toIntOrNull() ?: return@delete call.respond(HttpStatusCode.BadRequest)
+            if (!service.delete(id, call.userId())) return@delete call.respond(HttpStatusCode.NotFound)
+            call.respond(mapOf("message" to "Article deleted"))
+        }
     }
 }
