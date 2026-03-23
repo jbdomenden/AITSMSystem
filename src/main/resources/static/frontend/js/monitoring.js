@@ -9,7 +9,7 @@ let deviceRegistry = [];
 function statusBadge(status) {
   const s = String(status || '').toLowerCase();
   if (s === 'critical') return 'open';
-  if (s === 'offline' || s === 'unavailable') return 'warning';
+  if (s === 'offline' || s === 'unavailable' || s === 'not reachable') return 'warning';
   return 'resolved';
 }
 
