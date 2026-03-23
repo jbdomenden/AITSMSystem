@@ -22,6 +22,24 @@ function closeAllRowMenus() {
   document.getElementById('actionMenuBackdrop')?.classList.add('hidden');
 }
 
+function userTicketHref(ticketId) {
+  return `/tickets.html?ticketId=${encodeURIComponent(ticketId)}`;
+}
+
+function getRequestedTicketId() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('ticketId');
+}
+
+function focusRequestedTicket() {
+  const requestedId = getRequestedTicketId();
+  if (!requestedId) return;
+  const row = document.querySelector(`[data-ticket-id="${CSS.escape(requestedId)}"]`);
+  if (!row) return;
+  row.classList.add('ticket-row-focus');
+  row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 function toggleRowActionMenu(event, id) {
   event.stopPropagation();
   const menu = document.getElementById(`ticketRowMenu-${id}`);
@@ -90,12 +108,13 @@ async function loadTickets() {
   rows.innerHTML = tickets.map(t => {
     const klass = (t.status || 'Open').toLowerCase().replace(/\s+/g, '-');
     const actions = role === 'end-user' ? `<td>${actionMenu(t)}</td>` : '<td>-</td>';
-    return `<tr>
-      <td>#${t.id}</td><td>${t.title}</td><td>${t.priority}</td><td><span class='badge ${klass}'>${t.status}</span></td>
+    return `<tr data-ticket-id='${t.id}'>
+      <td><a class='ticket-link' href='${userTicketHref(t.id)}'>#${t.id}</a></td><td><a class='ticket-link ticket-link-title' href='${userTicketHref(t.id)}' title='${t.title || '-'}'>${t.title || '-'}</a></td><td>${t.priority}</td><td><span class='badge ${klass}'>${t.status}</span></td>
       <td style='color:${t.overdue ? "var(--danger)" : "inherit"}'>${t.slaRemainingMinutes ?? '-'} min</td>
       ${actions}
     </tr>`;
   }).join('') || `<tr><td colspan='6' class='small'>No tickets found.</td></tr>`;
+  focusRequestedTicket();
 }
 
 document.addEventListener('click', () => closeAllRowMenus());
