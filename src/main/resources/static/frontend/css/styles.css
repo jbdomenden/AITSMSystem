@@ -24,7 +24,6 @@ body {
   color: var(--text);
   font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
   min-height: 100vh;
-  overflow: hidden;
 }
 
 a { text-decoration: none; color: inherit; }
@@ -32,8 +31,11 @@ a { text-decoration: none; color: inherit; }
 
 .app-layout { min-height: 100vh; height: 100vh; display: grid; grid-template-columns: minmax(0, 270px) minmax(0, 1fr); padding-top: var(--topbar-height); overflow: hidden; transition: grid-template-columns .3s ease; }
 .sidebar {
-  position: sticky;
-  top: 0;
+  position: fixed;
+  top: var(--topbar-height);
+  left: 0;
+  bottom: 0;
+  z-index: 1350;
   background: #020b2a;
   color: #cbd5e1;
   padding: 20px 14px;
@@ -45,6 +47,8 @@ a { text-decoration: none; color: inherit; }
   width: 270px;
   min-width: 0;
   min-height: calc(100vh - var(--topbar-height));
+  max-height: calc(100vh - var(--topbar-height));
+  overflow-y: auto;
   transition: width .3s ease, padding .3s ease, border-color .3s ease, transform .3s ease, opacity .25s ease;
 }
 .brand {
@@ -100,8 +104,7 @@ a { text-decoration: none; color: inherit; }
 .svg-icon { line-height: 0; }
 .svg-icon svg { width: 18px; height: 18px; display: block; fill: currentColor; }
 
-.content { padding: 28px; display: grid; gap: 20px; align-content: start; }
-.content > * { min-width: 0; }
+.content { padding: 24px; min-width: 0; grid-column: 2; }
 .topbar {
   display: flex;
   justify-content: space-between;
@@ -364,7 +367,7 @@ textarea { resize: vertical; min-height: 120px; }
 .ticket-link:hover { color: #1e40af; text-decoration: underline; }
 .ticket-link-title { display: inline-block; max-width: min(100%, 320px); white-space: normal; overflow-wrap: anywhere; }
 .ticket-row-focus td { background: #eff6ff; }
-.monitor-text-wrap { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
+.monitor-text-wrap { min-width: 0; overflow-wrap: break-word; word-break: normal; hyphens: auto; }
 
 .monitor-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; }
 .device-kpis { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 12px; }
@@ -377,9 +380,9 @@ textarea { resize: vertical; min-height: 120px; }
 .kpi-chip .kpi-label { color: var(--muted); font-size: 12px; }
 .kpi-chip .kpi-value { font-size: 24px; margin-top: 4px; font-weight: 700; }
 .monitor-device-card { min-width: 0; }
-.monitor-device-head { align-items: flex-start; gap: 12px; }
-.monitor-device-title { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
-.monitor-telemetry-badge { max-width: 100%; white-space: normal; text-align: center; overflow-wrap: anywhere; }
+.monitor-device-head { align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.monitor-device-title { flex: 1 1 220px; min-width: 0; overflow-wrap: break-word; word-break: normal; hyphens: auto; }
+.monitor-telemetry-badge { max-width: 100%; white-space: nowrap; text-align: center; overflow-wrap: normal; word-break: keep-all; flex: 0 0 auto; margin-left: auto; }
 .monitor-device-meta { display: flex; flex-wrap: wrap; gap: 6px; line-height: 1.5; }
 .monitor-meta-separator { color: #94a3b8; }
 .monitor-device-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
