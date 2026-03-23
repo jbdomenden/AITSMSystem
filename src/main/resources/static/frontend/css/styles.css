@@ -23,13 +23,17 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+  min-height: 100vh;
+  overflow: hidden;
 }
 
 a { text-decoration: none; color: inherit; }
 .text-primary { color: var(--primary); }
 
-.app-layout { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 270px) minmax(0, 1fr); padding-top: var(--topbar-height); transition: grid-template-columns .3s ease; }
+.app-layout { min-height: 100vh; height: 100vh; display: grid; grid-template-columns: minmax(0, 270px) minmax(0, 1fr); padding-top: var(--topbar-height); overflow: hidden; transition: grid-template-columns .3s ease; }
 .sidebar {
+  position: sticky;
+  top: 0;
   background: #020b2a;
   color: #cbd5e1;
   padding: 20px 14px;
@@ -41,6 +45,8 @@ a { text-decoration: none; color: inherit; }
   width: 270px;
   min-width: 0;
   min-height: calc(100vh - var(--topbar-height));
+  max-height: calc(100vh - var(--topbar-height));
+  overflow-y: auto;
   transition: width .3s ease, padding .3s ease, border-color .3s ease, transform .3s ease, opacity .25s ease;
 }
 .brand {
@@ -96,7 +102,7 @@ a { text-decoration: none; color: inherit; }
 .svg-icon { line-height: 0; }
 .svg-icon svg { width: 18px; height: 18px; display: block; fill: currentColor; }
 
-.content { padding: 24px; }
+.content { padding: 24px; height: calc(100vh - var(--topbar-height)); overflow-y: auto; overflow-x: hidden; }
 .topbar {
   display: flex;
   justify-content: space-between;
@@ -147,7 +153,9 @@ a { text-decoration: none; color: inherit; }
 .grid { display: grid; gap: 16px; }
 .stats { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
 .stats.compact-grid { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
-.summary-balanced-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; }
+.summary-balanced-grid { grid-template-columns: repeat(12, minmax(0, 1fr)); align-items: stretch; }
+.summary-balanced-grid > * { grid-column: span 3; }
+.summary-balanced-grid > *:nth-child(n + 5) { grid-column: span 4; }
 .admin-panels { grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr); }
 
 .card {
@@ -249,6 +257,27 @@ tr:hover td { background: #f8fbff; }
 
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(210px, 1fr)); gap: 16px; }
 .form-group { display: grid; gap: 8px; }
+.password-field { position: relative; display: flex; align-items: center; }
+.password-field input { padding-right: 48px; }
+.password-toggle-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.password-toggle-btn:hover { background: rgba(148, 163, 184, 0.18); color: #0f172a; }
+.password-toggle-btn:focus-visible { outline: 2px solid #93c5fd; outline-offset: 1px; }
+.password-toggle-icon { font-size: 16px; line-height: 1; }
 label { font-size: 13px; font-weight: 600; color: #334155; }
 input, select, textarea {
   border: 1px solid var(--border);
@@ -437,6 +466,7 @@ textarea { resize: vertical; min-height: 120px; }
 @media (max-width: 1180px) {
   .admin-panels, .monitor-grid, .settings-grid { grid-template-columns: 1fr; }
   .summary-balanced-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .summary-balanced-grid > *, .summary-balanced-grid > *:nth-child(n + 5) { grid-column: span 1; }
 }
 @media (max-width: 980px) {
   .admin-panels { grid-template-columns: 1fr; }
@@ -460,6 +490,7 @@ textarea { resize: vertical; min-height: 120px; }
   .perf-grid { grid-template-columns: repeat(3, minmax(80px, 1fr)); height: auto; }
   .perf-bars { height: 160px; }
   .stats, .stats.compact-grid, .summary-balanced-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .summary-balanced-grid > *, .summary-balanced-grid > *:nth-child(n + 5) { grid-column: span 1; }
   .metric-card { padding: 16px; min-height: 156px; }
   .metric-value { font-size: 30px; }
 }
@@ -475,6 +506,7 @@ textarea { resize: vertical; min-height: 120px; }
   .page-subtitle { font-size: 15px; line-height: 1.45; }
   .card { padding: 16px; }
   .stats, .stats.compact-grid, .summary-balanced-grid { grid-template-columns: 1fr; }
+  .summary-balanced-grid > *, .summary-balanced-grid > *:nth-child(n + 5) { grid-column: auto; }
   .metric-card { min-height: 140px; }
   .metric-label, .metric-hint { font-size: 12px; }
   .metric-value { font-size: 28px; margin-top: 10px; }

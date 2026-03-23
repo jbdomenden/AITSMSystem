@@ -17,7 +17,13 @@
       </div>
       <div class='form-group'>
         <label>Password</label>
-        <input id='password' type='password' placeholder='••••••••'>
+        <div class='password-field'>
+          <input id='password' type='password' placeholder='••••••••'>
+          <button id='loginPasswordToggle' class='password-toggle-btn' type='button' aria-label='Show password' aria-pressed='false' title='Show password'>
+            <span class='password-toggle-icon password-toggle-show' aria-hidden='true'>👁</span>
+            <span class='password-toggle-icon password-toggle-hide hidden' aria-hidden='true'>🙈</span>
+          </button>
+        </div>
       </div>
     </div>
     <label class="remember-row">

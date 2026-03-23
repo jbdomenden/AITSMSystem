@@ -1,5 +1,6 @@
 package backend.repository
 
+import backend.config.AuditLogsTable
 import backend.config.EulaAcceptanceTable
 import backend.config.NotificationsTable
 import backend.config.TicketHistoryTable
@@ -228,6 +229,7 @@ class UserRepository {
 
         NotificationsTable.deleteWhere { NotificationsTable.userId eq userId }
         EulaAcceptanceTable.deleteWhere { EulaAcceptanceTable.userId eq userId }
+        AuditLogsTable.update({ AuditLogsTable.userId eq userId }) { it[AuditLogsTable.userId] = null }
         UsersTable.deleteWhere { UsersTable.id eq userId }
         row.let(::toUser)
     }
