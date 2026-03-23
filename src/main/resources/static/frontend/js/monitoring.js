@@ -9,8 +9,17 @@ let deviceRegistry = [];
 function statusBadge(status) {
   const s = String(status || '').toLowerCase();
   if (s === 'critical') return 'open';
-  if (s === 'offline' || s === 'unavailable' || s === 'not reachable') return 'warning';
+  if (s === 'high risk') return 'warning';
+  if (s === 'offline' || s === 'unavailable') return 'warning';
   return 'resolved';
+}
+
+function setStatusField(status) {
+  const normalized = (status || 'Not Reachable').trim() || 'Not Reachable';
+  const hidden = document.getElementById('status');
+  const display = document.getElementById('statusDisplay');
+  if (hidden) hidden.value = normalized;
+  if (display) display.value = normalized;
 }
 
 function formatLastSeen(value) {
@@ -212,12 +221,16 @@ async function autoFillDeviceContextByIp() {
   try {
     const res = await fetch(`/api/devices/ip-lookup?ip=${encodeURIComponent(ip)}`, { headers: authHeaders() });
     const data = await res.json();
-    if (!res.ok) return;
+    if (!res.ok) {
+      setStatusField('Not Reachable');
+      return;
+    }
 
     if (data.deviceName) deviceInput.value = data.deviceName;
     if (!assignedInput.value.trim() && data.assignedUser) assignedInput.value = data.assignedUser;
+    setStatusField(data.suggestedStatus);
   } catch {
-    // best-effort enrichment only
+    setStatusField('Not Reachable');
   }
 }
 
@@ -244,6 +257,11 @@ function bindAssetAutoFill() {
   ipInput.dataset.boundAutofill = '1';
   ipInput.addEventListener('blur', autoFillDeviceContextByIp);
   ipInput.addEventListener('change', autoFillDeviceContextByIp);
+  ipInput.addEventListener('keydown', async (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    await autoFillDeviceContextByIp();
+  });
 }
 
 function currentDeviceFormBody() {
@@ -267,7 +285,8 @@ function resetDeviceForm() {
     if (el) el.value = '';
   });
   const statusEl = document.getElementById('status');
-  if (statusEl) statusEl.value = 'Online';
+  if (statusEl) statusEl.value = 'Not Reachable';
+  setStatusField('Not Reachable');
   seedAssignedUserFromSession();
 }
 
@@ -282,7 +301,7 @@ function startEditDevice(device) {
   document.getElementById('ipAddress').value = device.ipAddress || '';
   document.getElementById('department').value = device.department || '';
   document.getElementById('assignedUser').value = device.assignedUser || '';
-  document.getElementById('status').value = device.status || 'Online';
+  setStatusField(device.status || 'Not Reachable');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -358,8 +377,12 @@ async function loadDevices() {
     <td>${formatLastSeen(d.lastSeen)}</td>
     <td>
       <div class='table-actions'>
-        <button class='btn btn-ghost' type='button' onclick='startEditDeviceById(${d.id})'>Edit</button>
-        <button class='btn btn-ghost text-danger' type='button' onclick='deleteDevice(${d.id}, ${JSON.stringify(d.deviceName || '')})'>Delete</button>
+        <button class='btn btn-ghost icon-only-btn' type='button' onclick='startEditDeviceById(${d.id})' aria-label='Edit ${d.deviceName || 'device'}' title='Edit'>
+          ✎
+        </button>
+        <button class='btn btn-ghost icon-only-btn text-danger' type='button' onclick='deleteDevice(${d.id}, ${JSON.stringify(d.deviceName || '')})' aria-label='Delete ${d.deviceName || 'device'}' title='Delete'>
+          🗑
+        </button>
       </div>
     </td>
   </tr>`).join('') || `<tr><td colspan='9' class='small'>No devices registered yet.</td></tr>`;

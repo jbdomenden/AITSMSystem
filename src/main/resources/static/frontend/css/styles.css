@@ -41,7 +41,11 @@ a { text-decoration: none; color: inherit; }
   width: 270px;
   min-width: 0;
   transition: width .3s ease, padding .3s ease, border-color .3s ease, transform .3s ease, opacity .25s ease;
-  overflow: hidden;
+  overflow: auto;
+  position: sticky;
+  top: var(--topbar-height);
+  align-self: start;
+  max-height: calc(100vh - var(--topbar-height));
 }
 .brand {
   display: flex;
@@ -273,6 +277,15 @@ a { text-decoration: none; color: inherit; }
 .btn-ghost { background: linear-gradient(180deg, #fff, #f8fbff); border-color: #d8e1ef; color: #334155; box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05); }
 .btn-ghost:hover { border-color: #cbd5e1; background: #f8fafc; transform: translateY(-1px); box-shadow: 0 10px 22px rgba(15, 23, 42, 0.09); }
 .table-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.icon-only-btn {
+  width: 40px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  font-size: 16px;
+}
+.icon-only-btn.text-danger { color: var(--danger); }
+.icon-only-btn.text-danger:hover { color: #b91c1c; }
 
 .table-wrap {
   overflow: auto;
@@ -493,7 +506,7 @@ textarea { resize: vertical; min-height: 120px; }
 }
 
 @media (max-width: 1180px) {
-  .dashboard-hero, .admin-panels, .monitor-grid, .settings-grid { grid-template-columns: 1fr; }
+  .admin-panels, .monitor-grid, .settings-grid { grid-template-columns: 1fr; }
   .summary-balanced-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 980px) {
