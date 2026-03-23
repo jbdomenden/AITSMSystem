@@ -31,7 +31,7 @@ function toggleAdminNotifMenu(){ document.getElementById('adminNotifMenu')?.clas
 function toggleAdminSidebar(){ document.body.classList.toggle('sidebar-hidden'); }
 
 function openAdminHelp() {
-  alert('How to use AITSM Admin:\n1) Monitor LAN/asset telemetry.\n2) Manage ticket statuses in Ticket Management.\n3) Manage users in User Management.\n4) Use Settings for profile and SLA review.');
+  alert('How to use AITSM Admin\n1) Monitor LAN/asset telemetry.\n2) Manage ticket statuses in Ticket Management.\n3) Manage users in User Management.\n4) Use Settings for profile and SLA review.');
 }
 
 async function loadHeaderNotifications(){
@@ -56,7 +56,7 @@ function renderUtilityHeader() {
   host.innerHTML = `
     <div class='utility-left'>
       <button class='btn btn-ghost icon-btn header-icon-btn' type='button' onclick='toggleAdminSidebar()' aria-label='Toggle sidebar' title='Toggle sidebar'>☰</button>
-      <div class='utility-brand'>AITSM Control</div>
+      <a class='utility-brand' href='/dashboard-admin.html' aria-label='Go to dashboard overview'>AITSM Control</a>
     </div>
     <div class='utility-right'>
       <button id='adminNotifTrigger' class='btn btn-ghost icon-btn header-icon-btn' type='button' onclick='toggleAdminNotifMenu()' aria-label='Notifications' title='Notifications'>🔔 <span id='adminNotifCount' class='notif-count'>0</span></button>
