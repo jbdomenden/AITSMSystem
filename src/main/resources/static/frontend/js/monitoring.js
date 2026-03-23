@@ -1,5 +1,8 @@
-const LAN_AUTO_REFRESH_MS = 3 * 60 * 1000;
+const LAN_AUTO_REFRESH_VISIBLE_MS = 10 * 1000;
+const LAN_AUTO_REFRESH_HIDDEN_MS = 30 * 1000;
 let monitoringAutoRefreshTimer = null;
+let monitoringRefreshInFlight = false;
+let monitoringLastUpdatedAt = null;
 let editingDeviceId = null;
 let deviceRegistry = [];
 
@@ -10,10 +13,43 @@ function statusBadge(status) {
   return 'resolved';
 }
 
-
 function formatLastSeen(value) {
   const date = new Date(value || '');
   return Number.isNaN(date.getTime()) ? (value || '-') : date.toLocaleString();
+}
+
+function formatRelativeTime(value) {
+  if (!value) return 'Waiting for update…';
+  const diffMs = Date.now() - value.getTime();
+  if (diffMs < 5000) return 'Updated just now';
+  const seconds = Math.round(diffMs / 1000);
+  if (seconds < 60) return `Updated ${seconds}s ago`;
+  const minutes = Math.round(seconds / 60);
+  return `Updated ${minutes}m ago`;
+}
+
+function updateMonitoringLiveStatus(state = 'idle', message) {
+  const chip = document.getElementById('monitorLiveStatus');
+  const label = document.getElementById('monitorLiveStatusText');
+  if (!chip || !label) return;
+
+  chip.dataset.state = state;
+  if (message) {
+    label.textContent = message;
+    return;
+  }
+
+  if (state === 'loading') {
+    label.textContent = 'Refreshing telemetry…';
+    return;
+  }
+
+  if (state === 'error') {
+    label.textContent = 'Telemetry refresh failed';
+    return;
+  }
+
+  label.textContent = formatRelativeTime(monitoringLastUpdatedAt);
 }
 
 function telemetryBadge(device) {
@@ -52,7 +88,7 @@ function renderMonitoringHealthPanel(summary, devices) {
       <div class='insight-item'><div class='insight-label'>Host</div><div class='insight-value'>${host.hostname}</div></div>
       <div class='insight-item'><div class='insight-label'>Host Memory</div><div class='insight-value'>${Number(host.memoryUsagePercent ?? 0).toFixed(1)}%</div></div>
       <div class='insight-item'><div class='insight-label'>Telemetry coverage</div><div class='insight-value'>${available}/${devices.length}</div></div>
-      <div class='insight-item'><div class='insight-label'>Last updated</div><div class='insight-value'>${summary.timestamp || host.timestamp || 'N/A'}</div></div>
+      <div class='insight-item'><div class='insight-label'>Last updated</div><div class='insight-value'>${formatLastSeen(summary.timestamp || host.timestamp || monitoringLastUpdatedAt)}</div></div>
     </div>`;
 }
 
@@ -96,33 +132,65 @@ function renderMonitorTable(devices) {
   </tr>`).join('');
 }
 
+function setRefreshDiscoveryBusy(isBusy) {
+  const button = document.getElementById('refreshDiscoveryBtn');
+  if (!button) return;
+  button.disabled = isBusy;
+  button.textContent = isBusy ? 'Refreshing…' : 'Refresh Discovery';
+}
+
 async function refreshDiscovery() {
-  const res = await fetch('/api/monitoring/refresh-discovery', { method: 'POST', headers: authHeaders() });
-  const data = await res.json();
-  if (!res.ok) {
-    alert(data.error || 'Failed to refresh discovery');
-    return;
+  setRefreshDiscoveryBusy(true);
+  try {
+    const res = await fetch('/api/monitoring/refresh-discovery', { method: 'POST', headers: authHeaders() });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error || 'Failed to refresh discovery');
+      return;
+    }
+    await loadMonitoring({ force: true, source: 'discovery' });
+  } finally {
+    setRefreshDiscoveryBusy(false);
   }
-  await loadMonitoring();
 }
 
-async function loadMonitoring() {
-  const [summaryRes, devicesRes] = await Promise.all([
-    fetch('/api/monitoring/summary', { headers: authHeaders() }),
-    fetch('/api/monitoring/lan-devices', { headers: authHeaders() })
-  ]);
-
-  const summary = await summaryRes.json();
-  const devices = await devicesRes.json();
-  const safeDevices = Array.isArray(devices) ? devices : [];
-
-  renderMonitorSummary(summaryRes.ok ? summary : null);
-  renderMonitoringHealthPanel(summaryRes.ok ? summary : null, safeDevices);
-  renderMonitorCards(safeDevices);
-  renderMonitorTable(safeDevices);
+function scheduleMonitoringAutoRefresh() {
+  stopMonitoringAutoRefresh();
+  const interval = document.hidden ? LAN_AUTO_REFRESH_HIDDEN_MS : LAN_AUTO_REFRESH_VISIBLE_MS;
+  monitoringAutoRefreshTimer = window.setInterval(() => {
+    loadMonitoring({ source: 'auto' });
+    loadDevices();
+  }, interval);
 }
 
+async function loadMonitoring({ force = false, source = 'manual' } = {}) {
+  if (monitoringRefreshInFlight && !force) return;
+  monitoringRefreshInFlight = true;
+  updateMonitoringLiveStatus('loading');
 
+  try {
+    const [summaryRes, devicesRes] = await Promise.all([
+      fetch('/api/monitoring/summary', { headers: authHeaders() }),
+      fetch('/api/monitoring/lan-devices', { headers: authHeaders() })
+    ]);
+
+    const summary = await summaryRes.json();
+    const devices = await devicesRes.json();
+    const safeDevices = Array.isArray(devices) ? devices : [];
+
+    renderMonitorSummary(summaryRes.ok ? summary : null);
+    renderMonitoringHealthPanel(summaryRes.ok ? summary : null, safeDevices);
+    renderMonitorCards(safeDevices);
+    renderMonitorTable(safeDevices);
+
+    monitoringLastUpdatedAt = new Date();
+    updateMonitoringLiveStatus('live', source === 'discovery' ? 'Discovery refreshed just now' : undefined);
+  } catch {
+    updateMonitoringLiveStatus('error');
+  } finally {
+    monitoringRefreshInFlight = false;
+  }
+}
 
 async function autoFillDeviceContextByIp() {
   const ipInput = document.getElementById('ipAddress');
@@ -145,8 +213,6 @@ async function autoFillDeviceContextByIp() {
   }
 }
 
-
-
 function seedAssignedUserFromSession() {
   const assignedInput = document.getElementById('assignedUser');
   if (!assignedInput) return;
@@ -160,7 +226,7 @@ async function refreshAssetConnections() {
   const res = await fetch('/api/devices/sync-from-monitoring', { method: 'POST', headers: authHeaders() });
   const data = await res.json();
   if (!res.ok) return alert(data.error || 'Unable to refresh device connections');
-  await Promise.all([loadDevices(), loadMonitoring()]);
+  await Promise.all([loadDevices(), loadMonitoring({ force: true, source: 'manual' })]);
   alert(data.message || 'Asset connections refreshed');
 }
 
@@ -230,7 +296,7 @@ async function deleteDevice(id, label) {
   if (!res.ok) return alert(data.error || 'Failed to delete device.');
 
   if (editingDeviceId === id) resetDeviceForm();
-  await Promise.all([loadDevices(), loadMonitoring()]);
+  await Promise.all([loadDevices(), loadMonitoring({ force: true, source: 'manual' })]);
   alert(data.message || 'Device deleted');
 }
 
@@ -256,7 +322,7 @@ async function registerDevice() {
 
   const wasEditing = Boolean(editingDeviceId);
   resetDeviceForm();
-  await Promise.all([loadDevices(), loadMonitoring()]);
+  await Promise.all([loadDevices(), loadMonitoring({ force: true, source: 'manual' })]);
   alert(wasEditing ? 'Device updated successfully.' : 'Device registered successfully.');
 }
 
@@ -291,26 +357,24 @@ async function loadDevices() {
   </tr>`).join('') || `<tr><td colspan='9' class='small'>No devices registered yet.</td></tr>`;
 }
 
-function startMonitoringAutoRefresh() {
-  if (monitoringAutoRefreshTimer) return;
-  monitoringAutoRefreshTimer = window.setInterval(() => {
-    loadMonitoring();
-    loadDevices();
-  }, LAN_AUTO_REFRESH_MS);
-}
-
 function stopMonitoringAutoRefresh() {
   if (!monitoringAutoRefreshTimer) return;
   window.clearInterval(monitoringAutoRefreshTimer);
   monitoringAutoRefreshTimer = null;
 }
 
+document.addEventListener('visibilitychange', () => {
+  scheduleMonitoringAutoRefresh();
+  if (!document.hidden) loadMonitoring({ source: 'visibility' });
+});
+
 document.addEventListener('DOMContentLoaded', () => {
-  loadMonitoring();
+  loadMonitoring({ source: 'initial' });
   loadDevices();
   bindAssetAutoFill();
   seedAssignedUserFromSession();
-  startMonitoringAutoRefresh();
+  scheduleMonitoringAutoRefresh();
+  window.setInterval(() => updateMonitoringLiveStatus('live'), 1000);
 });
 
 window.addEventListener('beforeunload', stopMonitoringAutoRefresh);
