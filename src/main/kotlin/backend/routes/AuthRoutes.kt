@@ -13,6 +13,7 @@ import backend.models.RegisterRequest
 import backend.models.ResendVerificationRequest
 import backend.models.RoleUpdateRequest
 import backend.models.VerifyEmailRequest
+import backend.models.UserActionResponse
 import backend.security.requireRole
 import backend.security.userId
 import backend.services.AuthService
@@ -70,33 +71,34 @@ fun Route.authRoutes(authService: AuthService) {
             if (!call.requireRole("admin")) return@put
             val id = call.parameters["id"]?.toIntOrNull() ?: return@put call.respond(HttpStatusCode.BadRequest)
             val req = call.receive<RoleUpdateRequest>()
-            call.respond(authService.updateUserRole(id, req.role, call.userId()))
+            val updated = authService.updateUserRole(id, req.role, call.userId())
+            call.respond(UserActionResponse("Role updated successfully", updated))
         }
         put("/{id}/reset-password") {
             if (!call.requireRole("admin")) return@put
             val id = call.parameters["id"]?.toIntOrNull() ?: return@put call.respond(HttpStatusCode.BadRequest)
             val req = call.receive<PasswordResetRequest>()
             val updated = authService.resetUserPassword(id, req.newPassword, req.confirmPassword, call.userId())
-            call.respond(mapOf("message" to "Password reset successful", "user" to updated))
+            call.respond(UserActionResponse("Password reset successful", updated))
         }
         put("/{id}/email-approval") {
             if (!call.requireRole("admin")) return@put
             val id = call.parameters["id"]?.toIntOrNull() ?: return@put call.respond(HttpStatusCode.BadRequest)
             val req = call.receive<EmailApprovalRequest>()
             val updated = authService.updateUserEmailApproval(id, req.approved, call.userId())
-            call.respond(mapOf("message" to if (req.approved) "User approved for login" else "User marked as pending", "user" to updated))
+            call.respond(UserActionResponse(if (req.approved) "User approved for login" else "User marked as pending", updated))
         }
         delete("/{id}") {
             if (!call.requireRole("admin")) return@delete
             val id = call.parameters["id"]?.toIntOrNull() ?: return@delete call.respond(HttpStatusCode.BadRequest)
             val deleted = authService.deleteUserAccount(id, call.userId())
-            call.respond(mapOf("message" to "User deleted", "user" to deleted))
+            call.respond(UserActionResponse("User deleted", deleted))
         }
         post {
             if (!call.requireRole("admin")) return@post
             val req = call.receive<InternalUserCreateRequest>()
             val created = authService.createUserInternally(req, call.userId())
-            call.respond(HttpStatusCode.Created, mapOf("message" to "User account created", "user" to created))
+            call.respond(HttpStatusCode.Created, UserActionResponse("User account created", created))
         }
 
         route("/admin") {
