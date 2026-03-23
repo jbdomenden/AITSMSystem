@@ -167,6 +167,10 @@ function renderSystemPerformance(elId, snapshots) {
     </div>`;
 }
 
+function adminTicketHref(ticketId) {
+  return `/ticket-management.html?ticketId=${encodeURIComponent(ticketId)}`;
+}
+
 function renderRecentAdminTickets(tickets) {
   const rows = document.getElementById('recentAdminTicketRows');
   if (!rows) return;
@@ -188,8 +192,8 @@ function renderRecentAdminTickets(tickets) {
 
   rows.innerHTML = relevant.map(t => `
     <tr>
-      <td>#${t.id}</td>
-      <td>${t.title || '-'}</td>
+      <td><a class='ticket-link' href='${adminTicketHref(t.id)}' aria-label='Open ticket ${t.id}'>#${t.id}</a></td>
+      <td><a class='ticket-link ticket-link-title monitor-text-wrap' href='${adminTicketHref(t.id)}' title='${t.title || '-'}'>${t.title || '-'}</a></td>
       <td>${t.priority || '-'}</td>
       <td><span class='badge ${t.status === 'Open' ? 'open' : (t.status === 'In Progress' ? 'in-progress' : 'resolved')}'>${t.status || 'Unknown'}</span></td>
       <td>${formatDateTime(t.updatedAt)}</td>

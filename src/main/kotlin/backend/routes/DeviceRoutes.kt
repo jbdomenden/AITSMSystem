@@ -9,7 +9,24 @@ import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.Serializable
 import java.net.InetAddress
+
+@Serializable
+private data class DeviceSyncResponse(
+    val message: String,
+    val devices: Int
+)
+
+private fun detectDeviceStatus(ip: String): String {
+    val normalizedIp = ip.trim()
+    if (normalizedIp.isBlank()) return "Not Reachable"
+
+    return runCatching {
+        val address = InetAddress.getByName(normalizedIp)
+        if (address.isReachable(1500)) "Online" else "Offline"
+    }.getOrElse { "Not Reachable" }
+}
 
 fun Route.deviceRoutes(deviceRepository: DeviceRepository, userRepository: UserRepository, monitoringService: MonitoringService) {
     route("/api/devices") {
@@ -50,7 +67,8 @@ fun Route.deviceRoutes(deviceRepository: DeviceRepository, userRepository: UserR
                         existing != null -> "device-registry"
                         signedInUser != null -> "signed-in-user-ip"
                         else -> "dns"
-                    }
+                    },
+                    "suggestedStatus" to (existing?.status ?: detectDeviceStatus(ip))
                 )
             )
         }
@@ -68,7 +86,7 @@ fun Route.deviceRoutes(deviceRepository: DeviceRepository, userRepository: UserR
                     )
                 }
             val synced = deviceRepository.syncDiscoveredDevices(peers)
-            call.respond(mapOf("message" to "Device registry synchronized", "devices" to synced.size))
+            call.respond(DeviceSyncResponse(message = "Device registry synchronized", devices = synced.size))
         }
 
         put("/{id}") {
