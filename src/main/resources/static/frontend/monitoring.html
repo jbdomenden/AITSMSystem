@@ -12,8 +12,12 @@
         <h1 class='page-title'>LAN Monitoring</h1>
         <p class='page-subtitle'>Device health and utilization for clients connected to your internal network.</p>
       </div>
-      <div class='inline-actions'>
-        <button class='btn btn-ghost' onclick='refreshDiscovery()'>Refresh Discovery</button>
+      <div class='inline-actions monitor-actions'>
+        <div id='monitorLiveStatus' class='live-status-chip' aria-live='polite'>
+          <span class='live-dot' aria-hidden='true'></span>
+          <span id='monitorLiveStatusText'>Waiting for update…</span>
+        </div>
+        <button id='refreshDiscoveryBtn' class='btn btn-ghost' onclick='refreshDiscovery()'>Refresh Discovery</button>
       </div>
     </div>
 
