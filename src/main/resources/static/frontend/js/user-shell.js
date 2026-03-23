@@ -37,7 +37,7 @@ function renderUserSidebar() {
 }
 
 function openUserHelp() {
-  alert('How to use AITSM:\n1) Create a ticket with clear issue details.\n2) Track status in My Tickets.\n3) Close resolved tickets, cancel active tickets, or request follow-up after 24h unresolved.');
+  alert('How to use AITSM\n1) Create a ticket with clear issue details.\n2) Track status in My Tickets.\n3) Close resolved tickets, cancel active tickets, or request follow-up after 24h unresolved.');
 }
 
 function closeUserHeaderMenu() {
@@ -50,6 +50,22 @@ function toggleUserHeaderMenu() {
 
 function toggleUserSidebar() {
   document.body.classList.toggle('sidebar-hidden');
+}
+
+async function loadUserHeaderNotifications() {
+  const list = document.getElementById('userNotifList');
+  const count = document.getElementById('userNotifCount');
+  if (!list || !count) return;
+  try {
+    const res = await fetch('/api/notifications', { headers: authHeaders() });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Unable to load notifications');
+    const items = (Array.isArray(data) ? data : []).slice(0, 8);
+    count.textContent = String(items.length);
+    list.innerHTML = items.map((n) => `<div class='small' style='padding:8px;border-bottom:1px solid #1f325f'>${n.message || 'Notification'}<br><span style='opacity:.7'>${n.createdAt || ''}</span></div>`).join('') || "<div class='small'>No notifications.</div>";
+  } catch {
+    list.innerHTML = "<div class='small'>Unable to load notifications.</div>";
+  }
 }
 
 function renderUserUtilityHeader() {
@@ -73,10 +89,13 @@ function renderUserUtilityHeader() {
   document.addEventListener('click', (event) => {
     const trigger = document.getElementById('userMenuTrigger');
     const menu = document.getElementById('userHeaderMenu');
-    if (!menu || !trigger) return;
-    if (menu.contains(event.target) || trigger.contains(event.target)) return;
-    closeUserHeaderMenu();
+    const notifBtn = document.getElementById('userNotifTrigger');
+    const notifMenu = document.getElementById('userNotifMenu');
+    if (menu && trigger && !(menu.contains(event.target) || trigger.contains(event.target))) closeUserHeaderMenu();
+    if (notifMenu && notifBtn && !(notifMenu.contains(event.target) || notifBtn.contains(event.target))) notifMenu.classList.add('hidden');
   });
+
+  loadUserHeaderNotifications();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
