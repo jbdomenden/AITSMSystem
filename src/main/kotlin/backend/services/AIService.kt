@@ -22,7 +22,7 @@ class AIService(private val knowledgeRepository: KnowledgeRepository? = null) {
     private val json = Json { ignoreUnknownKeys = true }
 
     private val openAiApiKey: String = System.getenv("OPENAI_API_KEY").orEmpty()
-    private val openAiModel: String = System.getenv("OPENAI_MODEL").ifBlank { "gpt-4.1-mini" }
+    private val openAiModel: String = System.getenv("OPENAI_MODEL")?.trim().orEmpty().ifBlank { "gpt-4.1-mini" }
     private val openAiTimeoutMillis: Long = System.getenv("OPENAI_TIMEOUT_MS")?.toLongOrNull()?.coerceIn(2_000, 25_000) ?: 12_000
     private val openAiTemperature: Double = System.getenv("OPENAI_TEMPERATURE")?.toDoubleOrNull()?.coerceIn(0.0, 1.0) ?: 0.2
     private val openAiMaxOutputTokens: Int = System.getenv("OPENAI_MAX_OUTPUT_TOKENS")?.toIntOrNull()?.coerceIn(250, 900) ?: 550
