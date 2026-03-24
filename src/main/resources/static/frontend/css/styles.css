@@ -770,3 +770,96 @@ body.sidebar-hidden .sidebar {
 .action-menu-backdrop { position: fixed; inset: 0; background: transparent; z-index: 35; }
 .row-action-menu { z-index: 50; }
 .remember-row{display:inline-flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;}
+
+.ai-assistant-layout {
+  margin-top: 16px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1.8fr) minmax(260px, 1fr);
+  align-items: start;
+}
+.ai-chat-card {
+  display: grid;
+  grid-template-rows: minmax(420px, 1fr) auto auto;
+  gap: 12px;
+}
+.ai-chat-thread {
+  min-height: 420px;
+  max-height: calc(100vh - 320px);
+  overflow-y: auto;
+  padding-right: 4px;
+  display: grid;
+  gap: 10px;
+}
+.ai-message {
+  display: grid;
+  gap: 6px;
+}
+.ai-message-user {
+  justify-items: end;
+}
+.ai-message-bubble {
+  max-width: min(100%, 740px);
+  border: 1px solid #d7e4ff;
+  border-radius: 14px;
+  padding: 11px 12px;
+  background: #fff;
+  line-height: 1.45;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.ai-message-user .ai-message-bubble {
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  color: #fff;
+  border-color: #2563eb;
+}
+.ai-message-meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+.ai-ticket-btn {
+  height: 36px;
+  font-size: 13px;
+}
+.ai-composer {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.ai-composer textarea {
+  min-height: 100px;
+  max-height: 240px;
+}
+.ai-loading {
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+.ai-suggestions-card {
+  display: grid;
+  gap: 10px;
+}
+.ai-prompt-list {
+  display: grid;
+  gap: 8px;
+}
+.ai-prompt {
+  justify-content: flex-start;
+  text-align: left;
+  width: 100%;
+  min-height: 42px;
+}
+
+@media (max-width: 1020px) {
+  .ai-assistant-layout {
+    grid-template-columns: 1fr;
+  }
+  .ai-chat-thread {
+    max-height: none;
+    min-height: 360px;
+  }
+}

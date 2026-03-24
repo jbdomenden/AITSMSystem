@@ -14,6 +14,7 @@
         <p class='page-subtitle'>Describe your issue with clear impact and context so support can respond faster.</p>
       </div>
       <div class='page-actions'>
+        <a class='btn btn-ghost' href='/ai-assistant.html'>Open AI Assistant</a>
         <a class='btn btn-ghost' href='/tickets.html'>My Tickets</a>
       </div>
     </div>
@@ -32,17 +33,6 @@
         <div class='form-group'><label>Category</label><select id='category'><option>Hardware</option><option>Software</option><option>Network</option><option>Database</option><option>Security</option><option>Other</option></select></div>
       </div>
       <div class='inline-actions' style='margin-top:12px'><a href='/tickets.html' class='btn btn-ghost'>Cancel</a><button class='btn btn-primary' onclick='createTicket()'>Create Ticket</button></div>
-    </section>
-
-    <section class='card' style='margin-top:16px'>
-      <div class='card-head'>
-        <div>
-          <h3 class='section-title'>AI Troubleshooting Assistant</h3>
-          <p class='section-subtitle'>Get instant suggestions before submitting or while drafting.</p>
-        </div>
-      </div>
-      <button class='btn btn-primary' style='width:auto' onclick='suggestFixes()'>Generate Suggestions</button>
-      <ul id='aiTips' class='tips'></ul>
     </section>
   </main>
 </div>
