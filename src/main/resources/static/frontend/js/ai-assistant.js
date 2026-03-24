@@ -1,10 +1,20 @@
 const AI_CHAT_STATE_KEY = 'aiAssistantChatState';
 const AI_TICKET_PREFILL_KEY = 'aiTicketPrefill';
+const AI_SESSION_KEY = 'aiAssistantSessionId';
 
 let aiState = {
   messages: [],
-  pending: false
+  pending: false,
+  lastDraft: null
 };
+
+function getSessionId() {
+  let id = localStorage.getItem(AI_SESSION_KEY);
+  if (id) return id;
+  id = (crypto?.randomUUID?.() || `sess-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+  localStorage.setItem(AI_SESSION_KEY, id);
+  return id;
+}
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -38,8 +48,10 @@ function loadState() {
     aiState.messages = parsed.messages
       .filter((msg) => msg && typeof msg.role === 'string' && typeof msg.content === 'string')
       .slice(-20);
+    aiState.lastDraft = parsed.lastDraft || null;
   } catch {
     aiState.messages = [];
+    aiState.lastDraft = null;
   }
 }
 
@@ -48,7 +60,7 @@ function renderMessages() {
   if (!thread) return;
 
   if (!aiState.messages.length) {
-    thread.innerHTML = "<p class='small'>Start by describing your issue. The assistant will provide troubleshooting steps and ticket suggestions.</p>";
+    thread.innerHTML = "<p class='small'>Start by describing your issue. The assistant will respond using real model output and suggest a ticket draft.</p>";
     return;
   }
 
@@ -59,7 +71,7 @@ function renderMessages() {
       <article class='ai-message ${isUser ? 'ai-message-user' : 'ai-message-assistant'}'>
         <div class='ai-message-bubble'>${escapeHtml(message.content).replaceAll('\n', '<br>')}</div>
         <div class='ai-message-meta'>${isUser ? 'You' : 'AI Assistant'} • ${formatTime(message.timestamp)}</div>
-        ${canCreateTicket ? `<button type='button' class='btn btn-ghost ai-ticket-btn' data-index='${index}'>Use this to create ticket</button>` : ''}
+        ${canCreateTicket ? `<button type='button' class='btn btn-ghost ai-ticket-btn' data-index='${index}'>Create ticket draft from this reply</button>` : ''}
       </article>`;
   }).join('');
 
@@ -77,16 +89,12 @@ function setPending(isPending) {
   loading?.classList.toggle('hidden', !isPending);
 }
 
-function toHistoryPayload() {
-  return aiState.messages
-    .slice(-10)
-    .map((message) => ({ role: message.role, content: message.content }));
-}
-
 function addMessage(role, content, extra = {}) {
+  const text = String(content || '').trim();
+  if (!text) return;
   aiState.messages.push({
     role,
-    content: String(content || '').trim(),
+    content: text,
     timestamp: new Date().toISOString(),
     ...extra
   });
@@ -107,38 +115,56 @@ async function sendMessage() {
   setPending(true);
 
   try {
-    const res = await fetch('/api/ai-assistant/chat', {
+    const res = await fetch('/api/ai/chat', {
       method: 'POST',
-      headers: authHeaders(),
-      body: JSON.stringify({
-        message,
-        history: toHistoryPayload()
-      })
+      headers: {
+        ...authHeaders(),
+        'X-AI-Session-Id': getSessionId()
+      },
+      body: JSON.stringify({ message })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Unable to contact AI assistant');
 
+    const structured = data.structured || {};
+    const ticketSuggestion = {
+      title: data.titleSuggestion || structured.issueSummary || 'IT support request',
+      description: data.descriptionSuggestion || structured.ticketDescription || data.reply || '',
+      category: data.category || structured.suggestedCategory || 'Other',
+      priority: data.priority || structured.suggestedPriority || 'Medium',
+      originalUserMessage: message,
+      issueSummary: structured.issueSummary || ''
+    };
+    aiState.lastDraft = ticketSuggestion;
+
     addMessage('assistant', data.reply || 'No response received.', {
-      ticketSuggestion: {
-        title: data.titleSuggestion || 'IT support request',
-        description: data.descriptionSuggestion || data.reply || '',
-        category: data.category || 'Other',
-        priority: data.priority || 'Medium'
-      },
-      fallback: Boolean(data.fallback)
+      ticketSuggestion,
+      model: data.model || ''
     });
   } catch (error) {
-    addMessage('assistant', `I could not process that right now. ${error?.message || 'Please try again.'}`);
+    addMessage('assistant', `AI service is currently unavailable. ${error?.message || 'Please try again in a moment.'}`);
   } finally {
     setPending(false);
     textarea.focus();
   }
 }
 
-function clearChat() {
-  aiState = { messages: [], pending: false };
+async function clearChat() {
+  aiState = { messages: [], pending: false, lastDraft: null };
   saveState();
   renderMessages();
+
+  try {
+    await fetch('/api/ai/clear', {
+      method: 'POST',
+      headers: {
+        ...authHeaders(),
+        'X-AI-Session-Id': getSessionId()
+      }
+    });
+  } catch {
+    // local clear is enough
+  }
 }
 
 function usePrompt(prompt) {
@@ -148,16 +174,28 @@ function usePrompt(prompt) {
   textarea.focus();
 }
 
-function storePrefillAndNavigate(index) {
-  const message = aiState.messages[index];
-  const suggestion = message?.ticketSuggestion;
+async function createDraftFromSuggestion(suggestion) {
   if (!suggestion) return;
+  const res = await fetch('/api/ai/create-ticket-draft', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({
+      issueSummary: suggestion.issueSummary || suggestion.title,
+      ticketDescription: suggestion.description,
+      suggestedPriority: suggestion.priority,
+      suggestedCategory: suggestion.category,
+      originalUserMessage: suggestion.originalUserMessage || null
+    })
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Unable to build ticket draft');
 
   sessionStorage.setItem(AI_TICKET_PREFILL_KEY, JSON.stringify({
-    title: suggestion.title,
-    description: suggestion.description,
-    category: suggestion.category,
-    priority: suggestion.priority
+    title: data.title,
+    description: data.description,
+    category: data.category,
+    priority: data.priority
   }));
   location.href = '/create-ticket.html';
 }
@@ -184,13 +222,26 @@ function wireEvents() {
     button.addEventListener('click', () => usePrompt(button.dataset.prompt || ''));
   });
 
-  document.getElementById('aiThread')?.addEventListener('click', (event) => {
+  document.getElementById('createTicketFromLastBtn')?.addEventListener('click', async () => {
+    try {
+      await createDraftFromSuggestion(aiState.lastDraft);
+    } catch (error) {
+      addMessage('assistant', `Could not prepare ticket draft. ${error?.message || ''}`);
+    }
+  });
+
+  document.getElementById('aiThread')?.addEventListener('click', async (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
     if (!target.classList.contains('ai-ticket-btn')) return;
     const index = Number(target.dataset.index);
     if (Number.isNaN(index)) return;
-    storePrefillAndNavigate(index);
+    const suggestion = aiState.messages[index]?.ticketSuggestion;
+    try {
+      await createDraftFromSuggestion(suggestion);
+    } catch (error) {
+      addMessage('assistant', `Could not prepare ticket draft. ${error?.message || ''}`);
+    }
   });
 }
 
