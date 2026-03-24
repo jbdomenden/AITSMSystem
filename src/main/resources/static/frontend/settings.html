@@ -42,7 +42,27 @@
         <div id='settingsNotificationSummary' class='small'>Loading notification summary...</div>
       </article>
 
-
+      <article class='card ollama-card'>
+        <div class='card-head'><h3 class='section-title'>Ollama AI Configuration</h3><span class='card-icon'>🤖</span></div>
+        <div class='form-grid single-col'>
+          <div class='form-group'>
+            <label for='aiBaseUrl'>Base URL</label>
+            <input id='aiBaseUrl' placeholder='http://localhost:11434'>
+          </div>
+          <div class='form-group'>
+            <label for='aiModelSelect'>Model</label>
+            <select id='aiModelSelect'></select>
+            <div id='aiModelHint' class='small'>Click “Refresh Models” to load installed models.</div>
+          </div>
+          <div class='inline-actions'>
+            <button id='aiRefreshModelsBtn' class='btn btn-ghost' type='button'>Refresh Models</button>
+            <button id='aiTestConnectionBtn' class='btn btn-ghost' type='button'>Test Connection</button>
+            <button id='aiSaveConfigBtn' class='btn btn-primary' type='button'>Save Configuration</button>
+          </div>
+          <div class='small'>Status: <span id='aiConnectionStatus' class='status-pill status-pill-neutral'>Unknown</span></div>
+          <div id='aiConfigMessage' class='small'></div>
+        </div>
+      </article>
     </section>
   </main>
 </div>

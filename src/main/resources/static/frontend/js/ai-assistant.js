@@ -5,7 +5,7 @@ const AI_SESSION_KEY = 'aiAssistantSessionId';
 let aiState = {
   messages: [],
   pending: false,
-  lastDraft: null
+  lastStructured: null
 };
 
 function getSessionId() {
@@ -25,12 +25,6 @@ function escapeHtml(value) {
     .replaceAll("'", '&#39;');
 }
 
-function formatTime(isoValue) {
-  const date = new Date(isoValue || Date.now());
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
 function saveState() {
   try {
     localStorage.setItem(AI_CHAT_STATE_KEY, JSON.stringify(aiState));
@@ -45,14 +39,27 @@ function loadState() {
     if (!raw) return;
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed.messages)) return;
-    aiState.messages = parsed.messages
-      .filter((msg) => msg && typeof msg.role === 'string' && typeof msg.content === 'string')
-      .slice(-20);
-    aiState.lastDraft = parsed.lastDraft || null;
+    aiState.messages = parsed.messages.slice(-20);
+    aiState.lastStructured = parsed.lastStructured || null;
   } catch {
     aiState.messages = [];
-    aiState.lastDraft = null;
+    aiState.lastStructured = null;
   }
+}
+
+function renderStructuredSections(structured = {}) {
+  const causes = (structured.likelyCauses || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+  const steps = (structured.troubleshootingSteps || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+  const escalate = (structured.escalationCriteria || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+
+  return `
+    <div class='ai-sections'>
+      <div><strong>Issue Summary</strong><p>${escapeHtml(structured.issueSummary || 'Not provided')}</p></div>
+      <div><strong>Likely Causes</strong><ul>${causes || '<li>No likely causes provided.</li>'}</ul></div>
+      <div><strong>Troubleshooting Steps</strong><ol>${steps || '<li>No troubleshooting steps provided.</li>'}</ol></div>
+      <div><strong>Escalation Criteria</strong><ul>${escalate || '<li>No escalation guidance provided.</li>'}</ul></div>
+      <div><strong>Suggested Priority</strong><p>${escapeHtml(structured.suggestedPriority || 'Medium')}</p></div>
+    </div>`;
 }
 
 function renderMessages() {
@@ -60,19 +67,26 @@ function renderMessages() {
   if (!thread) return;
 
   if (!aiState.messages.length) {
-    thread.innerHTML = "<p class='small'>Start by describing your issue. The assistant will respond using real model output and suggest a ticket draft.</p>";
+    thread.innerHTML = "<p class='small'>Start by describing your issue. The assistant will return structured troubleshooting guidance and ticket-ready output.</p>";
     return;
   }
 
   thread.innerHTML = aiState.messages.map((message, index) => {
-    const isUser = message.role === 'user';
-    const canCreateTicket = !isUser && message.ticketSuggestion;
-    return `
-      <article class='ai-message ${isUser ? 'ai-message-user' : 'ai-message-assistant'}'>
+    if (message.role === 'user') {
+      return `<article class='ai-message ai-message-user'>
         <div class='ai-message-bubble'>${escapeHtml(message.content).replaceAll('\n', '<br>')}</div>
-        <div class='ai-message-meta'>${isUser ? 'You' : 'AI Assistant'} • ${formatTime(message.timestamp)}</div>
-        ${canCreateTicket ? `<button type='button' class='btn btn-ghost ai-ticket-btn' data-index='${index}'>Create ticket draft from this reply</button>` : ''}
       </article>`;
+    }
+
+    return `<article class='ai-message ai-message-assistant'>
+      <div class='ai-message-bubble'>
+        <p>${escapeHtml(message.replyText || message.content || '').replaceAll('\n', '<br>')}</p>
+        ${renderStructuredSections(message.structured || {})}
+        <div class='inline-actions'>
+          <button type='button' class='btn btn-ghost ai-ticket-btn' data-index='${index}'>Create ticket draft from this reply</button>
+        </div>
+      </div>
+    </article>`;
   }).join('');
 
   thread.scrollTop = thread.scrollHeight;
@@ -80,24 +94,33 @@ function renderMessages() {
 
 function setPending(isPending) {
   aiState.pending = isPending;
-  const sendBtn = document.getElementById('aiSendBtn');
-  const loading = document.getElementById('aiLoading');
+  document.getElementById('aiSendBtn')?.toggleAttribute('disabled', isPending);
   const textarea = document.getElementById('aiMessage');
-
-  if (sendBtn) sendBtn.disabled = isPending;
   if (textarea) textarea.disabled = isPending;
-  loading?.classList.toggle('hidden', !isPending);
+  document.getElementById('aiLoading')?.classList.toggle('hidden', !isPending);
 }
 
-function addMessage(role, content, extra = {}) {
-  const text = String(content || '').trim();
-  if (!text) return;
+function addUserMessage(content) {
   aiState.messages.push({
-    role,
-    content: text,
-    timestamp: new Date().toISOString(),
-    ...extra
+    role: 'user',
+    content: String(content || '').trim(),
+    timestamp: new Date().toISOString()
   });
+  aiState.messages = aiState.messages.slice(-20);
+  saveState();
+  renderMessages();
+}
+
+function addAssistantMessage(payload) {
+  aiState.messages.push({
+    role: 'assistant',
+    content: payload.replyText || '',
+    replyText: payload.replyText || '',
+    structured: payload.structured || {},
+    model: payload.model || '',
+    timestamp: new Date().toISOString()
+  });
+  aiState.lastStructured = payload.structured || null;
   aiState.messages = aiState.messages.slice(-20);
   saveState();
   renderMessages();
@@ -110,7 +133,7 @@ async function sendMessage() {
   const message = textarea.value.trim();
   if (!message) return;
 
-  addMessage('user', message);
+  addUserMessage(message);
   textarea.value = '';
   setPending(true);
 
@@ -123,26 +146,23 @@ async function sendMessage() {
       },
       body: JSON.stringify({ message })
     });
+
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Unable to contact AI assistant');
-
-    const structured = data.structured || {};
-    const ticketSuggestion = {
-      title: data.titleSuggestion || structured.issueSummary || 'IT support request',
-      description: data.descriptionSuggestion || structured.ticketDescription || data.reply || '',
-      category: data.category || structured.suggestedCategory || 'Other',
-      priority: data.priority || structured.suggestedPriority || 'Medium',
-      originalUserMessage: message,
-      issueSummary: structured.issueSummary || ''
-    };
-    aiState.lastDraft = ticketSuggestion;
-
-    addMessage('assistant', data.reply || 'No response received.', {
-      ticketSuggestion,
-      model: data.model || ''
-    });
+    if (!res.ok) throw new Error(data.error || data.message || 'Unable to contact AI assistant');
+    addAssistantMessage(data);
   } catch (error) {
-    addMessage('assistant', `AI service is currently unavailable. ${error?.message || 'Please try again in a moment.'}`);
+    addAssistantMessage({
+      replyText: `AI service is currently unavailable. ${error?.message || 'Please try again in a moment.'}`,
+      structured: {
+        issueSummary: 'Unable to process request',
+        likelyCauses: ['Backend-to-Ollama connectivity issue'],
+        troubleshootingSteps: ['Verify Ollama is running locally', 'Check configured model in Settings', 'Retry request'],
+        escalationCriteria: ['Escalate if service remains unavailable for critical support cases'],
+        suggestedPriority: 'Medium',
+        ticketTitle: 'AI assistant unavailable',
+        ticketDescription: 'AI assistant request failed because backend could not reach Ollama.'
+      }
+    });
   } finally {
     setPending(false);
     textarea.focus();
@@ -150,7 +170,7 @@ async function sendMessage() {
 }
 
 async function clearChat() {
-  aiState = { messages: [], pending: false, lastDraft: null };
+  aiState = { messages: [], pending: false, lastStructured: null };
   saveState();
   renderMessages();
 
@@ -167,6 +187,43 @@ async function clearChat() {
   }
 }
 
+function draftFromStructured(structured) {
+  if (!structured) return null;
+  return {
+    title: structured.ticketTitle || structured.issueSummary || 'IT support request',
+    description: structured.ticketDescription || structured.replyText || '',
+    priority: structured.suggestedPriority || 'Medium',
+    issueSummary: structured.issueSummary || '',
+    originalUserMessage: aiState.messages.filter((m) => m.role === 'user').slice(-1)[0]?.content || ''
+  };
+}
+
+async function createDraftFromStructured(structured) {
+  const draft = draftFromStructured(structured);
+  if (!draft) throw new Error('No assistant response available yet.');
+
+  const res = await fetch('/api/ai/create-ticket-draft', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({
+      issueSummary: draft.issueSummary,
+      ticketDescription: draft.description,
+      suggestedPriority: draft.priority,
+      originalUserMessage: draft.originalUserMessage,
+      ticketTitle: draft.title
+    })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Unable to build ticket draft');
+
+  sessionStorage.setItem(AI_TICKET_PREFILL_KEY, JSON.stringify({
+    title: data.title,
+    description: data.description,
+    priority: data.priority
+  }));
+  location.href = '/create-ticket.html';
+}
+
 function usePrompt(prompt) {
   const textarea = document.getElementById('aiMessage');
   if (!textarea) return;
@@ -174,83 +231,11 @@ function usePrompt(prompt) {
   textarea.focus();
 }
 
-async function createDraftFromSuggestion(suggestion) {
-  if (!suggestion) return;
-  const res = await fetch('/api/ai/create-ticket-draft', {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify({
-      issueSummary: suggestion.issueSummary || suggestion.title,
-      ticketDescription: suggestion.description,
-      suggestedPriority: suggestion.priority,
-      suggestedCategory: suggestion.category,
-      originalUserMessage: suggestion.originalUserMessage || null
-    })
-  });
-
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Unable to build ticket draft');
-
-  sessionStorage.setItem(AI_TICKET_PREFILL_KEY, JSON.stringify({
-    title: data.title,
-    description: data.description,
-    category: data.category,
-    priority: data.priority
-  }));
-  location.href = '/create-ticket.html';
-}
-
-function wireEvents() {
-  const form = document.getElementById('aiComposer');
-  const textarea = document.getElementById('aiMessage');
-
-  form?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    await sendMessage();
-  });
-
-  textarea?.addEventListener('keydown', async (event) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault();
-      await sendMessage();
-    }
-  });
-
-  document.getElementById('clearAiChatBtn')?.addEventListener('click', clearChat);
-
-  document.querySelectorAll('.ai-prompt').forEach((button) => {
-    button.addEventListener('click', () => usePrompt(button.dataset.prompt || ''));
-  });
-
-  document.getElementById('createTicketFromLastBtn')?.addEventListener('click', async () => {
-    try {
-      await createDraftFromSuggestion(aiState.lastDraft);
-    } catch (error) {
-      addMessage('assistant', `Could not prepare ticket draft. ${error?.message || ''}`);
-    }
-  });
-
-  document.getElementById('aiThread')?.addEventListener('click', async (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
-    if (!target.classList.contains('ai-ticket-btn')) return;
-    const index = Number(target.dataset.index);
-    if (Number.isNaN(index)) return;
-    const suggestion = aiState.messages[index]?.ticketSuggestion;
-    try {
-      await createDraftFromSuggestion(suggestion);
-    } catch (error) {
-      addMessage('assistant', `Could not prepare ticket draft. ${error?.message || ''}`);
-    }
-  });
-}
-
 function applyTicketPrefillFromAI() {
   const title = document.getElementById('title');
   const description = document.getElementById('description');
-  const category = document.getElementById('category');
   const priority = document.getElementById('priority');
-  if (!title || !description || !category || !priority) return;
+  if (!title || !description || !priority) return;
 
   const raw = sessionStorage.getItem(AI_TICKET_PREFILL_KEY);
   if (!raw) return;
@@ -259,18 +244,54 @@ function applyTicketPrefillFromAI() {
     const prefill = JSON.parse(raw);
     if (prefill.title) title.value = String(prefill.title).slice(0, 255);
     if (prefill.description) description.value = String(prefill.description).slice(0, 5000);
-    if (prefill.category) category.value = prefill.category;
     if (prefill.priority) priority.value = prefill.priority;
-  } catch {
-    // noop
   } finally {
     sessionStorage.removeItem(AI_TICKET_PREFILL_KEY);
   }
 }
 
+function wireEvents() {
+  document.getElementById('aiComposer')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    await sendMessage();
+  });
+
+  document.getElementById('aiMessage')?.addEventListener('keydown', async (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      await sendMessage();
+    }
+  });
+
+  document.getElementById('clearAiChatBtn')?.addEventListener('click', clearChat);
+  document.querySelectorAll('.ai-prompt').forEach((button) => {
+    button.addEventListener('click', () => usePrompt(button.dataset.prompt || ''));
+  });
+
+  document.getElementById('createTicketFromLastBtn')?.addEventListener('click', async () => {
+    try {
+      await createDraftFromStructured(aiState.lastStructured);
+    } catch (error) {
+      alert(error?.message || 'Unable to create ticket draft');
+    }
+  });
+
+  document.getElementById('aiThread')?.addEventListener('click', async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement) || !target.classList.contains('ai-ticket-btn')) return;
+    const index = Number(target.dataset.index);
+    if (Number.isNaN(index)) return;
+    const structured = aiState.messages[index]?.structured;
+    try {
+      await createDraftFromStructured(structured);
+    } catch (error) {
+      alert(error?.message || 'Unable to create ticket draft');
+    }
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   applyTicketPrefillFromAI();
-
   if (!document.getElementById('aiComposer')) return;
   loadState();
   renderMessages();
