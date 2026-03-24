@@ -134,3 +134,14 @@ data class Device(
 
 @Serializable data class TroubleshootingResponse(val suggestions: List<String>)
 @Serializable data class AnalyticsResponse(val metric: String, val points: List<Map<String, String>>)
+
+@Serializable data class AIChatMessage(val role: String, val content: String)
+@Serializable data class AIChatRequest(val message: String, val history: List<AIChatMessage> = emptyList())
+@Serializable data class AIChatResponse(
+    val reply: String,
+    val category: String,
+    val priority: String,
+    val titleSuggestion: String,
+    val descriptionSuggestion: String,
+    val fallback: Boolean = false
+)
