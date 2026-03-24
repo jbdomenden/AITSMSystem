@@ -1,7 +1,7 @@
 async function fetchJsonOrThrow(url, options = {}) {
   const res = await fetch(url, { headers: authHeaders(), ...options });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `Failed request: ${url}`);
+  if (!res.ok) throw new Error(data.error || data.message || `Failed request: ${url}`);
   return data;
 }
 
@@ -35,7 +35,7 @@ async function loadSlaPolicies() {
   if (!rows) return;
 
   const policies = await fetchJsonOrThrow('/api/sla');
-  rows.innerHTML = policies.map(p => `<tr><td>${p.priority}</td><td>${p.responseTime}</td><td>${p.resolutionTime}</td></tr>`).join('')
+  rows.innerHTML = policies.map((p) => `<tr><td>${p.priority}</td><td>${p.responseTime}</td><td>${p.resolutionTime}</td></tr>`).join('')
     || "<tr><td colspan='3' class='small'>No SLA policies found.</td></tr>";
 }
 
@@ -45,19 +45,179 @@ async function loadNotificationSummary() {
 
   const items = await fetchJsonOrThrow('/api/notifications');
   const total = items.length;
-  const critical = items.filter(n => ['error', 'critical'].includes((n.type || '').toLowerCase())).length;
+  const critical = items.filter((n) => ['error', 'critical'].includes((n.type || '').toLowerCase())).length;
   const latest = items[0]?.createdAt ? new Date(items[0].createdAt).toLocaleString() : 'N/A';
   host.innerHTML = `Total notifications: <strong>${total}</strong><br>Critical notifications: <strong>${critical}</strong><br>Latest update: <strong>${latest}</strong>`;
+}
+
+function setAiMessage(text, isError = false) {
+  const host = document.getElementById('aiConfigMessage');
+  if (!host) return;
+  host.textContent = text || '';
+  host.classList.toggle('text-danger', Boolean(isError));
+}
+
+function setAiStatus(label, variant) {
+  const el = document.getElementById('aiConnectionStatus');
+  if (!el) return;
+  el.textContent = label;
+  el.className = `status-pill status-pill-${variant}`;
+}
+
+function setAiButtonsDisabled(disabled) {
+  ['aiRefreshModelsBtn', 'aiTestConnectionBtn', 'aiSaveConfigBtn'].forEach((id) => {
+    const btn = document.getElementById(id);
+    if (btn) btn.disabled = disabled;
+  });
+}
+
+function validUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return ['http:', 'https:'].includes(parsed.protocol);
+  } catch {
+    return false;
+  }
+}
+
+function currentAiFormState() {
+  return {
+    baseUrl: (document.getElementById('aiBaseUrl')?.value || '').trim(),
+    model: (document.getElementById('aiModelSelect')?.value || '').trim()
+  };
+}
+
+function renderModelOptions(models = [], selectedModel = '') {
+  const select = document.getElementById('aiModelSelect');
+  const hint = document.getElementById('aiModelHint');
+  if (!select) return;
+
+  if (!models.length) {
+    select.innerHTML = "<option value=''>No models found</option>";
+    select.value = '';
+    if (hint) hint.textContent = 'No local models found. Run `ollama pull <model>` first.';
+    return;
+  }
+
+  select.innerHTML = models.map((name) => `<option value='${name}'>${name}</option>`).join('');
+  select.value = models.includes(selectedModel) ? selectedModel : models[0];
+  if (hint) hint.textContent = `${models.length} model(s) detected from local Ollama.`;
+}
+
+async function loadAiConfig() {
+  const data = await fetchJsonOrThrow('/api/ai/config');
+  const input = document.getElementById('aiBaseUrl');
+  if (input) input.value = data.baseUrl || 'http://localhost:11434';
+  setAiStatus('Unknown', 'neutral');
+  await refreshModels();
+}
+
+async function refreshModels() {
+  const { baseUrl } = currentAiFormState();
+  if (!baseUrl || !validUrl(baseUrl)) {
+    setAiMessage('Base URL must be a valid http(s) URL before refreshing models.', true);
+    return;
+  }
+
+  setAiButtonsDisabled(true);
+  setAiMessage('Refreshing model list...');
+  try {
+    const saveRes = await fetch('/api/ai/config', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ baseUrl, model: (document.getElementById('aiModelSelect')?.value || 'llama3.1:8b') })
+    });
+    if (!saveRes.ok) {
+      const err = await saveRes.json();
+      throw new Error(err.error || err.message || 'Unable to apply base URL');
+    }
+
+    const data = await fetchJsonOrThrow('/api/ai/models');
+    renderModelOptions(data.models || [], data.currentModel || '');
+    setAiMessage('Model list refreshed successfully.');
+  } catch (error) {
+    renderModelOptions([], '');
+    setAiMessage(error.message || 'Failed to refresh models.', true);
+    setAiStatus('Failed', 'fail');
+  } finally {
+    setAiButtonsDisabled(false);
+  }
+}
+
+async function testAiConnection() {
+  const { baseUrl, model } = currentAiFormState();
+  if (!baseUrl || !validUrl(baseUrl)) {
+    setAiMessage('Base URL must be a valid http(s) URL.', true);
+    return;
+  }
+  if (!model) {
+    setAiMessage('Please select a model before testing connection.', true);
+    return;
+  }
+
+  setAiButtonsDisabled(true);
+  setAiMessage('Testing Ollama connection...');
+
+  try {
+    const response = await fetch('/api/ai/test', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ baseUrl, model })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Connection failed');
+    setAiStatus('Connected', 'ok');
+    setAiMessage(data.message || 'Connection successful.');
+  } catch (error) {
+    setAiStatus('Failed', 'fail');
+    setAiMessage(error.message || 'Unable to connect to Ollama.', true);
+  } finally {
+    setAiButtonsDisabled(false);
+  }
+}
+
+async function saveAiConfig() {
+  const { baseUrl, model } = currentAiFormState();
+  if (!baseUrl || !validUrl(baseUrl)) {
+    setAiMessage('Please enter a valid Base URL (http:// or https://).', true);
+    return;
+  }
+  if (!model) {
+    setAiMessage('Please select an Ollama model.', true);
+    return;
+  }
+
+  setAiButtonsDisabled(true);
+  setAiMessage('Saving AI configuration...');
+
+  try {
+    await fetchJsonOrThrow('/api/ai/config', {
+      method: 'POST',
+      body: JSON.stringify({ baseUrl, model })
+    });
+    setAiMessage('Configuration saved successfully.');
+  } catch (error) {
+    setAiMessage(error.message || 'Unable to save configuration.', true);
+  } finally {
+    setAiButtonsDisabled(false);
+  }
+}
+
+function wireAiSettingsEvents() {
+  document.getElementById('aiRefreshModelsBtn')?.addEventListener('click', refreshModels);
+  document.getElementById('aiTestConnectionBtn')?.addEventListener('click', testAiConnection);
+  document.getElementById('aiSaveConfigBtn')?.addEventListener('click', saveAiConfig);
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
   try {
     await Promise.all([loadProfileSettings(), loadSlaPolicies(), loadNotificationSummary()]);
+    wireAiSettingsEvents();
+    await loadAiConfig();
   } catch (error) {
     alert(error.message || 'Unable to load settings data');
   }
 });
-
 
 async function changeMyPassword() {
   const body = {

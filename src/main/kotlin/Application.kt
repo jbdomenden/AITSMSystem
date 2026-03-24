@@ -22,6 +22,9 @@ import backend.services.MonitoringService
 import backend.services.NotificationService
 import backend.services.SLAService
 import backend.services.TicketService
+import backend.services.ai.AIChatService
+import backend.services.ai.AIConfigService
+import backend.services.ai.OllamaProvider
 import backend.security.PasswordHasher
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
@@ -57,6 +60,7 @@ fun Application.module() {
         allowHeader("Content-Type")
         allowHeader("X-User-Id")
         allowHeader("X-User-Role")
+        allowHeader("X-AI-Session-Id")
 
         val allowedOrigins = (System.getenv("CORS_ALLOWED_ORIGINS") ?: "")
             .split(',')
@@ -103,7 +107,9 @@ fun Application.module() {
     val authService = AuthService(userRepo, auditRepo)
     val ticketService = TicketService(ticketRepo, auditRepo)
     val monitoringService = MonitoringService(deviceRepo)
-    val aiService = AIService(knowledgeRepo)
+    val aiService = AIService()
+    val aiConfigService = AIConfigService(environment.config)
+    val aiChatService = AIChatService(OllamaProvider(), aiConfigService).also { it.startupLog() }
     val slaService = SLAService().also { it.seedDefaults() }
     val notificationService = NotificationService()
     val knowledgeService = KnowledgeService(knowledgeRepo, auditRepo)
@@ -134,6 +140,6 @@ fun Application.module() {
         notificationRoutes(notificationService)
         knowledgeRoutes(knowledgeService)
         slaRoutes(slaService)
-        aiRoutes(aiService)
+        aiRoutes(aiChatService, aiConfigService)
     }
 }
