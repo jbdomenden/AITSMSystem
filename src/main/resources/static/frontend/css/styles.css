@@ -205,6 +205,9 @@ a { text-decoration: none; color: inherit; }
 }
 
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid transparent;
   border-radius: 14px;
   height: 44px;
