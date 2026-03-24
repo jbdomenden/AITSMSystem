@@ -14,7 +14,10 @@ import org.jetbrains.exposed.sql.update
 import java.time.LocalDateTime
 
 class KnowledgeRepository {
-    fun list(): List<KnowledgeArticle> = transaction { KnowledgeArticlesTable.selectAll().map(::toArticle) }
+    fun list(limit: Int, offset: Long): PagedResult<KnowledgeArticle> = transaction {
+        val base = KnowledgeArticlesTable.selectAll()
+        PagedResult(base.limit(limit, offset).map(::toArticle), base.count())
+    }
 
     fun create(req: KnowledgeRequest): KnowledgeArticle = transaction {
         val id = KnowledgeArticlesTable.insert {
@@ -23,7 +26,7 @@ class KnowledgeRepository {
             it[category] = req.category
             it[createdAt] = LocalDateTime.now()
         }[KnowledgeArticlesTable.id]
-        list().first { it.id == id }
+KnowledgeArticlesTable.selectAll().where { KnowledgeArticlesTable.id eq id }.single().let(::toArticle)
     }
 
     fun update(id: Int, req: KnowledgeRequest): KnowledgeArticle? = transaction {
