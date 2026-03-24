@@ -1,20 +1,22 @@
 package backend.security
 
+import backend.models.ApiErrorResponse
+import backend.models.UserRole
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 
 fun ApplicationCall.userId(): Int? = request.headers["X-User-Id"]?.toIntOrNull()
-fun ApplicationCall.userRole(): String = request.headers["X-User-Role"] ?: "end-user"
+fun ApplicationCall.userRole(): UserRole = UserRole.from(request.headers["X-User-Role"])
 
-suspend fun ApplicationCall.requireRole(role: String): Boolean {
+suspend fun ApplicationCall.requireRole(role: UserRole): Boolean {
     val callerRole = userRole()
     val allowed = when (role) {
-        "admin" -> callerRole == "admin" || callerRole == "superadmin"
+        UserRole.ADMIN -> callerRole == UserRole.ADMIN || callerRole == UserRole.SUPERADMIN
         else -> callerRole == role
     }
     if (!allowed) {
-        respond(HttpStatusCode.Forbidden, mapOf("error" to "Access denied for $role resources"))
+        respond(HttpStatusCode.Forbidden, ApiErrorResponse(HttpStatusCode.Forbidden.value, "Access denied for ${role.name} resources"))
         return false
     }
     return true

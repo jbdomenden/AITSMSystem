@@ -2,15 +2,12 @@ package backend.repository
 
 import backend.config.AuditLogsTable
 import backend.config.EulaAcceptanceTable
-import backend.config.NotificationsTable
-import backend.config.TicketHistoryTable
-import backend.config.TicketsTable
 import backend.config.UsersTable
 import backend.models.RegisterRequest
 import backend.models.User
+import backend.models.UserRole
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
@@ -25,7 +22,7 @@ class UserRepository {
         company: String,
         department: String,
         passwordHash: String,
-        role: String = "end-user",
+        role: UserRole = UserRole.END_USER,
         emailVerified: Boolean = true
     ): User = transaction {
         val now = LocalDateTime.now()
@@ -35,7 +32,7 @@ class UserRepository {
             it[UsersTable.company] = company
             it[UsersTable.department] = department
             it[UsersTable.passwordHash] = passwordHash
-            it[UsersTable.role] = role
+            it[UsersTable.role] = role.name
             it[UsersTable.emailVerified] = emailVerified
             it[UsersTable.verificationCode] = null
             it[UsersTable.verificationExpiresAt] = null
@@ -48,7 +45,7 @@ class UserRepository {
     fun create(
         request: RegisterRequest,
         passwordHash: String,
-        role: String = "end-user",
+        role: UserRole = UserRole.END_USER,
         emailVerified: Boolean = false,
         verificationCode: String? = null,
         verificationExpiry: LocalDateTime? = null
@@ -60,7 +57,7 @@ class UserRepository {
             it[company] = request.company
             it[department] = request.department
             it[UsersTable.passwordHash] = passwordHash
-            it[UsersTable.role] = role
+            it[UsersTable.role] = role.name
             it[UsersTable.emailVerified] = emailVerified
             it[UsersTable.verificationCode] = verificationCode
             it[UsersTable.verificationExpiresAt] = verificationExpiry
@@ -93,7 +90,7 @@ class UserRepository {
                 it[UsersTable.company] = company
                 it[UsersTable.department] = department
                 it[UsersTable.passwordHash] = passwordHash
-                it[UsersTable.role] = "superadmin"
+                it[UsersTable.role] = UserRole.SUPERADMIN.name
                 it[UsersTable.emailVerified] = true
                 it[UsersTable.verificationCode] = null
                 it[UsersTable.verificationExpiresAt] = null
@@ -105,7 +102,7 @@ class UserRepository {
         val userId = existing[UsersTable.id]
         UsersTable.update({ UsersTable.id eq userId }) {
             it[UsersTable.passwordHash] = passwordHash
-            it[UsersTable.role] = "superadmin"
+            it[UsersTable.role] = UserRole.SUPERADMIN.name
             it[UsersTable.emailVerified] = true
             it[UsersTable.verificationCode] = null
             it[UsersTable.verificationExpiresAt] = null
@@ -156,19 +153,19 @@ class UserRepository {
         UsersTable.selectAll().orderBy(UsersTable.createdAt).map(::toUser)
     }
 
-    fun updateRoleByEmail(email: String, role: String): User? = transaction {
+    fun updateRoleByEmail(email: String, role: UserRole): User? = transaction {
         val row = UsersTable.selectAll().where { UsersTable.email eq email.lowercase() }.singleOrNull() ?: return@transaction null
-        if (row[UsersTable.role] == "superadmin") return@transaction null
+        if (row[UsersTable.role] == UserRole.SUPERADMIN.name) return@transaction null
 
-        UsersTable.update({ UsersTable.id eq row[UsersTable.id] }) { it[UsersTable.role] = role }
+        UsersTable.update({ UsersTable.id eq row[UsersTable.id] }) { it[UsersTable.role] = role.name }
         UsersTable.selectAll().where { UsersTable.id eq row[UsersTable.id] }.singleOrNull()?.let(::toUser)
     }
 
-    fun updateRole(userId: Int, role: String): User? = transaction {
+    fun updateRole(userId: Int, role: UserRole): User? = transaction {
         val row = UsersTable.selectAll().where { UsersTable.id eq userId }.singleOrNull() ?: return@transaction null
-        if (row[UsersTable.role] == "superadmin") return@transaction null
+        if (row[UsersTable.role] == UserRole.SUPERADMIN.name) return@transaction null
 
-        UsersTable.update({ UsersTable.id eq userId }) { it[UsersTable.role] = role }
+        UsersTable.update({ UsersTable.id eq userId }) { it[UsersTable.role] = role.name }
         UsersTable.selectAll().where { UsersTable.id eq userId }.singleOrNull()?.let(::toUser)
     }
 
@@ -179,7 +176,7 @@ class UserRepository {
 
     fun updateEmailVerified(userId: Int, approved: Boolean): User? = transaction {
         val row = UsersTable.selectAll().where { UsersTable.id eq userId }.singleOrNull() ?: return@transaction null
-        if (row[UsersTable.role] == "superadmin") return@transaction null
+        if (row[UsersTable.role] == UserRole.SUPERADMIN.name) return@transaction null
 
         UsersTable.update({ UsersTable.id eq userId }) {
             it[UsersTable.emailVerified] = approved
@@ -211,7 +208,7 @@ class UserRepository {
 
     fun updatePassword(userId: Int, passwordHash: String): User? = transaction {
         val row = UsersTable.selectAll().where { UsersTable.id eq userId }.singleOrNull() ?: return@transaction null
-        if (row[UsersTable.role] == "superadmin") return@transaction null
+        if (row[UsersTable.role] == UserRole.SUPERADMIN.name) return@transaction null
 
         UsersTable.update({ UsersTable.id eq userId }) { it[UsersTable.passwordHash] = passwordHash }
         UsersTable.selectAll().where { UsersTable.id eq userId }.singleOrNull()?.let(::toUser)
@@ -219,16 +216,8 @@ class UserRepository {
 
     fun deleteUser(userId: Int): User? = transaction {
         val row = UsersTable.selectAll().where { UsersTable.id eq userId }.singleOrNull() ?: return@transaction null
-        if (row[UsersTable.role] == "superadmin") return@transaction null
+        if (row[UsersTable.role] == UserRole.SUPERADMIN.name) return@transaction null
 
-        val ticketIds = TicketsTable.selectAll().where { TicketsTable.userId eq userId }.map { it[TicketsTable.id] }
-        if (ticketIds.isNotEmpty()) {
-            TicketHistoryTable.deleteWhere { TicketHistoryTable.ticketId inList ticketIds }
-            TicketsTable.deleteWhere { TicketsTable.id inList ticketIds }
-        }
-
-        NotificationsTable.deleteWhere { NotificationsTable.userId eq userId }
-        EulaAcceptanceTable.deleteWhere { EulaAcceptanceTable.userId eq userId }
         AuditLogsTable.update({ AuditLogsTable.userId eq userId }) { it[AuditLogsTable.userId] = null }
         UsersTable.deleteWhere { UsersTable.id eq userId }
         row.let(::toUser)
@@ -244,7 +233,7 @@ class UserRepository {
         email = row[UsersTable.email],
         company = row[UsersTable.company],
         department = row[UsersTable.department],
-        role = row[UsersTable.role],
+        role = UserRole.from(row[UsersTable.role]),
         emailVerified = row[UsersTable.emailVerified],
         createdAt = row[UsersTable.createdAt].toString()
     )

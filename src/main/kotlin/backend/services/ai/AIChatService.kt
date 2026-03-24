@@ -8,6 +8,8 @@ import backend.models.ai.AITicketDraftResponse
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -16,7 +18,8 @@ import org.slf4j.LoggerFactory
 
 class AIChatService(
     private val provider: AIProvider,
-    private val configService: AIConfigService
+    private val configService: AIConfigService,
+    private val conversationRepository: backend.repository.AIConversationRepository
 ) {
     private val logger = LoggerFactory.getLogger(AIChatService::class.java)
     private val json = Json { ignoreUnknownKeys = true }
@@ -25,6 +28,7 @@ class AIChatService(
 
     private val conversationLimit = 20
     private val sessionTtlMs = Duration.ofHours(8).toMillis()
+    private val aiExecutor = Executors.newCachedThreadPool()
 
     fun startupLog() {
         val config = configService.snapshot()
@@ -38,9 +42,11 @@ class AIChatService(
         require(cleanInput.isNotBlank()) { "Message is required" }
 
         cleanupStaleSessions()
-        val history = conversationStore.computeIfAbsent(sessionId) { mutableListOf() }
+        val history = conversationStore.computeIfAbsent(sessionId) { conversationRepository.loadSession(sessionId, conversationLimit) }
         synchronized(history) {
-            history += AIMessage(role = "user", content = cleanInput)
+            val userMessage = AIMessage(role = "user", content = cleanInput)
+            history += userMessage
+            conversationRepository.appendMessage(sessionId, userMessage)
             trimConversation(history)
         }
         sessionLastSeen[sessionId] = Instant.now().toEpochMilli()
@@ -51,7 +57,14 @@ class AIChatService(
             addAll(synchronized(history) { history.takeLast(conversationLimit) })
         }
 
-        val providerReply = provider.chat(cfg.baseUrl, cfg.model, cfg.timeoutMillis, promptMessages)
+        val providerReply = runCatching {
+            java.util.concurrent.CompletableFuture.supplyAsync({ provider.chat(cfg.baseUrl, cfg.model, cfg.timeoutMillis, promptMessages) }, aiExecutor)
+                .orTimeout(cfg.timeoutMillis + 2_000, TimeUnit.MILLISECONDS)
+                .join()
+        }.getOrElse {
+            logger.error("AI call failed", it)
+            AIProviderResult(ok = false, content = "", errorMessage = it.message ?: "AI call failure")
+        }
         if (!providerReply.ok) {
             logger.error("Ollama chat failed: {}", providerReply.errorMessage)
             return AIChatResponse(
@@ -66,7 +79,9 @@ class AIChatService(
 
         val structured = parseStructuredReply(providerReply.content)
         synchronized(history) {
-            history += AIMessage(role = "assistant", content = structured.replyText)
+            val assistant = AIMessage(role = "assistant", content = structured.replyText)
+            history += assistant
+            conversationRepository.appendMessage(sessionId, assistant)
             trimConversation(history)
         }
 
