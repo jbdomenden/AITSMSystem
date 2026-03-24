@@ -136,12 +136,45 @@ data class Device(
 @Serializable data class AnalyticsResponse(val metric: String, val points: List<Map<String, String>>)
 
 @Serializable data class AIChatMessage(val role: String, val content: String)
-@Serializable data class AIChatRequest(val message: String, val history: List<AIChatMessage> = emptyList())
-@Serializable data class AIChatResponse(
+@Serializable data class AIChatRequest(val message: String)
+
+@Serializable
+data class AIStructuredResponse(
+    val issueSummary: String,
+    val likelyCauses: List<String>,
+    val troubleshootingSteps: List<String>,
+    val escalationCriteria: List<String>,
+    val suggestedPriority: String,
+    val ticketDescription: String,
+    val suggestedCategory: String
+)
+
+@Serializable
+data class AIChatResponse(
     val reply: String,
-    val category: String,
+    val structured: AIStructuredResponse,
     val priority: String,
+    val category: String,
     val titleSuggestion: String,
     val descriptionSuggestion: String,
-    val fallback: Boolean = false
+    val conversationSize: Int,
+    val provider: String = "openai",
+    val model: String
+)
+
+@Serializable
+data class AITicketDraftRequest(
+    val issueSummary: String,
+    val ticketDescription: String,
+    val suggestedPriority: String,
+    val suggestedCategory: String,
+    val originalUserMessage: String? = null
+)
+
+@Serializable
+data class AITicketDraftResponse(
+    val title: String,
+    val description: String,
+    val priority: String,
+    val category: String
 )
