@@ -789,6 +789,7 @@ body.sidebar-hidden .sidebar {
   overflow-y: auto;
   padding-right: 4px;
   display: grid;
+  align-content: start;
   gap: 10px;
 }
 .ai-message {
