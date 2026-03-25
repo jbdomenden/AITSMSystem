@@ -28,6 +28,13 @@
       <div class='card ai-chat-card'>
         <div id='aiThread' class='ai-chat-thread'></div>
         <div id='aiLoading' class='ai-loading hidden'>AI assistant is preparing troubleshooting guidance...</div>
+        <div id='aiFallbackPanel' class='card hidden' style='margin:12px 0'>
+          <div id='aiFallbackMessage' class='small'></div>
+          <div id='aiFallbackDetails'></div>
+          <div class='inline-actions'>
+            <button id='aiFallbackTicketBtn' type='button' class='btn btn-ghost'>Create ticket draft from this reply</button>
+          </div>
+        </div>
         <form id='aiComposer' class='ai-composer'>
           <label for='aiMessage' class='small'>Describe your issue</label>
           <textarea id='aiMessage' maxlength='2000' placeholder='Example: My laptop is slow after startup and Outlook keeps freezing.'></textarea>

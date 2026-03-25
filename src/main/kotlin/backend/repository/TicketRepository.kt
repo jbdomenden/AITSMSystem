@@ -5,9 +5,9 @@ import backend.config.TicketHistoryTable
 import backend.config.TicketsTable
 import backend.models.Ticket
 import backend.models.TicketRequest
+import backend.models.TicketStatus
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -24,7 +24,7 @@ class TicketRepository {
             it[description] = req.description
             it[priority] = req.priority
             it[category] = req.category
-            it[status] = "Open"
+            it[status] = TicketStatus.OPEN.name
             it[deviceId] = req.deviceId
             it[createdAt] = now
             it[updatedAt] = now
@@ -32,16 +32,18 @@ class TicketRepository {
 
         TicketHistoryTable.insert {
             it[ticketId] = id
-            it[status] = "Open"
+            it[status] = TicketStatus.OPEN.name
             it[updatedBy] = "user-$userId"
             it[timestamp] = now
         }
         get(id)!!
     }
 
-    fun list(userId: Int?, admin: Boolean): List<Ticket> = transaction {
-        val query = if (admin) TicketsTable.selectAll() else TicketsTable.selectAll().where { TicketsTable.userId eq userId!! }
-        query.map(::toTicket)
+    fun list(userId: Int?, admin: Boolean, limit: Int, offset: Long): PagedResult<Ticket> = transaction {
+        val base = if (admin) TicketsTable.selectAll() else TicketsTable.selectAll().where { TicketsTable.userId eq userId!! }
+        val total = base.count()
+        val items = base.limit(limit, offset).map(::toTicket)
+        PagedResult(items, total)
     }
 
     fun get(id: Int): Ticket? = transaction { TicketsTable.selectAll().where { TicketsTable.id eq id }.singleOrNull()?.let(::toTicket) }
@@ -86,13 +88,13 @@ class TicketRepository {
             description = row[TicketsTable.description],
             priority = priorityValue,
             category = row[TicketsTable.category],
-            status = row[TicketsTable.status],
+            status = runCatching { TicketStatus.valueOf(row[TicketsTable.status]) }.getOrDefault(TicketStatus.OPEN),
             assignedTo = row[TicketsTable.assignedTo],
             deviceId = row[TicketsTable.deviceId],
             createdAt = row[TicketsTable.createdAt].toString(),
             updatedAt = row[TicketsTable.updatedAt].toString(),
             slaRemainingMinutes = remaining,
-            overdue = remaining < 0 && row[TicketsTable.status] != "Resolved"
+            overdue = remaining < 0 && runCatching { TicketStatus.valueOf(row[TicketsTable.status]) }.getOrDefault(TicketStatus.OPEN) != TicketStatus.RESOLVED
         )
     }
 }
