@@ -23,7 +23,7 @@ function closeAllRowMenus() {
 }
 
 function userTicketHref(ticketId) {
-  return `/frontend/html/tickets.html?ticketId=${encodeURIComponent(ticketId)}`;
+  return `/tickets.html?ticketId=${encodeURIComponent(ticketId)}`;
 }
 
 function getRequestedTicketId() {
@@ -83,7 +83,7 @@ async function createTicket() {
   const data = await res.json();
   if (!res.ok) return alert(data.error || 'Unable to create ticket');
   alert(`Ticket #${data.id} created successfully.`);
-  location.href = '/frontend/html/tickets.html';
+  location.href = '/tickets.html';
 }
 
 async function updateMyTicketStatus(id, status){

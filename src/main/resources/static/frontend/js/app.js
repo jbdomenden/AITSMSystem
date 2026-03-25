@@ -12,11 +12,11 @@ const authHeaders = () => ({
 
 function logout() {
   localStorage.clear();
-  location.href = '/frontend/html/login.html';
+  location.href = '/login.html';
 }
 
 function redirectForRole(role) {
-  location.href = ['admin', 'superadmin'].includes(role) ? '/frontend/html/dashboard-admin.html' : '/frontend/html/dashboard-user.html';
+  location.href = ['admin', 'superadmin'].includes(role) ? '/dashboard-admin.html' : '/dashboard-user.html';
 }
 
 function enforcePageAccess() {
@@ -26,17 +26,17 @@ function enforcePageAccess() {
   const endUserOnlyPages = ['dashboard-user.html', 'create-ticket.html', 'tickets.html', 'knowledge-library.html', 'ai-assistant.html', 'signup.html'];
 
   if (!role && page !== 'login.html' && page !== 'index.html' && page !== 'signup.html') {
-    location.href = '/frontend/html/login.html';
+    location.href = '/login.html';
     return;
   }
 
   if (['admin', 'superadmin'].includes(role) && endUserOnlyPages.includes(page)) {
-    location.href = '/frontend/html/dashboard-admin.html';
+    location.href = '/dashboard-admin.html';
     return;
   }
 
   if (!['admin', 'superadmin'].includes(role) && adminOnlyPages.includes(page)) {
-    location.href = '/frontend/html/dashboard-user.html';
+    location.href = '/dashboard-user.html';
   }
 }
 
