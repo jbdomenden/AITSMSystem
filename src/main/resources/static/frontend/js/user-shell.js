@@ -17,11 +17,11 @@ function userIcon(name) {
 function userNavItems() {
   return [
     { section: 'Workspace', items: [
-      { page: 'dashboard-user.html', href: '/dashboard-user.html', icon: 'overview', label: 'Overview' },
-      { page: 'create-ticket.html', href: '/create-ticket.html', icon: 'create', label: 'Create Ticket' },
-      { page: 'tickets.html', href: '/tickets.html', icon: 'tickets', label: 'My Tickets' },
-      { page: 'knowledge-library.html', href: '/knowledge-library.html', icon: 'knowledge', label: 'Knowledge Base' },
-      { page: 'ai-assistant.html', href: '/ai-assistant.html', icon: 'assistant', label: 'AI Assistant' }
+      { page: 'dashboard-user.html', href: '/frontend/html/dashboard-user.html', icon: 'overview', label: 'Overview' },
+      { page: 'create-ticket.html', href: '/frontend/html/create-ticket.html', icon: 'create', label: 'Create Ticket' },
+      { page: 'tickets.html', href: '/frontend/html/tickets.html', icon: 'tickets', label: 'My Tickets' },
+      { page: 'knowledge-library.html', href: '/frontend/html/knowledge-library.html', icon: 'knowledge', label: 'Knowledge Base' },
+      { page: 'ai-assistant.html', href: '/frontend/html/ai-assistant.html', icon: 'assistant', label: 'AI Assistant' }
     ] }
   ];
 }
@@ -79,7 +79,7 @@ function renderUserUtilityHeader() {
   host.innerHTML = `
     <div class='utility-left'>
       <button class='btn btn-ghost icon-btn header-icon-btn' type='button' onclick='toggleUserSidebar()' aria-label='Toggle sidebar' title='Toggle sidebar'>${userIcon('menu')}</button>
-      <a class='utility-brand' href='/dashboard-user.html' aria-label='Go to user dashboard overview'>AITSM Portal</a>
+      <a class='utility-brand' href='/frontend/html/dashboard-user.html' aria-label='Go to user dashboard overview'>AITSM Portal</a>
     </div>
     <div class='utility-right'>
       <button id='userMenuTrigger' class='btn btn-ghost icon-btn header-icon-btn' type='button' onclick='toggleUserHeaderMenu()' aria-label='Open account menu' title='Account menu'>${userIcon('more')}</button>
