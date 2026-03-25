@@ -39,20 +39,33 @@ If the server starts successfully, you'll see the following output:
 ```
 
 
-## Default Superadmin Account
+## Runtime environment variables
 
-On startup, the application ensures a `superadmin` account exists for administrative access.
+Copy `.env.example` to `.env` and set values for your environment before startup.
 
-- Email: `superadmin@aitsm.local`
-- Password: `SuperAdmin@123`
+The server now requires credentials and provider configuration via environment variables (no hard-coded defaults for secrets).
 
-You can override these using environment variables:
+Required in all environments:
+
+- `DB_URL`
+- `DB_USER`
+- `DB_PASSWORD`
+
+Required in production (`APP_ENV=production`):
 
 - `SUPERADMIN_EMAIL`
 - `SUPERADMIN_PASSWORD`
+
+Optional:
+
 - `SUPERADMIN_NAME`
 - `SUPERADMIN_COMPANY`
 - `SUPERADMIN_DEPARTMENT`
+- `CORS_ALLOWED_ORIGINS`
+- `AI_PROVIDER`
+- `AI_OLLAMA_BASE_URL`
+- `AI_OLLAMA_MODEL`
+- `AI_TIMEOUT_MILLIS`
 
 
 ## Email verification
@@ -91,3 +104,7 @@ Example payload:
   "status": "Online"
 }
 ```
+
+## Schema note
+
+Primary keys remain integer-based in this release to minimize API breakage; UUID migration is planned as a staged change with backward-compatible ID translation.

@@ -1,5 +1,6 @@
 package backend.routes
 
+import backend.models.UserRole
 import backend.models.ClientMetricsRequest
 import backend.repository.DeviceRepository
 import backend.security.requireRole
@@ -27,32 +28,32 @@ fun Route.monitoringRoutes(service: MonitoringService, deviceRepository: DeviceR
         }
 
         get("/host-telemetry") {
-            if (!call.requireRole("admin")) return@get
+            if (!call.requireRole(UserRole.ADMIN)) return@get
             call.respond(service.hostTelemetry())
         }
         get("/lan-devices") {
-            if (!call.requireRole("admin")) return@get
+            if (!call.requireRole(UserRole.ADMIN)) return@get
             call.respond(service.lanDevices())
         }
         get("/summary") {
-            if (!call.requireRole("admin")) return@get
+            if (!call.requireRole(UserRole.ADMIN)) return@get
             call.respond(service.summary())
         }
         post("/refresh-discovery") {
-            if (!call.requireRole("admin")) return@post
+            if (!call.requireRole(UserRole.ADMIN)) return@post
             call.respond(service.refreshDiscovery())
         }
 
         get("/devices") {
-            if (!call.requireRole("admin")) return@get
+            if (!call.requireRole(UserRole.ADMIN)) return@get
             call.respond(service.devices())
         }
         get("/cpu") {
-            if (!call.requireRole("admin")) return@get
+            if (!call.requireRole(UserRole.ADMIN)) return@get
             call.respond(service.cpu())
         }
         get("/alerts") {
-            if (!call.requireRole("admin")) return@get
+            if (!call.requireRole(UserRole.ADMIN)) return@get
             call.respond(service.alerts())
         }
     }
