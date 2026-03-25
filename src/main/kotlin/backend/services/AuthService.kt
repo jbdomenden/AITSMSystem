@@ -9,6 +9,7 @@ import backend.models.ProfileUpdateRequest
 import backend.models.RegisterRequest
 import backend.models.RegistrationResponse
 import backend.models.User
+import backend.models.UserRole
 import backend.repository.AuditRepository
 import backend.repository.UserRepository
 import backend.security.PasswordHasher
@@ -35,7 +36,7 @@ class AuthService(
         val user = userRepository.create(
             request,
             PasswordHasher.hash(request.password),
-            role = "end-user",
+            role = UserRole.END_USER,
             emailVerified = false,
             verificationCode = verificationCode,
             verificationExpiry = expiresAt
@@ -124,12 +125,11 @@ class AuthService(
         return deleted
     }
 
-    fun updateUserRole(targetUserId: Int, role: String, actorUserId: Int?): User {
-        require(role in setOf("admin", "end-user")) { "Unsupported role" }
-        if (role == "admin") error("Direct admin grant disabled. Use secure admin-grant flow.")
+    fun updateUserRole(targetUserId: Int, role: UserRole, actorUserId: Int?): User {
+        require(role == UserRole.END_USER) { "Direct admin grant disabled. Use secure admin-grant flow." }
 
         val updated = userRepository.updateRole(targetUserId, role) ?: error("User not found or cannot be modified")
-        auditRepository.log(actorUserId, "Updated role for user ${updated.email} to $role", "users")
+        auditRepository.log(actorUserId, "Updated role for user ${updated.email} to ${role.name}", "users")
         return updated
     }
 
@@ -148,7 +148,7 @@ class AuthService(
         require(request.department.isNotBlank()) { "Department is required" }
         require(request.password == request.confirmPassword) { "Passwords do not match" }
         require(request.password.length >= 8) { "Password must be at least 8 characters" }
-        require(request.role in setOf("end-user", "admin")) { "Unsupported role" }
+        require(request.role in setOf(UserRole.END_USER, UserRole.ADMIN)) { "Unsupported role" }
 
         val normalizedEmail = request.email.trim().lowercase()
         require(userRepository.findByEmailOnly(normalizedEmail) == null) { "Email already exists" }
@@ -170,7 +170,7 @@ class AuthService(
         val user = userRepository.findByEmailOnly(targetEmail)
             ?: return AdminEligibilityResponse(found = false, eligible = false, alreadyAdmin = false, message = "User not found")
 
-        if (user.role == "admin" || user.role == "superadmin") {
+        if (user.role == UserRole.ADMIN || user.role == UserRole.SUPERADMIN) {
             return AdminEligibilityResponse(found = true, eligible = false, alreadyAdmin = true, targetUserId = user.id, message = "Target already has admin rights")
         }
 
@@ -198,7 +198,7 @@ class AuthService(
         if (!eligibility.found) return AdminGrantResponse(false, null, "Target email not found")
         if (!eligibility.eligible) return AdminGrantResponse(false, null, eligibility.message)
 
-        val updated = userRepository.updateRoleByEmail(targetEmail, "admin")
+        val updated = userRepository.updateRoleByEmail(targetEmail, UserRole.ADMIN)
             ?: return AdminGrantResponse(false, null, "Unable to grant admin role")
 
         sensitiveVerifications.remove(verificationToken)
@@ -207,5 +207,5 @@ class AuthService(
     }
 
     private fun generateVerificationCode(): String = (100000..999999).random().toString()
-    private fun tokenFor(userId: Int, role: String): String = Base64.getEncoder().encodeToString("$userId:$role".toByteArray())
+    private fun tokenFor(userId: Int, role: UserRole): String = Base64.getEncoder().encodeToString("$userId:${role.name}".toByteArray())
 }

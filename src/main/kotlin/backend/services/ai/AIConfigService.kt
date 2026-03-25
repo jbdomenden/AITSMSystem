@@ -17,8 +17,8 @@ class AIConfigService(config: ApplicationConfig) {
     private val state = AtomicReference(
         AIConfigState(
             provider = envOrConfig("AI_PROVIDER", config, "ai.provider") ?: "ollama",
-            baseUrl = envOrConfig("AI_OLLAMA_BASE_URL", config, "ai.ollama.baseUrl") ?: "http://localhost:11434",
-            model = envOrConfig("AI_OLLAMA_MODEL", config, "ai.ollama.model") ?: "llama3.1:8b",
+            baseUrl = envOrConfig("AI_OLLAMA_BASE_URL", config, "ai.ollama.baseUrl") ?: error("AI_OLLAMA_BASE_URL is required"),
+            model = envOrConfig("AI_OLLAMA_MODEL", config, "ai.ollama.model") ?: error("AI_OLLAMA_MODEL is required"),
             timeoutMillis = (envOrConfig("AI_TIMEOUT_MILLIS", config, "ai.timeoutMillis")?.toLongOrNull() ?: 60_000L)
                 .coerceIn(5_000L, 120_000L)
         )
@@ -39,7 +39,7 @@ class AIConfigService(config: ApplicationConfig) {
     }
 
     fun normalizeAndValidateBaseUrl(input: String): String {
-        val url = input.trim().ifBlank { "http://localhost:11434" }.removeSuffix("/")
+        val url = input.trim().ifBlank { throw IllegalArgumentException("Base URL is required") }.removeSuffix("/")
         val uri = runCatching { URI(url) }.getOrNull() ?: throw IllegalArgumentException("Base URL is not a valid URL")
         require(uri.scheme == "http" || uri.scheme == "https") { "Base URL must start with http:// or https://" }
         require(!uri.host.isNullOrBlank()) { "Base URL must contain a host" }

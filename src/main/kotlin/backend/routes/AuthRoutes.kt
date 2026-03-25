@@ -13,6 +13,7 @@ import backend.models.RegisterRequest
 import backend.models.ResendVerificationRequest
 import backend.models.RoleUpdateRequest
 import backend.models.VerifyEmailRequest
+import backend.models.UserRole
 import backend.models.UserActionResponse
 import backend.security.requireRole
 import backend.security.userId
@@ -64,38 +65,38 @@ fun Route.authRoutes(authService: AuthService) {
         }
 
         get {
-            if (!call.requireRole("admin")) return@get
+            if (!call.requireRole(UserRole.ADMIN)) return@get
             call.respond(authService.listUsers())
         }
         put("/{id}/role") {
-            if (!call.requireRole("admin")) return@put
+            if (!call.requireRole(UserRole.ADMIN)) return@put
             val id = call.parameters["id"]?.toIntOrNull() ?: return@put call.respond(HttpStatusCode.BadRequest)
             val req = call.receive<RoleUpdateRequest>()
             val updated = authService.updateUserRole(id, req.role, call.userId())
             call.respond(UserActionResponse("Role updated successfully", updated))
         }
         put("/{id}/reset-password") {
-            if (!call.requireRole("admin")) return@put
+            if (!call.requireRole(UserRole.ADMIN)) return@put
             val id = call.parameters["id"]?.toIntOrNull() ?: return@put call.respond(HttpStatusCode.BadRequest)
             val req = call.receive<PasswordResetRequest>()
             val updated = authService.resetUserPassword(id, req.newPassword, req.confirmPassword, call.userId())
             call.respond(UserActionResponse("Password reset successful", updated))
         }
         put("/{id}/email-approval") {
-            if (!call.requireRole("admin")) return@put
+            if (!call.requireRole(UserRole.ADMIN)) return@put
             val id = call.parameters["id"]?.toIntOrNull() ?: return@put call.respond(HttpStatusCode.BadRequest)
             val req = call.receive<EmailApprovalRequest>()
             val updated = authService.updateUserEmailApproval(id, req.approved, call.userId())
             call.respond(UserActionResponse(if (req.approved) "User approved for login" else "User marked as pending", updated))
         }
         delete("/{id}") {
-            if (!call.requireRole("admin")) return@delete
+            if (!call.requireRole(UserRole.ADMIN)) return@delete
             val id = call.parameters["id"]?.toIntOrNull() ?: return@delete call.respond(HttpStatusCode.BadRequest)
             val deleted = authService.deleteUserAccount(id, call.userId())
             call.respond(UserActionResponse("User deleted", deleted))
         }
         post {
-            if (!call.requireRole("admin")) return@post
+            if (!call.requireRole(UserRole.ADMIN)) return@post
             val req = call.receive<InternalUserCreateRequest>()
             val created = authService.createUserInternally(req, call.userId())
             call.respond(HttpStatusCode.Created, UserActionResponse("User account created", created))
@@ -103,12 +104,12 @@ fun Route.authRoutes(authService: AuthService) {
 
         route("/admin") {
             post("/eligibility") {
-                if (!call.requireRole("admin")) return@post
+                if (!call.requireRole(UserRole.ADMIN)) return@post
                 val req = call.receive<AdminEligibilityRequest>()
                 call.respond(authService.adminGrantEligibility(req.targetEmail))
             }
             post("/verify") {
-                if (!call.requireRole("admin")) return@post
+                if (!call.requireRole(UserRole.ADMIN)) return@post
                 val actor = call.userId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
                 val req = call.receive<AdminSensitiveVerifyRequest>()
                 val (ok, token, meta) = authService.verifySensitiveAction(actor, req.password)
@@ -116,7 +117,7 @@ fun Route.authRoutes(authService: AuthService) {
                 call.respond(mapOf("verified" to true, "verificationToken" to token, "expiresAt" to meta, "message" to "Verification successful"))
             }
             post("/grant") {
-                if (!call.requireRole("admin")) return@post
+                if (!call.requireRole(UserRole.ADMIN)) return@post
                 val actor = call.userId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
                 val req = call.receive<AdminGrantRequest>()
                 val result = authService.grantAdminByEmail(req.targetEmail, actor, req.verificationToken)

@@ -3,13 +3,52 @@ package backend.models
 import kotlinx.serialization.Serializable
 
 @Serializable
+enum class TicketStatus {
+    OPEN,
+    PENDING,
+    RESOLVED,
+    CLOSED
+}
+
+@Serializable
+enum class UserRole {
+    SUPERADMIN,
+    ADMIN,
+    END_USER;
+
+    fun asHeaderValue(): String = name.lowercase().replace('_', '-')
+
+    companion object {
+        fun from(value: String?): UserRole = when (value?.trim()?.lowercase()) {
+            "superadmin" -> SUPERADMIN
+            "admin" -> ADMIN
+            else -> END_USER
+        }
+    }
+}
+
+@Serializable
+data class PaginationMeta(
+    val totalCount: Long,
+    val pageSize: Int,
+    val offset: Long,
+    val currentPage: Int
+)
+
+@Serializable
+data class PaginatedResponse<T>(
+    val data: List<T>,
+    val meta: PaginationMeta
+)
+
+@Serializable
 data class User(
     val id: Int,
     val fullName: String,
     val email: String,
     val company: String,
     val department: String,
-    val role: String,
+    val role: UserRole,
     val emailVerified: Boolean = false,
     val createdAt: String
 )
@@ -31,7 +70,7 @@ data class RegisterRequest(
 @Serializable data class RegistrationResponse(val message: String, val email: String, val devVerificationCode: String? = null)
 @Serializable data class VerifyEmailRequest(val email: String, val code: String)
 @Serializable data class ResendVerificationRequest(val email: String)
-@Serializable data class RoleUpdateRequest(val role: String)
+@Serializable data class RoleUpdateRequest(val role: UserRole)
 
 @Serializable data class ProfileUpdateRequest(val fullName: String, val company: String, val department: String)
 @Serializable data class PasswordResetRequest(val newPassword: String, val confirmPassword: String)
@@ -45,7 +84,7 @@ data class RegisterRequest(
     val department: String,
     val password: String,
     val confirmPassword: String,
-    val role: String = "end-user",
+    val role: UserRole = UserRole.END_USER,
     val emailVerified: Boolean = true
 )
 @Serializable data class AdminEligibilityRequest(val targetEmail: String)
@@ -65,7 +104,7 @@ data class Ticket(
     val description: String,
     val priority: String,
     val category: String,
-    val status: String,
+    val status: TicketStatus,
     val assignedTo: String? = null,
     val deviceId: Int? = null,
     val createdAt: String,
@@ -75,7 +114,7 @@ data class Ticket(
 )
 
 @Serializable data class TicketRequest(val title: String, val description: String, val priority: String, val category: String, val deviceId: Int? = null)
-@Serializable data class TicketStatusUpdate(val status: String)
+@Serializable data class TicketStatusUpdate(val status: TicketStatus)
 
 @Serializable
 data class Device(

@@ -1,11 +1,8 @@
 package com.aitsm
 
 import backend.config.DatabaseFactory
-import backend.repository.AuditRepository
-import backend.repository.DeviceRepository
-import backend.repository.KnowledgeRepository
-import backend.repository.TicketRepository
-import backend.repository.UserRepository
+import backend.config.ServiceContainer
+import backend.models.ApiErrorResponse
 import backend.routes.aiRoutes
 import backend.routes.analyticsRoutes
 import backend.routes.authRoutes
@@ -15,16 +12,6 @@ import backend.routes.monitoringRoutes
 import backend.routes.notificationRoutes
 import backend.routes.slaRoutes
 import backend.routes.ticketRoutes
-import backend.services.AIService
-import backend.services.AuthService
-import backend.services.KnowledgeService
-import backend.services.MonitoringService
-import backend.services.NotificationService
-import backend.services.SLAService
-import backend.services.TicketService
-import backend.services.ai.AIChatService
-import backend.services.ai.AIConfigService
-import backend.services.ai.OllamaProvider
 import backend.security.PasswordHasher
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
@@ -37,17 +24,21 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.defaultheaders.*
 import io.ktor.server.plugins.statuspages.*
+import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import java.net.URI
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 fun main() {
-    embeddedServer(Netty, port = System.getenv("PORT")?.toIntOrNull() ?: 8070,host = "0.0.0.0", module = Application::module).start(wait = true)
+    embeddedServer(Netty, port = System.getenv("PORT")?.toIntOrNull() ?: 8070, host = "0.0.0.0", module = Application::module).start(wait = true)
 }
 
 fun Application.module() {
     val appEnv = (System.getenv("APP_ENV") ?: "development").lowercase()
     val isProduction = appEnv == "production"
+    val metrics = ConcurrentHashMap<String, AtomicLong>()
 
     install(DefaultHeaders) {
         header("X-Content-Type-Options", "nosniff")
@@ -56,6 +47,16 @@ fun Application.module() {
     }
     install(CallLogging)
     install(ContentNegotiation) { json() }
+    intercept(ApplicationCallPipeline.Monitoring) {
+        val started = System.nanoTime()
+        proceed()
+        val durationMs = (System.nanoTime() - started) / 1_000_000
+        val key = "${call.request.httpMethod.value} ${call.request.path()}"
+        metrics.computeIfAbsent("requests.total", { AtomicLong(0) }).incrementAndGet()
+        metrics.computeIfAbsent("requests.$key.count", { AtomicLong(0) }).incrementAndGet()
+        metrics.computeIfAbsent("requests.$key.durationMs", { AtomicLong(0) }).addAndGet(durationMs)
+    }
+
     install(CORS) {
         allowHeader("Content-Type")
         allowHeader("X-User-Id")
@@ -80,66 +81,61 @@ fun Application.module() {
     }
     install(StatusPages) {
         exception<IllegalArgumentException> { call, cause ->
-            call.respond(HttpStatusCode.BadRequest, mapOf("error" to (cause.message ?: "Invalid request")))
+            call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(HttpStatusCode.BadRequest.value, cause.message ?: "Invalid request"))
         }
         exception<IllegalStateException> { call, cause ->
-            call.respond(HttpStatusCode.BadRequest, mapOf("error" to (cause.message ?: "Invalid state")))
+            call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(HttpStatusCode.BadRequest.value, cause.message ?: "Invalid state"))
         }
         exception<SecurityException> { call, cause ->
-            call.respond(HttpStatusCode.Forbidden, mapOf("error" to (cause.message ?: "Access denied")))
+            call.respond(HttpStatusCode.Forbidden, ApiErrorResponse(HttpStatusCode.Forbidden.value, cause.message ?: "Access denied"))
         }
-        exception<Throwable> { call, cause ->
-            call.respond(
-                HttpStatusCode.InternalServerError,
-                mapOf("error" to if (isProduction) "Internal server error" else (cause.message ?: "Unexpected error"))
-            )
+        exception<Throwable> { call, _ ->
+            metrics.computeIfAbsent("requests.errors", { AtomicLong(0) }).incrementAndGet()
+            call.respond(HttpStatusCode.InternalServerError, ApiErrorResponse(HttpStatusCode.InternalServerError.value, if (isProduction) "Internal server error" else "Unexpected error"))
         }
     }
 
     DatabaseFactory.init()
+    val container = ServiceContainer(this)
+    container.knowledgeRepo.seedDefaults()
+    container.aiChatService.startupLog()
+    container.slaService.seedDefaults()
 
-    val auditRepo = AuditRepository()
-    val userRepo = UserRepository()
-    val ticketRepo = TicketRepository()
-    val deviceRepo = DeviceRepository()
-    val knowledgeRepo = KnowledgeRepository().also { it.seedDefaults() }
+    val superAdminEmail = System.getenv("SUPERADMIN_EMAIL")?.takeIf { it.isNotBlank() }
+    val superAdminPassword = System.getenv("SUPERADMIN_PASSWORD")?.takeIf { it.isNotBlank() }
 
-    val authService = AuthService(userRepo, auditRepo)
-    val ticketService = TicketService(ticketRepo, auditRepo)
-    val monitoringService = MonitoringService(deviceRepo)
-    val aiService = AIService()
-    val aiConfigService = AIConfigService(environment.config)
-    val aiChatService = AIChatService(OllamaProvider(), aiConfigService).also { it.startupLog() }
-    val slaService = SLAService().also { it.seedDefaults() }
-    val notificationService = NotificationService()
-    val knowledgeService = KnowledgeService(knowledgeRepo, auditRepo)
-
-    val superAdminEmail = System.getenv("SUPERADMIN_EMAIL") ?: "superadmin@aitsm.local"
-    val superAdminPassword = System.getenv("SUPERADMIN_PASSWORD") ?: "SuperAdmin@123"
-    if (isProduction && superAdminPassword == "SuperAdmin@123") {
-        error("SUPERADMIN_PASSWORD must be set in production")
+    if (isProduction && (superAdminEmail == null || superAdminPassword == null)) {
+        error("SUPERADMIN_EMAIL and SUPERADMIN_PASSWORD are required in production")
     }
-    userRepo.ensureSuperAdmin(
-        email = superAdminEmail,
-        passwordHash = PasswordHasher.hash(superAdminPassword),
-        fullName = System.getenv("SUPERADMIN_NAME") ?: "System Super Admin",
-        company = System.getenv("SUPERADMIN_COMPANY") ?: "AITSM",
-        department = System.getenv("SUPERADMIN_DEPARTMENT") ?: "Platform"
-    )
+    if (superAdminEmail != null && superAdminPassword != null) {
+        container.userRepo.ensureSuperAdmin(
+            email = superAdminEmail,
+            passwordHash = PasswordHasher.hash(superAdminPassword),
+            fullName = System.getenv("SUPERADMIN_NAME") ?: "System Super Admin",
+            company = System.getenv("SUPERADMIN_COMPANY") ?: "AITSM",
+            department = System.getenv("SUPERADMIN_DEPARTMENT") ?: "Platform"
+        )
+    }
 
     routing {
         get("/api/health") {
             call.respond(mapOf("status" to "ok", "environment" to appEnv))
         }
+        get("/metrics") {
+            call.respond(metrics.mapValues { it.value.get() })
+        }
+        get("/docs") {
+            call.respond(mapOf("message" to "OpenAPI publishing is tracked for a follow-up release."))
+        }
         staticResources("/", "static/frontend")
-        authRoutes(authService)
-        ticketRoutes(ticketService)
-        monitoringRoutes(monitoringService, deviceRepo)
-        analyticsRoutes(ticketService, monitoringService, aiService)
-        deviceRoutes(deviceRepo, userRepo, monitoringService)
-        notificationRoutes(notificationService)
-        knowledgeRoutes(knowledgeService)
-        slaRoutes(slaService)
-        aiRoutes(aiChatService, aiConfigService)
+        authRoutes(container.authService)
+        ticketRoutes(container.ticketService)
+        monitoringRoutes(container.monitoringService, container.deviceRepo)
+        analyticsRoutes(container.ticketService, container.monitoringService, container.aiService)
+        deviceRoutes(container.deviceRepo, container.userRepo, container.monitoringService)
+        notificationRoutes(container.notificationService)
+        knowledgeRoutes(container.knowledgeService)
+        slaRoutes(container.slaService)
+        aiRoutes(container.aiChatService, container.aiConfigService)
     }
 }

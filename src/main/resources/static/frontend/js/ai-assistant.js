@@ -5,7 +5,7 @@ const AI_SESSION_KEY = 'aiAssistantSessionId';
 let aiState = {
   messages: [],
   pending: false,
-  lastStructured: null
+  lastVisible: null
 };
 
 function getSessionId() {
@@ -40,25 +40,25 @@ function loadState() {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed.messages)) return;
     aiState.messages = parsed.messages.slice(-20);
-    aiState.lastStructured = parsed.lastStructured || null;
+    aiState.lastVisible = parsed.lastVisible || null;
   } catch {
     aiState.messages = [];
-    aiState.lastStructured = null;
+    aiState.lastVisible = null;
   }
 }
 
-function renderStructuredSections(structured = {}) {
-  const causes = (structured.likelyCauses || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('');
-  const steps = (structured.troubleshootingSteps || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('');
-  const escalate = (structured.escalationCriteria || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+function renderFallbackSections(fallback = {}) {
+  const causes = (fallback.likelyCauses || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+  const steps = (fallback.troubleshootingSteps || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+  const escalate = (fallback.escalationCriteria || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('');
 
   return `
     <div class='ai-sections'>
-      <div><strong>Issue Summary</strong><p>${escapeHtml(structured.issueSummary || 'Not provided')}</p></div>
+      <div><strong>Issue Summary</strong><p>${escapeHtml(fallback.issueSummary || 'Not provided')}</p></div>
       <div><strong>Likely Causes</strong><ul>${causes || '<li>No likely causes provided.</li>'}</ul></div>
       <div><strong>Troubleshooting Steps</strong><ol>${steps || '<li>No troubleshooting steps provided.</li>'}</ol></div>
       <div><strong>Escalation Criteria</strong><ul>${escalate || '<li>No escalation guidance provided.</li>'}</ul></div>
-      <div><strong>Suggested Priority</strong><p>${escapeHtml(structured.suggestedPriority || 'Medium')}</p></div>
+      <div><strong>Suggested Priority</strong><p>${escapeHtml(fallback.suggestedPriority || 'Medium')}</p></div>
     </div>`;
 }
 
@@ -67,29 +67,36 @@ function renderMessages() {
   if (!thread) return;
 
   if (!aiState.messages.length) {
-    thread.innerHTML = "<p class='small'>Start by describing your issue. The assistant will return structured troubleshooting guidance and ticket-ready output.</p>";
+    thread.innerHTML = "<p class='small'>Start by describing your issue. The assistant will return troubleshooting guidance.</p>";
+  } else {
+    thread.innerHTML = aiState.messages.map((message) => {
+      if (message.role === 'user') {
+        return `<article class='ai-message ai-message-user'><div class='ai-message-bubble'>${escapeHtml(message.content).replaceAll('\n', '<br>')}</div></article>`;
+      }
+      return `<article class='ai-message ai-message-assistant'><div class='ai-message-bubble'><p>${escapeHtml(message.content || '').replaceAll('\n', '<br>')}</p></div></article>`;
+    }).join('');
+  }
+
+  thread.scrollTop = thread.scrollHeight;
+}
+
+function renderFallbackPanel() {
+  const panel = document.getElementById('aiFallbackPanel');
+  const message = document.getElementById('aiFallbackMessage');
+  const details = document.getElementById('aiFallbackDetails');
+  if (!panel || !message || !details) return;
+
+  const visible = aiState.lastVisible;
+  if (!visible || visible.type !== 'fallback' || !visible.fallback) {
+    panel.classList.add('hidden');
+    message.textContent = '';
+    details.innerHTML = '';
     return;
   }
 
-  thread.innerHTML = aiState.messages.map((message, index) => {
-    if (message.role === 'user') {
-      return `<article class='ai-message ai-message-user'>
-        <div class='ai-message-bubble'>${escapeHtml(message.content).replaceAll('\n', '<br>')}</div>
-      </article>`;
-    }
-
-    return `<article class='ai-message ai-message-assistant'>
-      <div class='ai-message-bubble'>
-        <p>${escapeHtml(message.replyText || message.content || '').replaceAll('\n', '<br>')}</p>
-        ${renderStructuredSections(message.structured || {})}
-        <div class='inline-actions'>
-          <button type='button' class='btn btn-ghost ai-ticket-btn' data-index='${index}'>Create ticket draft from this reply</button>
-        </div>
-      </div>
-    </article>`;
-  }).join('');
-
-  thread.scrollTop = thread.scrollHeight;
+  panel.classList.remove('hidden');
+  message.textContent = visible.fallback.message || 'AI backend is unavailable.';
+  details.innerHTML = renderFallbackSections(visible.fallback);
 }
 
 function setPending(isPending) {
@@ -111,19 +118,65 @@ function addUserMessage(content) {
   renderMessages();
 }
 
-function addAssistantMessage(payload) {
+function addAssistantReply(replyText) {
   aiState.messages.push({
     role: 'assistant',
-    content: payload.replyText || '',
-    replyText: payload.replyText || '',
-    structured: payload.structured || {},
-    model: payload.model || '',
+    content: String(replyText || '').trim(),
     timestamp: new Date().toISOString()
   });
-  aiState.lastStructured = payload.structured || null;
   aiState.messages = aiState.messages.slice(-20);
+}
+
+function applyAiResponse(payload, userMessage) {
+  if (!payload || typeof payload !== 'object') {
+    aiState.lastVisible = {
+      type: 'fallback',
+      fallback: localFallback('Malformed AI response payload.', userMessage)
+    };
+    saveState();
+    renderMessages();
+    renderFallbackPanel();
+    return;
+  }
+
+  const source = payload.source;
+  if (source === 'ollama' && typeof payload.reply === 'string' && payload.reply.trim()) {
+    addAssistantReply(payload.reply.trim());
+    aiState.lastVisible = { type: 'ollama', reply: payload.reply.trim() };
+    saveState();
+    renderMessages();
+    renderFallbackPanel();
+    return;
+  }
+
+  if (source === 'fallback' && payload.fallback && typeof payload.fallback === 'object') {
+    aiState.lastVisible = { type: 'fallback', fallback: payload.fallback };
+    saveState();
+    renderMessages();
+    renderFallbackPanel();
+    return;
+  }
+
+  aiState.lastVisible = {
+    type: 'fallback',
+    fallback: localFallback('AI response shape was invalid.', userMessage)
+  };
   saveState();
   renderMessages();
+  renderFallbackPanel();
+}
+
+function localFallback(reason, userMessage) {
+  return {
+    message: 'I’m currently unable to process a full diagnosis. Please verify local Ollama connectivity and retry.',
+    issueSummary: userMessage || 'Unable to process request',
+    likelyCauses: [reason || 'Backend-to-Ollama connectivity issue'],
+    troubleshootingSteps: ['Verify Ollama is running locally', 'Check configured model in Settings', 'Retry request'],
+    escalationCriteria: ['Escalate if service remains unavailable for critical support cases'],
+    suggestedPriority: 'Medium',
+    ticketTitle: 'AI assistant unavailable',
+    ticketDescription: 'AI assistant request failed because backend could not reach Ollama.'
+  };
 }
 
 async function sendMessage() {
@@ -147,22 +200,18 @@ async function sendMessage() {
       body: JSON.stringify({ message })
     });
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || data.message || 'Unable to contact AI assistant');
-    addAssistantMessage(data);
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      aiState.lastVisible = { type: 'fallback', fallback: localFallback(data?.error || data?.message || 'Unable to contact AI assistant', message) };
+      saveState();
+      renderFallbackPanel();
+      return;
+    }
+    applyAiResponse(data, message);
   } catch (error) {
-    addAssistantMessage({
-      replyText: `AI service is currently unavailable. ${error?.message || 'Please try again in a moment.'}`,
-      structured: {
-        issueSummary: 'Unable to process request',
-        likelyCauses: ['Backend-to-Ollama connectivity issue'],
-        troubleshootingSteps: ['Verify Ollama is running locally', 'Check configured model in Settings', 'Retry request'],
-        escalationCriteria: ['Escalate if service remains unavailable for critical support cases'],
-        suggestedPriority: 'Medium',
-        ticketTitle: 'AI assistant unavailable',
-        ticketDescription: 'AI assistant request failed because backend could not reach Ollama.'
-      }
-    });
+    aiState.lastVisible = { type: 'fallback', fallback: localFallback(error?.message || 'Unable to contact AI assistant', message) };
+    saveState();
+    renderFallbackPanel();
   } finally {
     setPending(false);
     textarea.focus();
@@ -170,9 +219,10 @@ async function sendMessage() {
 }
 
 async function clearChat() {
-  aiState = { messages: [], pending: false, lastStructured: null };
+  aiState = { messages: [], pending: false, lastVisible: null };
   saveState();
   renderMessages();
+  renderFallbackPanel();
 
   try {
     await fetch('/api/ai/clear', {
@@ -187,19 +237,36 @@ async function clearChat() {
   }
 }
 
-function draftFromStructured(structured) {
-  if (!structured) return null;
-  return {
-    title: structured.ticketTitle || structured.issueSummary || 'IT support request',
-    description: structured.ticketDescription || structured.replyText || '',
-    priority: structured.suggestedPriority || 'Medium',
-    issueSummary: structured.issueSummary || '',
-    originalUserMessage: aiState.messages.filter((m) => m.role === 'user').slice(-1)[0]?.content || ''
-  };
+function draftFromVisible() {
+  const visible = aiState.lastVisible;
+  const lastUser = aiState.messages.filter((m) => m.role === 'user').slice(-1)[0]?.content || '';
+  if (!visible) return null;
+
+  if (visible.type === 'ollama' && visible.reply) {
+    return {
+      title: 'AI-assisted IT support request',
+      description: visible.reply,
+      priority: 'Medium',
+      issueSummary: lastUser || 'IT support request',
+      originalUserMessage: lastUser
+    };
+  }
+
+  if (visible.type === 'fallback' && visible.fallback) {
+    return {
+      title: visible.fallback.ticketTitle || visible.fallback.issueSummary || 'IT support request',
+      description: visible.fallback.ticketDescription || visible.fallback.message || '',
+      priority: visible.fallback.suggestedPriority || 'Medium',
+      issueSummary: visible.fallback.issueSummary || lastUser,
+      originalUserMessage: lastUser
+    };
+  }
+
+  return null;
 }
 
-async function createDraftFromStructured(structured) {
-  const draft = draftFromStructured(structured);
+async function createDraftFromVisible() {
+  const draft = draftFromVisible();
   if (!draft) throw new Error('No assistant response available yet.');
 
   const res = await fetch('/api/ai/create-ticket-draft', {
@@ -270,20 +337,15 @@ function wireEvents() {
 
   document.getElementById('createTicketFromLastBtn')?.addEventListener('click', async () => {
     try {
-      await createDraftFromStructured(aiState.lastStructured);
+      await createDraftFromVisible();
     } catch (error) {
       alert(error?.message || 'Unable to create ticket draft');
     }
   });
 
-  document.getElementById('aiThread')?.addEventListener('click', async (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLElement) || !target.classList.contains('ai-ticket-btn')) return;
-    const index = Number(target.dataset.index);
-    if (Number.isNaN(index)) return;
-    const structured = aiState.messages[index]?.structured;
+  document.getElementById('aiFallbackTicketBtn')?.addEventListener('click', async () => {
     try {
-      await createDraftFromStructured(structured);
+      await createDraftFromVisible();
     } catch (error) {
       alert(error?.message || 'Unable to create ticket draft');
     }
@@ -295,5 +357,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!document.getElementById('aiComposer')) return;
   loadState();
   renderMessages();
+  renderFallbackPanel();
   wireEvents();
 });

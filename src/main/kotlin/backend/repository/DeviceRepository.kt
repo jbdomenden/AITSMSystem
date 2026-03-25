@@ -54,23 +54,27 @@ class DeviceRepository {
         list().first { it.id == id }
     }
 
-    fun list(): List<Device> = transaction { DevicesTable.selectAll().map(::toDevice) }
+    fun list(limit: Int = 100, offset: Long = 0): List<Device> = transaction {
+        DevicesTable.selectAll().limit(limit, offset).map(::toDevice)
+    }
 
-    fun listWithLiveStatus(liveDevices: Map<String, LanDeviceDto>): List<Device> = transaction {
-        DevicesTable.selectAll().map { row ->
-            val base = toDevice(row)
-            val live = liveDevices[base.ipAddress]
+    fun listWithLiveStatus(liveDevices: Map<String, LanDeviceDto>, limit: Int = 100, offset: Long = 0): PagedResult<Device> = transaction {
+        val base = DevicesTable.selectAll()
+        val items = base.limit(limit, offset).map { row ->
+            val current = toDevice(row)
+            val live = liveDevices[current.ipAddress]
             if (live == null) {
-                base
+                current
             } else {
-                base.copy(
-                    cpuUsage = live.cpuUsagePercent?.toInt()?.coerceIn(0, 100) ?: base.cpuUsage,
-                    memoryUsage = live.memoryUsagePercent?.toInt()?.coerceIn(0, 100) ?: base.memoryUsage,
+                current.copy(
+                    cpuUsage = live.cpuUsagePercent?.toInt()?.coerceIn(0, 100) ?: current.cpuUsage,
+                    memoryUsage = live.memoryUsagePercent?.toInt()?.coerceIn(0, 100) ?: current.memoryUsage,
                     status = deriveLiveStatus(live),
-                    lastSeen = live.lastSeen.ifBlank { base.lastSeen }
+                    lastSeen = live.lastSeen.ifBlank { current.lastSeen }
                 )
             }
         }
+        PagedResult(items, base.count())
     }
 
     fun findByIp(ip: String): Device? = transaction {
@@ -109,9 +113,6 @@ class DeviceRepository {
 
         DevicesTable.selectAll().where { DevicesTable.id eq existing[DevicesTable.id] }.single().let(::toDevice)
     }
-
-
-
 
     fun syncDiscoveredDevices(discovered: List<DiscoveredPeer>): List<Device> = transaction {
         val now = LocalDateTime.now()
