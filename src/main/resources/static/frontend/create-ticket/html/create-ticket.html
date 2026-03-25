@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+<head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Create Ticket | AITSM</title><link rel='stylesheet' href='/shared/css/styles.css'></head>
+<body>
+<div class='app-layout'>
+  <aside id='userSidebar' class='sidebar'></aside>
+  <main class='content'>
+    <section id='utilityHeader' class='utility-bar card'></section>
+
+    <div class='topbar'>
+      <div>
+        <p class='page-kicker'>Support request</p>
+        <h1 class='page-title'>Create New Ticket</h1>
+        <p class='page-subtitle'>Describe your issue with clear impact and context so support can respond faster.</p>
+      </div>
+      <div class='page-actions'>
+        <a class='btn btn-ghost' href='/ai-assistant.html'>Open AI Assistant</a>
+        <a class='btn btn-ghost' href='/tickets.html'>My Tickets</a>
+      </div>
+    </div>
+
+    <section class='card'>
+      <div class='card-head'>
+        <div>
+          <h3 class='section-title'>Ticket Details <span class="help-tip" data-help="Add clear title, impact, and exact error details for faster resolution.">?</span></h3>
+          <p class='section-subtitle'>Provide clear information about your issue.</p>
+        </div>
+      </div>
+      <div class='form-group'><label>Title *</label><input id='title' maxlength='255' placeholder='Brief summary of your issue'><div class='small'>0/255 characters</div></div>
+      <div class='form-group'><label>Description *</label><textarea id='description' placeholder='Provide detailed information including steps and any error messages'></textarea><div class='small'>Minimum 10 characters required</div></div>
+      <div class='form-grid'>
+        <div class='form-group'><label>Priority *</label><select id='priority'><option>Critical</option><option>High</option><option selected>Medium</option><option>Low</option></select></div>
+        <div class='form-group'><label>Category</label><select id='category'><option>Hardware</option><option>Software</option><option>Network</option><option>Database</option><option>Security</option><option>Other</option></select></div>
+      </div>
+      <div class='inline-actions' style='margin-top:12px'><a href='/tickets.html' class='btn btn-ghost'>Cancel</a><button class='btn btn-primary' onclick='createTicket()'>Create Ticket</button></div>
+    </section>
+  </main>
+</div>
+<script src='/modules/sidebar/js/user-shell.js'></script><script src='/modules/common/js/app.js'></script><script src='/modules/common/js/help.js'></script><script src='/create-ticket/js/tickets.js'></script><script src='/create-ticket/js/ai-assistant.js'></script>
+</body></html>
