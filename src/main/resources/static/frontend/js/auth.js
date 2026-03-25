@@ -52,7 +52,7 @@ async function verifyEmailCode() {
   if (!res.ok) return alert(data.error || 'Verification failed');
 
   saveSession(data);
-  location.href = ['admin', 'superadmin'].includes(data.user.role) ? '/dashboard-admin.html' : '/dashboard-user.html';
+  location.href = ['admin', 'superadmin'].includes(data.user.role) ? '/frontend/html/dashboard-admin.html' : '/frontend/html/dashboard-user.html';
 }
 
 async function resendVerificationCode() {
@@ -79,7 +79,7 @@ async function login() {
   if (!res.ok) return alert(data.error || 'Login failed');
 
   saveSession(data);
-  location.href = ['admin', 'superadmin'].includes(data.user.role) ? '/dashboard-admin.html' : '/dashboard-user.html';
+  location.href = ['admin', 'superadmin'].includes(data.user.role) ? '/frontend/html/dashboard-admin.html' : '/frontend/html/dashboard-user.html';
 }
 
 

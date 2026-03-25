@@ -20,15 +20,15 @@ function adminIcon(name) {
 function adminNavItems() {
   return [
     { section: 'Operations', items: [
-      { page: 'dashboard-admin.html', href: '/dashboard-admin.html', icon: 'overview', label: 'Overview' },
-      { page: 'ticket-management.html', href: '/ticket-management.html', icon: 'tickets', label: 'Ticket Management' },
-      { page: 'monitoring.html', href: '/monitoring.html', icon: 'monitoring', label: 'LAN Monitoring' },
-      { page: 'knowledge.html', href: '/knowledge.html', icon: 'knowledge', label: 'Knowledge Base' }
+      { page: 'dashboard-admin.html', href: '/frontend/html/dashboard-admin.html', icon: 'overview', label: 'Overview' },
+      { page: 'ticket-management.html', href: '/frontend/html/ticket-management.html', icon: 'tickets', label: 'Ticket Management' },
+      { page: 'monitoring.html', href: '/frontend/html/monitoring.html', icon: 'monitoring', label: 'LAN Monitoring' },
+      { page: 'knowledge.html', href: '/frontend/html/knowledge.html', icon: 'knowledge', label: 'Knowledge Base' }
     ]},
     { section: 'System', items: [
-      { page: 'settings.html', href: '/settings.html', icon: 'settings', label: 'Settings' },
-      { page: 'assets.html', href: '/assets.html', icon: 'assets', label: 'Asset Management' },
-      { page: 'user-management.html', href: '/user-management.html', icon: 'users', label: 'User Management' }
+      { page: 'settings.html', href: '/frontend/html/settings.html', icon: 'settings', label: 'Settings' },
+      { page: 'assets.html', href: '/frontend/html/assets.html', icon: 'assets', label: 'Asset Management' },
+      { page: 'user-management.html', href: '/frontend/html/user-management.html', icon: 'users', label: 'User Management' }
     ]}
   ];
 }
@@ -75,7 +75,7 @@ function renderUtilityHeader() {
   host.innerHTML = `
     <div class='utility-left'>
       <button class='btn btn-ghost icon-btn header-icon-btn' type='button' onclick='toggleAdminSidebar()' aria-label='Toggle sidebar' title='Toggle sidebar'>${adminIcon('menu')}</button>
-      <a class='utility-brand' href='/dashboard-admin.html' aria-label='Go to dashboard overview'>AITSM Control</a>
+      <a class='utility-brand' href='/frontend/html/dashboard-admin.html' aria-label='Go to dashboard overview'>AITSM Control</a>
     </div>
     <div class='utility-right'>
       <button id='adminNotifTrigger' class='btn btn-ghost icon-btn header-icon-btn notif-trigger-btn' type='button' onclick='toggleAdminNotifMenu()' aria-label='Notifications' title='Notifications'>${adminIcon('bell')}<span id='adminNotifCount' class='notif-count'>0</span></button>
