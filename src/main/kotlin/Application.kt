@@ -1,6 +1,7 @@
 package com.aitsm
 
 import backend.config.DatabaseFactory
+import backend.config.Env
 import backend.config.ServiceContainer
 import backend.models.ApiErrorResponse
 import backend.routes.aiRoutes
@@ -32,11 +33,11 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 fun main() {
-    embeddedServer(Netty, port = System.getenv("PORT")?.toIntOrNull() ?: 8070, host = "0.0.0.0", module = Application::module).start(wait = true)
+    embeddedServer(Netty, port = Env.get("PORT")?.toIntOrNull() ?: 8070, host = "0.0.0.0", module = Application::module).start(wait = true)
 }
 
 fun Application.module() {
-    val appEnv = (System.getenv("APP_ENV") ?: "development").lowercase()
+    val appEnv = (Env.get("APP_ENV") ?: "development").lowercase()
     val isProduction = appEnv == "production"
     val metrics = ConcurrentHashMap<String, AtomicLong>()
 
@@ -63,7 +64,7 @@ fun Application.module() {
         allowHeader("X-User-Role")
         allowHeader("X-AI-Session-Id")
 
-        val allowedOrigins = (System.getenv("CORS_ALLOWED_ORIGINS") ?: "")
+        val allowedOrigins = (Env.get("CORS_ALLOWED_ORIGINS") ?: "")
             .split(',')
             .map { it.trim() }
             .filter { it.isNotBlank() }
@@ -101,8 +102,8 @@ fun Application.module() {
     container.aiChatService.startupLog()
     container.slaService.seedDefaults()
 
-    val superAdminEmail = System.getenv("SUPERADMIN_EMAIL")?.takeIf { it.isNotBlank() }
-    val superAdminPassword = System.getenv("SUPERADMIN_PASSWORD")?.takeIf { it.isNotBlank() }
+    val superAdminEmail = Env.get("SUPERADMIN_EMAIL")?.takeIf { it.isNotBlank() }
+    val superAdminPassword = Env.get("SUPERADMIN_PASSWORD")?.takeIf { it.isNotBlank() }
 
     if (isProduction && (superAdminEmail == null || superAdminPassword == null)) {
         error("SUPERADMIN_EMAIL and SUPERADMIN_PASSWORD are required in production")
@@ -111,9 +112,9 @@ fun Application.module() {
         container.userRepo.ensureSuperAdmin(
             email = superAdminEmail,
             passwordHash = PasswordHasher.hash(superAdminPassword),
-            fullName = System.getenv("SUPERADMIN_NAME") ?: "System Super Admin",
-            company = System.getenv("SUPERADMIN_COMPANY") ?: "AITSM",
-            department = System.getenv("SUPERADMIN_DEPARTMENT") ?: "Platform"
+            fullName = Env.get("SUPERADMIN_NAME") ?: "System Super Admin",
+            company = Env.get("SUPERADMIN_COMPANY") ?: "AITSM",
+            department = Env.get("SUPERADMIN_DEPARTMENT") ?: "Platform"
         )
     }
 

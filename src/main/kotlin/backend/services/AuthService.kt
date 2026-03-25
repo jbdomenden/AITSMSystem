@@ -1,5 +1,6 @@
 package backend.services
 
+import backend.config.Env
 import backend.models.AdminEligibilityResponse
 import backend.models.AdminGrantResponse
 import backend.models.AuthResponse
@@ -25,7 +26,7 @@ class AuthService(
 ) {
     private data class SensitiveVerification(val userId: Int, val expiresAt: LocalDateTime)
     private val sensitiveVerifications = ConcurrentHashMap<String, SensitiveVerification>()
-    private val exposeDevVerificationCode = ((System.getenv("AUTH_EXPOSE_DEV_VERIFICATION_CODE") ?: "false").lowercase() == "true")
+    private val exposeDevVerificationCode = ((Env.get("AUTH_EXPOSE_DEV_VERIFICATION_CODE") ?: "false").lowercase() == "true")
 
     fun register(request: RegisterRequest): RegistrationResponse {
         require(request.password == request.confirmPassword) { "Passwords do not match." }

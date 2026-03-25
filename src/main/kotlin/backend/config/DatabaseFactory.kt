@@ -115,9 +115,9 @@ object AIConversationMessagesTable : Table("ai_conversation_messages") {
 
 object DatabaseFactory {
     fun init() {
-        val dbUrl = System.getenv("DB_URL") ?: error("DB_URL is required")
-        val dbUser = System.getenv("DB_USER") ?: error("DB_USER is required")
-        val dbPassword = System.getenv("DB_PASSWORD") ?: error("DB_PASSWORD is required")
+        val dbUrl = Env.get("DB_URL") ?: error("DB_URL is required")
+        val dbUser = Env.get("DB_USER") ?: error("DB_USER is required")
+        val dbPassword = Env.get("DB_PASSWORD") ?: error("DB_PASSWORD is required")
 
         val config = HikariConfig().apply {
             jdbcUrl = dbUrl
