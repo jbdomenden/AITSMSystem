@@ -288,7 +288,7 @@ async function createDraftFromVisible() {
     description: data.description,
     priority: data.priority
   }));
-  location.href = '/frontend/html/create-ticket.html';
+  location.href = '/create-ticket.html';
 }
 
 function usePrompt(prompt) {
