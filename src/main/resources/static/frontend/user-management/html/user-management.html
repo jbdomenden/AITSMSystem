@@ -1,0 +1,89 @@
+<!doctype html>
+<html>
+<head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>User Management | AITSM</title><link rel='stylesheet' href='/shared/css/styles.css'></head>
+<body>
+<div class='app-layout'>
+  <aside id='adminSidebar' class='sidebar'></aside>
+  <main class='content'>
+    <section id='utilityHeader' class='utility-bar card'></section>
+
+    <div class='topbar'>
+      <div>
+        <h1 class='page-title'>User Management</h1>
+        <p class='page-subtitle'>Manage roles, reset passwords, delete user accounts, and create internal accounts from one dedicated page.</p>
+      </div>
+      <div class='inline-actions'>
+        <button id='openCreateUserBtn' class='btn btn-primary'>Create User Account</button>
+      </div>
+    </div>
+
+    <section class='card'>
+      <div class='card-head'>
+        <div>
+          <h3 class='section-title'>Users</h3>
+          <p class='section-subtitle'>All actions are connected to backend user lifecycle APIs. End-users can login once email is verified via code or approved by an admin.</p>
+        </div>
+      </div>
+      <div class='table-wrap'>
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Email Verified</th><th>Actions</th></tr></thead>
+          <tbody id='userMgmtRows'></tbody>
+        </table>
+      </div>
+    </section>
+
+    <div id='createUserModal' class='modal-overlay hidden'>
+      <div class='modal-card'>
+        <div class='card-head'>
+          <div>
+            <h3 class='section-title'>Create Internal User</h3>
+            <p class='section-subtitle'>Provision an account without self-signup.</p>
+          </div>
+        </div>
+        <form id='createUserForm' class='form-grid signup-grid'>
+          <div class='form-group'>
+            <label for='internalFullName'>Full name</label>
+            <input id='internalFullName' type='text' required>
+          </div>
+          <div class='form-group'>
+            <label for='internalEmail'>Email</label>
+            <input id='internalEmail' type='email' required>
+          </div>
+          <div class='form-group'>
+            <label for='internalCompany'>Company</label>
+            <input id='internalCompany' type='text' required>
+          </div>
+          <div class='form-group'>
+            <label for='internalDepartment'>Department</label>
+            <input id='internalDepartment' type='text' required>
+          </div>
+          <div class='form-group'>
+            <label for='internalPassword'>Temporary password</label>
+            <input id='internalPassword' type='password' minlength='8' required>
+          </div>
+          <div class='form-group'>
+            <label for='internalConfirmPassword'>Confirm password</label>
+            <input id='internalConfirmPassword' type='password' minlength='8' required>
+          </div>
+          <div class='form-group'>
+            <label for='internalRole'>Role</label>
+            <select id='internalRole'>
+              <option value='end-user'>End-user</option>
+              <option value='admin'>Admin</option>
+            </select>
+          </div>
+          <div class='form-group'>
+            <label><input id='internalEmailVerified' type='checkbox' checked> Mark email as verified</label>
+          </div>
+          <div class='inline-actions' style='grid-column: 1 / -1;'>
+            <button type='button' class='btn btn-ghost' onclick='closeCreateUserModal()'>Cancel</button>
+            <button type='submit' class='btn btn-primary'>Create account</button>
+          </div>
+        </form>
+        <p id='createUserMessage' class='small' style='margin-top:12px'></p>
+      </div>
+    </div>
+  </main>
+</div>
+<script src='/modules/sidebar/js/admin-shell.js'></script><script src='/modules/common/js/app.js'></script><script src='/user-management/js/user-management.js'></script>
+</body></html>

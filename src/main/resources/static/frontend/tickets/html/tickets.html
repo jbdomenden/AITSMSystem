@@ -1,0 +1,38 @@
+<!doctype html>
+<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>My Tickets | AITSM</title><link rel='stylesheet' href='/shared/css/styles.css'></head>
+<body>
+<div class='app-layout'>
+  <aside id='userSidebar' class='sidebar'></aside>
+  <main class='content'>
+    <section id='utilityHeader' class='utility-bar card'></section>
+
+    <div class='topbar'>
+      <div>
+        <p class='page-kicker'>Support tracking</p>
+        <h1 class='page-title'>My Tickets</h1>
+        <p class='page-subtitle'>Track progress, SLA timing, and resolution updates across every request.</p>
+      </div>
+      <div class='page-actions'>
+        <a class='btn btn-ghost' href='/dashboard-user.html'>Overview</a>
+        <a class='btn btn-primary' href='/create-ticket.html'>Create Ticket</a>
+      </div>
+    </div>
+
+    <section class='card'>
+      <div class='card-head'>
+        <div>
+          <h3 class='section-title'>Ticket Queue</h3>
+          <p class='section-subtitle'>Live ticket states and SLA remaining time.</p>
+        </div>
+      </div>
+      <div class='table-wrap'>
+        <table>
+          <thead><tr><th>ID</th><th>Title</th><th>Priority</th><th>Status</th><th>SLA</th><th>Actions <span class="help-tip" data-help="Close resolved tickets, cancel active tickets, and request follow-up after 24 hours without resolution.">?</span></th></tr></thead>
+          <tbody id='ticketRows'></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+<script src='/modules/sidebar/js/user-shell.js'></script><script src='/modules/common/js/app.js'></script><script src='/modules/common/js/help.js'></script><script src='/tickets/js/tickets.js'></script>
+</body></html>

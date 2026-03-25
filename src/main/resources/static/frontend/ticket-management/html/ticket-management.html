@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+<head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Ticket Management | AITSM</title><link rel='stylesheet' href='/shared/css/styles.css'></head>
+<body>
+<div class='app-layout'>
+  <aside id='adminSidebar' class='sidebar'></aside>
+  <main class='content'>
+    <section id='utilityHeader' class='utility-bar card'></section>
+    <div class='topbar'>
+      <div>
+        <h1 class='page-title'>Ticket Management</h1>
+        <p class='page-subtitle'>Manage all tickets and update workflow statuses.</p>
+      </div>
+    </div>
+    <section class='card'>
+      <div class='card-head'>
+        <div>
+          <h3 class='section-title'>All Tickets <span class='help-tip' data-help='Admins can move tickets to In Progress or Resolved. End-users can close resolved tickets or request follow-up.'>?</span></h3>
+          <p class='section-subtitle'>Connected to live backend `/api/tickets` status APIs.</p>
+        </div>
+      </div>
+      <div class='table-wrap'>
+        <table>
+          <thead><tr><th>ID</th><th>User</th><th>Title</th><th>Priority</th><th>Status</th><th>Updated</th><th>Action</th></tr></thead>
+          <tbody id='adminTicketRows'></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+<script src='/modules/sidebar/js/admin-shell.js'></script><script src='/modules/common/js/app.js'></script><script src='/modules/common/js/help.js'></script><script src='/ticket-management/js/admin-ticket-management.js'></script>
+</body></html>

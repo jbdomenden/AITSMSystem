@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Settings | AITSM</title><link rel='stylesheet' href='/shared/css/styles.css'></head>
+<body>
+<div class='app-layout'>
+  <aside id='adminSidebar' class='sidebar'></aside>
+  <main class='content'>
+    <section id='utilityHeader' class='utility-bar card'></section>
+
+    <div class='topbar'>
+      <div>
+        <h1 class='page-title'>Settings</h1>
+        <p class='page-subtitle'>Profile and policy settings connected to backend services.</p>
+      </div>
+      <div class='inline-actions'><button class='btn btn-ghost' onclick='logout()'>Logout</button></div>
+    </div>
+
+    <section class='settings-grid'>
+      <article class='card'>
+        <div class='card-head'><h3 class='section-title'>Profile</h3><span class='card-icon'>👤</span></div>
+        <div class='form-grid'>
+          <div class='form-group'><label>Display Name</label><input id='settingsFullName'></div>
+          <div class='form-group'><label>Email</label><input id='settingsEmail' readonly></div>
+          <div class='form-group'><label>Company</label><input id='settingsCompany'></div>
+          <div class='form-group'><label>Department</label><input id='settingsDepartment'></div>
+        </div>
+        <div class='inline-actions' style='margin-top:12px'><button class='btn btn-primary' onclick='saveProfileSettings()'>Save Profile</button></div>
+      </article>
+
+      <article class='card'>
+        <div class='card-head'><h3 class='section-title'>SLA Policies</h3><span class='card-icon'>⏱</span></div>
+        <div class='table-wrap'>
+          <table>
+            <thead><tr><th>Priority</th><th>Response (min)</th><th>Resolution (min)</th></tr></thead>
+            <tbody id='slaRows'></tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class='card'>
+        <div class='card-head'><h3 class='section-title'>Notifications</h3><span class='card-icon'>🔔</span></div>
+        <div id='settingsNotificationSummary' class='small'>Loading notification summary...</div>
+      </article>
+
+      <article class='card ollama-card'>
+        <div class='card-head'><h3 class='section-title'>Ollama AI Configuration</h3><span class='card-icon'>🤖</span></div>
+        <div class='form-grid single-col'>
+          <div class='form-group'>
+            <label for='aiBaseUrl'>Base URL</label>
+            <input id='aiBaseUrl' placeholder='http://localhost:11434'>
+          </div>
+          <div class='form-group'>
+            <label for='aiModelSelect'>Model</label>
+            <select id='aiModelSelect'></select>
+            <div id='aiModelHint' class='small'>Click “Refresh Models” to load installed models.</div>
+          </div>
+          <div class='inline-actions'>
+            <button id='aiRefreshModelsBtn' class='btn btn-ghost' type='button'>Refresh Models</button>
+            <button id='aiTestConnectionBtn' class='btn btn-ghost' type='button'>Test Connection</button>
+            <button id='aiSaveConfigBtn' class='btn btn-primary' type='button'>Save Configuration</button>
+          </div>
+          <div class='small'>Status: <span id='aiConnectionStatus' class='status-pill status-pill-neutral'>Unknown</span></div>
+          <div id='aiConfigMessage' class='small'></div>
+        </div>
+      </article>
+    </section>
+  </main>
+</div>
+<script src='/modules/sidebar/js/admin-shell.js'></script><script src='/modules/common/js/app.js'></script><script src='/modules/common/js/help.js'></script><script src='/settings/js/settings.js'></script>
+</body></html>

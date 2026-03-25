@@ -119,6 +119,22 @@ fun Application.module() {
     }
 
     routing {
+        get("/") { call.respondRedirect("/index/html/index.html") }
+        get("/index.html") { call.respondRedirect("/index/html/index.html") }
+        get("/login.html") { call.respondRedirect("/login/html/login.html") }
+        get("/signup.html") { call.respondRedirect("/signup/html/signup.html") }
+        get("/dashboard-admin.html") { call.respondRedirect("/dashboard-admin/html/dashboard-admin.html") }
+        get("/dashboard-user.html") { call.respondRedirect("/dashboard-user/html/dashboard-user.html") }
+        get("/ticket-management.html") { call.respondRedirect("/ticket-management/html/ticket-management.html") }
+        get("/tickets.html") { call.respondRedirect("/tickets/html/tickets.html") }
+        get("/create-ticket.html") { call.respondRedirect("/create-ticket/html/create-ticket.html") }
+        get("/assets.html") { call.respondRedirect("/assets/html/assets.html") }
+        get("/monitoring.html") { call.respondRedirect("/monitoring/html/monitoring.html") }
+        get("/knowledge.html") { call.respondRedirect("/knowledge/html/knowledge.html") }
+        get("/knowledge-library.html") { call.respondRedirect("/knowledge-library/html/knowledge-library.html") }
+        get("/settings.html") { call.respondRedirect("/settings/html/settings.html") }
+        get("/user-management.html") { call.respondRedirect("/user-management/html/user-management.html") }
+        get("/ai-assistant.html") { call.respondRedirect("/ai-assistant/html/ai-assistant.html") }
         get("/api/health") {
             call.respond(mapOf("status" to "ok", "environment" to appEnv))
         }
