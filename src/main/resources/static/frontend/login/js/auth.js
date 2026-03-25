@@ -1,6 +1,7 @@
 function saveSession(data) {
   localStorage.setItem('userId', data.user.id);
-  localStorage.setItem('role', data.user.role);
+  const normalizedRole = String(data.user.role || '').toLowerCase();
+  localStorage.setItem('role', normalizedRole);
   localStorage.setItem('email', data.user.email || '');
   localStorage.setItem('fullName', data.user.fullName || '');
 }
@@ -52,7 +53,8 @@ async function verifyEmailCode() {
   if (!res.ok) return alert(data.error || 'Verification failed');
 
   saveSession(data);
-  location.href = ['admin', 'superadmin'].includes(data.user.role) ? '/dashboard-admin.html' : '/dashboard-user.html';
+  const role = String(data.user.role || '').toLowerCase();
+  location.href = ['admin', 'superadmin'].includes(role) ? '/dashboard-admin.html' : '/dashboard-user.html';
 }
 
 async function resendVerificationCode() {
@@ -79,7 +81,8 @@ async function login() {
   if (!res.ok) return alert(data.error || 'Login failed');
 
   saveSession(data);
-  location.href = ['admin', 'superadmin'].includes(data.user.role) ? '/dashboard-admin.html' : '/dashboard-user.html';
+  const role = String(data.user.role || '').toLowerCase();
+  location.href = ['admin', 'superadmin'].includes(role) ? '/dashboard-admin.html' : '/dashboard-user.html';
 }
 
 

@@ -1,7 +1,11 @@
 const apiBase = '';
 
+function normalizeRole(role) {
+  return String(role || '').toLowerCase();
+}
+
 function currentRole() {
-  return localStorage.getItem('role') || '';
+  return normalizeRole(localStorage.getItem('role'));
 }
 
 const authHeaders = () => ({
@@ -16,7 +20,8 @@ function logout() {
 }
 
 function redirectForRole(role) {
-  location.href = ['admin', 'superadmin'].includes(role) ? '/dashboard-admin.html' : '/dashboard-user.html';
+  const normalizedRole = normalizeRole(role);
+  location.href = ['admin', 'superadmin'].includes(normalizedRole) ? '/dashboard-admin.html' : '/dashboard-user.html';
 }
 
 function enforcePageAccess() {
