@@ -1,11 +1,15 @@
 package backend.routes
 
 import backend.models.DeviceRequest
+import backend.models.PaginatedResponse
+import backend.models.PaginationMeta
+import backend.models.UserRole
 import backend.repository.DeviceRepository
 import backend.repository.UserRepository
 import backend.security.requireRole
 import backend.services.MonitoringService
 import io.ktor.http.*
+import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -54,20 +58,23 @@ private fun detectDeviceStatus(ip: String): String {
 fun Route.deviceRoutes(deviceRepository: DeviceRepository, userRepository: UserRepository, monitoringService: MonitoringService) {
     route("/api/devices") {
         post {
-            if (!call.requireRole("admin")) return@post
+            if (!call.requireRole(UserRole.ADMIN)) return@post
             val created = deviceRepository.create(call.receive<DeviceRequest>())
             call.respond(HttpStatusCode.Created, created)
         }
         get {
-            if (!call.requireRole("admin")) return@get
+            if (!call.requireRole(UserRole.ADMIN)) return@get
+            val limit = (call.request.queryParameters["limit"]?.toIntOrNull() ?: 20).coerceIn(1, 100)
+            val offset = (call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L).coerceAtLeast(0)
             val liveStatuses = monitoringService.lanDevices()
                 .filter { it.telemetrySourceType != "HOST" }
                 .associateBy { it.ipAddress }
-            call.respond(deviceRepository.listWithLiveStatus(liveStatuses))
+            val page = deviceRepository.listWithLiveStatus(liveStatuses, limit, offset)
+            call.respond(PaginatedResponse(page.items, PaginationMeta(page.total, limit, offset, (offset / limit).toInt() + 1)))
         }
 
         get("/ip-lookup") {
-            if (!call.requireRole("admin")) return@get
+            if (!call.requireRole(UserRole.ADMIN)) return@get
             val ip = call.request.queryParameters["ip"]?.trim().orEmpty()
             if (ip.isBlank()) return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "ip query param is required"))
 
@@ -101,7 +108,7 @@ fun Route.deviceRoutes(deviceRepository: DeviceRepository, userRepository: UserR
 
 
         post("/sync-from-monitoring") {
-            if (!call.requireRole("admin")) return@post
+            if (!call.requireRole(UserRole.ADMIN)) return@post
             val peers = monitoringService.lanDevices()
                 .filter { it.telemetrySourceType != "HOST" }
                 .map {
@@ -116,14 +123,14 @@ fun Route.deviceRoutes(deviceRepository: DeviceRepository, userRepository: UserR
         }
 
         put("/{id}") {
-            if (!call.requireRole("admin")) return@put
+            if (!call.requireRole(UserRole.ADMIN)) return@put
             val id = call.parameters["id"]?.toIntOrNull() ?: return@put call.respond(HttpStatusCode.BadRequest)
             val updated = deviceRepository.update(id, call.receive<DeviceRequest>()) ?: return@put call.respond(HttpStatusCode.NotFound)
             call.respond(updated)
         }
 
         delete("/{id}") {
-            if (!call.requireRole("admin")) return@delete
+            if (!call.requireRole(UserRole.ADMIN)) return@delete
             val id = call.parameters["id"]?.toIntOrNull() ?: return@delete call.respond(HttpStatusCode.BadRequest)
             if (!deviceRepository.delete(id)) return@delete call.respond(HttpStatusCode.NotFound)
             call.respond(mapOf("message" to "Device deleted"))
