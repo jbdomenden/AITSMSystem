@@ -8,6 +8,6 @@ ktor:
 ai:
   provider: ${AI_PROVIDER:ollama}
   ollama:
-    baseUrl: ${AI_OLLAMA_BASE_URL}
-    model: ${AI_OLLAMA_MODEL}
+    baseUrl: ${AI_OLLAMA_BASE_URL:http://localhost:11434}
+    model: ${AI_OLLAMA_MODEL:llama3.1:8b}
   timeoutMillis: ${AI_TIMEOUT_MILLIS:60000}

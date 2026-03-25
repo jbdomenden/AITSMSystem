@@ -1,5 +1,6 @@
 package backend.services.ai
 
+import backend.config.Env
 import backend.models.ai.AIConfigResponse
 import backend.models.ai.AIConfigUpdateRequest
 import io.ktor.server.config.ApplicationConfig
@@ -47,7 +48,7 @@ class AIConfigService(config: ApplicationConfig) {
     }
 
     private fun envOrConfig(envName: String, config: ApplicationConfig, path: String): String? {
-        val env = System.getenv(envName)?.trim()
+        val env = Env.get(envName)?.trim()
         if (!env.isNullOrBlank()) return env
         return config.propertyOrNull(path)?.getString()?.trim()?.takeIf { it.isNotBlank() }
     }
