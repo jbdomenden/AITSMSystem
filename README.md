@@ -41,6 +41,8 @@ If the server starts successfully, you'll see the following output:
 
 ## Runtime environment variables
 
+Copy `.env.example` to `.env` and set values for your environment before startup.
+
 The server now requires credentials and provider configuration via environment variables (no hard-coded defaults for secrets).
 
 Required in all environments:
