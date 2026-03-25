@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+<head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Asset Management | AITSM</title><link rel='stylesheet' href='/shared/css/styles.css'></head>
+<body>
+<div class='app-layout'>
+  <aside id='adminSidebar' class='sidebar'></aside>
+  <main class='content'>
+    <section id='utilityHeader' class='utility-bar card'></section>
+
+    <div class='topbar'>
+      <div>
+        <h1 class='page-title'>Asset Management</h1>
+        <p class='page-subtitle'>Register LAN devices and maintain ownership visibility.</p>
+      </div>
+      <div class='inline-actions'><button class='btn btn-ghost' onclick='refreshAssetConnections()'>Refresh Connection</button></div>
+    </div>
+
+    <section class='card'>
+      <div class='card-head'>
+        <div>
+          <h3 class='section-title'>Register Device</h3>
+          <p class='section-subtitle'>Add a LAN endpoint to monitoring and analytics.</p>
+        </div>
+        <span class='card-icon'>＋</span>
+      </div>
+      <div class='form-grid'>
+        <div class='form-group'><label>Device Name</label><input id='deviceName' placeholder='Auto-detected from IP/hostname' readonly></div>
+        <div class='form-group'><label>IP Address (LAN)</label><input id='ipAddress' placeholder='192.168.x.x'></div>
+        <div class='form-group'><label>Department</label><input id='department' placeholder='Finance'></div>
+        <div class='form-group'><label>Assigned User</label><input id='assignedUser' placeholder='jane.doe'></div>
+        <div class='form-group'>
+          <label>Status</label>
+          <input id='statusDisplay' placeholder='Auto-detected from monitoring and reachability' readonly>
+          <input id='status' type='hidden' value='Not Reachable'>
+        </div>
+      </div>
+      <div class='inline-actions' style='margin-top:16px'>
+        <button class='btn btn-primary' onclick='registerDevice()'>Register Device</button>
+        <button id='cancelDeviceEditBtn' class='btn btn-ghost hidden' type='button' onclick='resetDeviceForm()'>Cancel Edit</button>
+      </div>
+    </section>
+
+    <section class='card' style='margin-top:16px'>
+      <div class='card-head'>
+        <div>
+          <h3 class='section-title'>Registered Devices</h3>
+          <p class='section-subtitle'>Inventory list for asset governance and support alignment.</p>
+        </div>
+      </div>
+      <div class='table-wrap'>
+        <table>
+          <thead><tr><th>Device</th><th>IP Address</th><th>Department</th><th>Owner</th><th>Status</th><th>CPU</th><th>Memory</th><th>Last Seen</th><th>Actions</th></tr></thead>
+          <tbody id='deviceList'></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+<script src='/modules/sidebar/js/admin-shell.js'></script><script src='/modules/common/js/app.js'></script><script src='/assets/js/monitoring.js'></script>
+</body></html>

@@ -1,0 +1,64 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset='utf-8'>
+  <meta name='viewport' content='width=device-width,initial-scale=1'>
+  <title>User Dashboard | AITSM</title>
+  <link rel='stylesheet' href='/shared/css/styles.css'>
+</head>
+<body>
+<div class='app-layout'>
+  <aside id='userSidebar' class='sidebar'></aside>
+  <main class='content'>
+    <section id='utilityHeader' class='utility-bar card'></section>
+
+    <div class='topbar'>
+      <div>
+        <p class='page-kicker'>End-user workspace</p>
+        <h1 class='page-title'>Ticketing Workspace</h1>
+        <p class='page-subtitle'>Real-time overview of your ticket queue, notifications, and next support actions.</p>
+      </div>
+      <div class='page-actions'>
+        <a class='btn btn-ghost' href='/tickets.html'>View Tickets</a>
+        <a class='btn btn-primary' href='/create-ticket.html'>Create Ticket</a>
+      </div>
+    </div>
+
+    <section id='userSummaryCards' class='grid stats'></section>
+
+    <section class='grid admin-panels' style='margin-top:16px'>
+      <article class='card'>
+        <div class='card-head'>
+          <div>
+            <h3 class='section-title'>Recent Tickets</h3>
+            <p class='section-subtitle'>Latest activity from your submitted requests.</p>
+          </div>
+          <a class='btn btn-ghost' href='/tickets.html'>View all</a>
+        </div>
+        <div class='table-wrap'>
+          <table>
+            <thead><tr><th>ID</th><th>Title</th><th>Priority</th><th>Status</th><th>Updated</th></tr></thead>
+            <tbody id='recentTicketRows'></tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class='card'>
+        <div class='card-head'>
+          <div>
+            <h3 class='section-title'>Notifications</h3>
+            <p class='section-subtitle'>Messages delivered from support workflows.</p>
+          </div>
+        </div>
+        <div id='userNotifications' class='notification-list'></div>
+      </article>
+    </section>
+
+
+  </main>
+</div>
+<script src='/modules/sidebar/js/user-shell.js'></script>
+<script src='/modules/common/js/app.js'></script>
+<script src='/dashboard-user/js/user-dashboard.js'></script>
+</body>
+</html>

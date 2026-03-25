@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+<head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>LAN Monitoring | AITSM</title><link rel='stylesheet' href='/shared/css/styles.css'></head>
+<body>
+<div class='app-layout'>
+  <aside id='adminSidebar' class='sidebar'></aside>
+  <main class='content'>
+    <section id='utilityHeader' class='utility-bar card'></section>
+
+    <div class='topbar'>
+      <div>
+        <h1 class='page-title'>LAN Monitoring</h1>
+        <p class='page-subtitle'>Device health and utilization for clients connected to your internal network.</p>
+      </div>
+      <div class='inline-actions monitor-actions'>
+        <div id='monitorLiveStatus' class='live-status-chip' aria-live='polite'>
+          <span class='live-dot' aria-hidden='true'></span>
+          <span id='monitorLiveStatusText'>Waiting for update…</span>
+        </div>
+        <button id='refreshDiscoveryBtn' class='btn btn-ghost' onclick='refreshDiscovery()'>Refresh Discovery</button>
+      </div>
+    </div>
+
+    <section id='monitorSummary' class='device-kpis'></section>
+
+    <section class='grid monitor-grid' style='margin-top:16px'>
+      <article class='card'>
+        <div class='card-head'>
+          <div>
+            <h3 class='section-title'>Device Status</h3>
+            <p class='section-subtitle'>Live snapshot of LAN client resources.</p>
+          </div>
+          <span class='card-icon'>🖧</span>
+        </div>
+        <div id='monitorCards' class='grid stats'></div>
+      </article>
+
+      <article class='card'>
+        <div class='card-head'>
+          <div>
+            <h3 class='section-title'>Monitoring Health</h3>
+            <p class='section-subtitle'>Readiness indicators for operations.</p>
+          </div>
+          <span class='card-icon'>✓</span>
+        </div>
+        <div id='monitorHealthPanel'></div>
+      </article>
+    </section>
+
+    <section class='card' style='margin-top:16px'>
+      <div class='card-head'>
+        <div>
+          <h3 class='section-title'>Device Inventory</h3>
+          <p class='section-subtitle'>Structured list for quick operational scanning.</p>
+        </div>
+      </div>
+      <div class='inline-actions' style='justify-content:flex-start;margin-bottom:10px'>
+        <button class='btn btn-ghost'>All Departments</button>
+        <button class='btn btn-ghost'>All Statuses</button>
+      </div>
+      <div class='table-wrap'>
+        <table>
+          <thead><tr><th>Device</th><th>IP Address</th><th>Telemetry Source</th><th>Reachability</th><th>CPU</th><th>Memory</th><th>Telemetry State</th></tr></thead>
+          <tbody id='monitorTableRows'></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+<script src='/modules/sidebar/js/admin-shell.js'></script><script src='/modules/common/js/app.js'></script><script src='/monitoring/js/monitoring.js'></script>
+</body></html>
