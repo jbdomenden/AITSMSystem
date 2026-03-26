@@ -35,6 +35,10 @@ fun Route.monitoringRoutes(service: MonitoringService, deviceRepository: DeviceR
             if (!call.requireRole(UserRole.ADMIN)) return@get
             call.respond(service.lanDevices())
         }
+        get("/lan-peer-ips") {
+            if (!call.requireRole(UserRole.ADMIN)) return@get
+            call.respond(service.lanPeerIps())
+        }
         get("/summary") {
             if (!call.requireRole(UserRole.ADMIN)) return@get
             call.respond(service.summary())

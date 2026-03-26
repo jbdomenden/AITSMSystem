@@ -107,6 +107,12 @@ class MonitoringService(private val deviceRepository: DeviceRepository) {
         return mapOf("message" to "Discovery refresh completed", "interfaces" to peers)
     }
 
+    fun lanPeerIps(): List<String> = discoverLanPeers()
+        .map { it.ipAddress.trim() }
+        .filter { isLanIp(it) }
+        .distinct()
+        .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it })
+
     private data class Peer(val hostname: String, val ipAddress: String)
 
     private fun discoverLanPeers(): List<Peer> {

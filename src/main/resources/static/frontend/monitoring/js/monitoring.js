@@ -149,11 +149,11 @@ function renderMonitorTable(devices) {
   </tr>`).join('');
 }
 
-function renderLanIpSuggestions(devices) {
+function renderLanIpSuggestions(ips) {
   const suggestions = document.getElementById('lanIpSuggestions');
   if (!suggestions) return;
 
-  const uniqueIps = [...new Set((devices || []).map((device) => (device.ipAddress || '').trim()).filter(Boolean))]
+  const uniqueIps = [...new Set((ips || []).map((ip) => (ip || '').trim()).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
   suggestions.innerHTML = uniqueIps.map((ip) => `<option value="${ip}"></option>`).join('');
@@ -196,20 +196,23 @@ async function loadMonitoring({ force = false, source = 'manual' } = {}) {
   updateMonitoringLiveStatus('loading');
 
   try {
-    const [summaryRes, devicesRes] = await Promise.all([
+    const [summaryRes, devicesRes, peerIpsRes] = await Promise.all([
       fetch('/api/monitoring/summary', { headers: authHeaders() }),
-      fetch('/api/monitoring/lan-devices', { headers: authHeaders() })
+      fetch('/api/monitoring/lan-devices', { headers: authHeaders() }),
+      fetch('/api/monitoring/lan-peer-ips', { headers: authHeaders() })
     ]);
 
     const summary = await summaryRes.json();
     const devices = await devicesRes.json();
+    const peerIps = await peerIpsRes.json();
     const safeDevices = Array.isArray(devices) ? devices : [];
+    const safePeerIps = Array.isArray(peerIps) ? peerIps : [];
 
     renderMonitorSummary(summaryRes.ok ? summary : null);
     renderMonitoringHealthPanel(summaryRes.ok ? summary : null, safeDevices);
     renderMonitorCards(safeDevices);
     renderMonitorTable(safeDevices);
-    renderLanIpSuggestions(safeDevices);
+    renderLanIpSuggestions(safePeerIps);
 
     monitoringLastUpdatedAt = new Date();
     updateMonitoringLiveStatus('live', source === 'discovery' ? 'Discovery refreshed just now' : undefined);
