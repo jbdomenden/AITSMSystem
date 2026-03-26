@@ -364,7 +364,11 @@ async function loadDevices() {
     return;
   }
 
-  const safe = Array.isArray(data) ? data : [];
+  const safe = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.data)
+      ? data.data
+      : [];
   deviceRegistry = safe;
   rows.innerHTML = safe.map(d => `<tr>
     <td>${d.deviceName || '-'}</td>
