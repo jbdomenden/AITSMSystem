@@ -110,6 +110,7 @@ class MonitoringService(private val deviceRepository: DeviceRepository) {
 
     fun lanPeerIps(): List<String> = discoverLanPeers()
         .map { it.ipAddress.trim() }
+        .plus(devices().map { it.ipAddress.trim() })
         .filter { isLanIp(it) }
         .distinct()
         .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it })
@@ -132,7 +133,7 @@ class MonitoringService(private val deviceRepository: DeviceRepository) {
     private fun discoverArpPeers(): List<Peer> {
         val osName = System.getProperty("os.name", "").lowercase(Locale.getDefault())
         val commands = if ("windows" in osName) {
-            listOf(listOf("arp", "-a"))
+            listOf(listOf("cmd", "/c", "arp -a"))
         } else {
             listOf(
                 listOf("sh", "-c", "ip neigh"),
