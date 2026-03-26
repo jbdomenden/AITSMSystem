@@ -46,13 +46,13 @@ private fun isLanIp(ip: String): Boolean {
 
 private fun detectDeviceStatus(ip: String): String {
     val normalizedIp = ip.trim()
-    if (normalizedIp.isBlank()) return "Not Reachable"
-    if (!isLanIp(normalizedIp)) return "Not Reachable"
+    if (normalizedIp.isBlank()) return "Unreachable"
+    if (!isLanIp(normalizedIp)) return "Unreachable"
 
     return runCatching {
         val address = InetAddress.getByName(normalizedIp)
         if (address.isReachable(1500)) "Online" else "Offline"
-    }.getOrElse { "Not Reachable" }
+    }.getOrElse { "Unreachable" }
 }
 
 fun Route.deviceRoutes(deviceRepository: DeviceRepository, userRepository: UserRepository, monitoringService: MonitoringService) {

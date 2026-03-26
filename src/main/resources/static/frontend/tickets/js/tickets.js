@@ -16,6 +16,11 @@ const FOLLOW_UP_HOURS = 24;
 
 function parseDate(v){ const d=new Date(v||''); return Number.isNaN(d.getTime()) ? null : d; }
 function hoursSince(v){ const d=parseDate(v); if(!d) return 999; return (Date.now()-d.getTime())/(1000*60*60); }
+function normalizeListResponse(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  return [];
+}
 
 function closeAllRowMenus() {
   document.querySelectorAll('.row-action-menu').forEach((el) => el.classList.add('hidden'));
@@ -103,7 +108,7 @@ async function loadTickets() {
   const res = await fetch('/api/tickets', { headers: authHeaders() });
   const data = await res.json();
   if(!res.ok){ rows.innerHTML = `<tr><td colspan='6' class='small text-danger'>${data.error||'Unable to load tickets'}</td></tr>`; return; }
-  const tickets = Array.isArray(data) ? data : [];
+  const tickets = normalizeListResponse(data);
 
   rows.innerHTML = tickets.map(t => {
     const klass = (t.status || 'Open').toLowerCase().replace(/\s+/g, '-');

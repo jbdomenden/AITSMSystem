@@ -47,7 +47,14 @@ function renderAdminSidebar() {
 function closeAdminHeaderMenu(){ document.getElementById('adminHeaderMenu')?.classList.add('hidden'); }
 function toggleAdminHeaderMenu(){ document.getElementById('adminHeaderMenu')?.classList.toggle('hidden'); }
 function toggleAdminNotifMenu(){ document.getElementById('adminNotifMenu')?.classList.toggle('hidden'); }
-function toggleAdminSidebar(){ document.body.classList.toggle('sidebar-hidden'); }
+function toggleAdminSidebar(forceHidden) {
+  const hideSidebar = typeof forceHidden === 'boolean'
+    ? forceHidden
+    : !document.body.classList.contains('sidebar-hidden');
+  document.body.classList.toggle('sidebar-hidden', hideSidebar);
+  const toggle = document.getElementById('adminSidebarToggle');
+  if (toggle) toggle.setAttribute('aria-expanded', hideSidebar ? 'false' : 'true');
+}
 
 function openAdminHelp() {
   alert('How to use AITSM Admin\n1) Monitor LAN/asset telemetry.\n2) Manage ticket statuses in Ticket Management.\n3) Manage users in User Management.\n4) Use Settings for profile and SLA review.');
@@ -74,7 +81,7 @@ function renderUtilityHeader() {
   if (!host) return;
   host.innerHTML = `
     <div class='utility-left'>
-      <button class='btn btn-ghost icon-btn header-icon-btn' type='button' onclick='toggleAdminSidebar()' aria-label='Toggle sidebar' title='Toggle sidebar'>${adminIcon('menu')}</button>
+      <button id='adminSidebarToggle' class='btn btn-ghost icon-btn header-icon-btn' type='button' aria-label='Toggle sidebar' title='Toggle sidebar' aria-expanded='true'>${adminIcon('menu')}</button>
       <a class='utility-brand' href='/dashboard-admin.html' aria-label='Go to dashboard overview'>AITSM Control</a>
     </div>
     <div class='utility-right'>
@@ -87,6 +94,12 @@ function renderUtilityHeader() {
         <button type='button' class='menu-action-btn danger' onclick='logout()'>${adminIcon('logout')}<span>Logout</span></button>
       </div>
     </div>`;
+
+  document.getElementById('adminSidebarToggle')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleAdminSidebar();
+  });
 
   document.addEventListener('click', (event) => {
     const trigger = document.getElementById('adminMenuTrigger');
