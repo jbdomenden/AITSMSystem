@@ -25,13 +25,17 @@
       </div>
       <div class='form-grid'>
         <div class='form-group'><label>Device Name</label><input id='deviceName' placeholder='Auto-detected from IP/hostname' readonly></div>
-        <div class='form-group'><label>IP Address (LAN)</label><input id='ipAddress' placeholder='192.168.x.x'></div>
+        <div class='form-group'>
+          <label>IP Address (LAN)</label>
+          <input id='ipAddress' list='lanIpSuggestions' placeholder='192.168.x.x'>
+          <datalist id='lanIpSuggestions'></datalist>
+        </div>
         <div class='form-group'><label>Department</label><input id='department' placeholder='Finance'></div>
         <div class='form-group'><label>Assigned User</label><input id='assignedUser' placeholder='jane.doe'></div>
         <div class='form-group'>
           <label>Status</label>
           <input id='statusDisplay' placeholder='Auto-detected from monitoring and reachability' readonly>
-          <input id='status' type='hidden' value='Not Reachable'>
+          <input id='status' type='hidden' value='Unreachable'>
         </div>
       </div>
       <div class='inline-actions' style='margin-top:16px'>

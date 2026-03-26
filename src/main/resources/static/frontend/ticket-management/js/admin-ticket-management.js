@@ -14,6 +14,11 @@ function ensureActionMenuBackdrop() {
 
 function fmt(v){ const d=new Date(v||''); return Number.isNaN(d.getTime()) ? (v||'-') : d.toLocaleString(); }
 function badge(status){ const s=(status||'').toLowerCase(); if(s==='resolved'||s==='closed') return 'resolved'; if(s==='cancelled') return 'warning'; if(s==='in progress'||s==='follow-up requested') return 'in-progress'; return 'open'; }
+function normalizeListResponse(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  return [];
+}
 
 function closeAdminRowMenus() {
   document.querySelectorAll('.row-action-menu').forEach((el) => el.classList.add('hidden'));
@@ -82,7 +87,7 @@ async function loadAdminTicketManagement(){
   const res = await fetch('/api/tickets', { headers: authHeaders() });
   const data = await res.json();
   if(!res.ok){ rows.innerHTML=`<tr><td colspan='7' class='small text-danger'>${data.error||'Unable to load tickets'}</td></tr>`; return; }
-  const tickets = Array.isArray(data)?data:[];
+  const tickets = normalizeListResponse(data);
   rows.innerHTML = tickets.map(t => `<tr data-ticket-id='${t.id}'>
     <td><a class='ticket-link' href='${adminTicketHref(t.id)}'>#${t.id}</a></td><td>${t.userId}</td><td><a class='ticket-link ticket-link-title' href='${adminTicketHref(t.id)}' title='${t.title || '-'}'>${t.title||'-'}</a></td><td>${t.priority||'-'}</td>
     <td><span class='badge ${badge(t.status)}'>${t.status||'-'}</span></td>

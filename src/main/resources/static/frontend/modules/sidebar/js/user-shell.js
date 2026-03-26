@@ -52,8 +52,13 @@ function toggleUserHeaderMenu() {
   document.getElementById('userHeaderMenu')?.classList.toggle('hidden');
 }
 
-function toggleUserSidebar() {
-  document.body.classList.toggle('sidebar-hidden');
+function toggleUserSidebar(forceHidden) {
+  const hideSidebar = typeof forceHidden === 'boolean'
+    ? forceHidden
+    : !document.body.classList.contains('sidebar-hidden');
+  document.body.classList.toggle('sidebar-hidden', hideSidebar);
+  const toggle = document.getElementById('userSidebarToggle');
+  if (toggle) toggle.setAttribute('aria-expanded', hideSidebar ? 'false' : 'true');
 }
 
 async function loadUserHeaderNotifications() {
@@ -78,7 +83,7 @@ function renderUserUtilityHeader() {
 
   host.innerHTML = `
     <div class='utility-left'>
-      <button class='btn btn-ghost icon-btn header-icon-btn' type='button' onclick='toggleUserSidebar()' aria-label='Toggle sidebar' title='Toggle sidebar'>${userIcon('menu')}</button>
+      <button id='userSidebarToggle' class='btn btn-ghost icon-btn header-icon-btn' type='button' aria-label='Toggle sidebar' title='Toggle sidebar' aria-expanded='true'>${userIcon('menu')}</button>
       <a class='utility-brand' href='/dashboard-user.html' aria-label='Go to user dashboard overview'>AITSM Portal</a>
     </div>
     <div class='utility-right'>
@@ -89,6 +94,12 @@ function renderUserUtilityHeader() {
         <button type='button' class='menu-action-btn danger' onclick='logout()'>${userIcon('logout')}<span>Logout</span></button>
       </div>
     </div>`;
+
+  document.getElementById('userSidebarToggle')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleUserSidebar();
+  });
 
   document.addEventListener('click', (event) => {
     const trigger = document.getElementById('userMenuTrigger');

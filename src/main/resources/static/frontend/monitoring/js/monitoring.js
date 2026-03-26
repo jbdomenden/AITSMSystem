@@ -10,12 +10,12 @@ function statusBadge(status) {
   const s = String(status || '').toLowerCase();
   if (s === 'critical') return 'open';
   if (s === 'high risk') return 'warning';
-  if (s === 'offline' || s === 'unavailable') return 'warning';
+  if (s === 'offline' || s === 'unavailable' || s === 'unreachable') return 'warning';
   return 'resolved';
 }
 
 function setStatusField(status) {
-  const normalized = (status || 'Not Reachable').trim() || 'Not Reachable';
+  const normalized = (status || 'Unreachable').trim() || 'Unreachable';
   const hidden = document.getElementById('status');
   const display = document.getElementById('statusDisplay');
   if (hidden) hidden.value = normalized;
@@ -149,6 +149,16 @@ function renderMonitorTable(devices) {
   </tr>`).join('');
 }
 
+function renderLanIpSuggestions(devices) {
+  const suggestions = document.getElementById('lanIpSuggestions');
+  if (!suggestions) return;
+
+  const uniqueIps = [...new Set((devices || []).map((device) => (device.ipAddress || '').trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+
+  suggestions.innerHTML = uniqueIps.map((ip) => `<option value="${ip}"></option>`).join('');
+}
+
 function setRefreshDiscoveryBusy(isBusy) {
   const button = document.getElementById('refreshDiscoveryBtn');
   if (!button) return;
@@ -199,6 +209,7 @@ async function loadMonitoring({ force = false, source = 'manual' } = {}) {
     renderMonitoringHealthPanel(summaryRes.ok ? summary : null, safeDevices);
     renderMonitorCards(safeDevices);
     renderMonitorTable(safeDevices);
+    renderLanIpSuggestions(safeDevices);
 
     monitoringLastUpdatedAt = new Date();
     updateMonitoringLiveStatus('live', source === 'discovery' ? 'Discovery refreshed just now' : undefined);
@@ -222,7 +233,7 @@ async function autoFillDeviceContextByIp() {
     const res = await fetch(`/api/devices/ip-lookup?ip=${encodeURIComponent(ip)}`, { headers: authHeaders() });
     const data = await res.json();
     if (!res.ok) {
-      setStatusField('Not Reachable');
+      setStatusField('Unreachable');
       return;
     }
 
@@ -230,7 +241,7 @@ async function autoFillDeviceContextByIp() {
     if (!assignedInput.value.trim() && data.assignedUser) assignedInput.value = data.assignedUser;
     setStatusField(data.suggestedStatus);
   } catch {
-    setStatusField('Not Reachable');
+    setStatusField('Unreachable');
   }
 }
 
@@ -285,8 +296,8 @@ function resetDeviceForm() {
     if (el) el.value = '';
   });
   const statusEl = document.getElementById('status');
-  if (statusEl) statusEl.value = 'Not Reachable';
-  setStatusField('Not Reachable');
+  if (statusEl) statusEl.value = 'Unreachable';
+  setStatusField('Unreachable');
   seedAssignedUserFromSession();
 }
 
@@ -301,7 +312,7 @@ function startEditDevice(device) {
   document.getElementById('ipAddress').value = device.ipAddress || '';
   document.getElementById('department').value = device.department || '';
   document.getElementById('assignedUser').value = device.assignedUser || '';
-  setStatusField(device.status || 'Not Reachable');
+  setStatusField(device.status || 'Unreachable');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -364,7 +375,11 @@ async function loadDevices() {
     return;
   }
 
-  const safe = Array.isArray(data) ? data : [];
+  const safe = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.data)
+      ? data.data
+      : [];
   deviceRegistry = safe;
   rows.innerHTML = safe.map(d => `<tr>
     <td>${d.deviceName || '-'}</td>

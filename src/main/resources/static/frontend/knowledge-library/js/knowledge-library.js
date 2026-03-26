@@ -1,10 +1,15 @@
 let knowledgeLibraryArticles = [];
+function normalizeListResponse(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  return [];
+}
 
 async function fetchKnowledgeLibrary() {
   const res = await fetch('/api/knowledge', { headers: authHeaders() });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Unable to load knowledge articles');
-  return Array.isArray(data) ? data : [];
+  return normalizeListResponse(data);
 }
 
 function filterKnowledgeLibrary(items) {
