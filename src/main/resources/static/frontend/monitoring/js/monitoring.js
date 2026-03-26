@@ -10,12 +10,12 @@ function statusBadge(status) {
   const s = String(status || '').toLowerCase();
   if (s === 'critical') return 'open';
   if (s === 'high risk') return 'warning';
-  if (s === 'offline' || s === 'unavailable') return 'warning';
+  if (s === 'offline' || s === 'unavailable' || s === 'unreachable') return 'warning';
   return 'resolved';
 }
 
 function setStatusField(status) {
-  const normalized = (status || 'Not Reachable').trim() || 'Not Reachable';
+  const normalized = (status || 'Unreachable').trim() || 'Unreachable';
   const hidden = document.getElementById('status');
   const display = document.getElementById('statusDisplay');
   if (hidden) hidden.value = normalized;
@@ -233,7 +233,7 @@ async function autoFillDeviceContextByIp() {
     const res = await fetch(`/api/devices/ip-lookup?ip=${encodeURIComponent(ip)}`, { headers: authHeaders() });
     const data = await res.json();
     if (!res.ok) {
-      setStatusField('Not Reachable');
+      setStatusField('Unreachable');
       return;
     }
 
@@ -241,7 +241,7 @@ async function autoFillDeviceContextByIp() {
     if (!assignedInput.value.trim() && data.assignedUser) assignedInput.value = data.assignedUser;
     setStatusField(data.suggestedStatus);
   } catch {
-    setStatusField('Not Reachable');
+    setStatusField('Unreachable');
   }
 }
 
@@ -296,8 +296,8 @@ function resetDeviceForm() {
     if (el) el.value = '';
   });
   const statusEl = document.getElementById('status');
-  if (statusEl) statusEl.value = 'Not Reachable';
-  setStatusField('Not Reachable');
+  if (statusEl) statusEl.value = 'Unreachable';
+  setStatusField('Unreachable');
   seedAssignedUserFromSession();
 }
 
@@ -312,7 +312,7 @@ function startEditDevice(device) {
   document.getElementById('ipAddress').value = device.ipAddress || '';
   document.getElementById('department').value = device.department || '';
   document.getElementById('assignedUser').value = device.assignedUser || '';
-  setStatusField(device.status || 'Not Reachable');
+  setStatusField(device.status || 'Unreachable');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 

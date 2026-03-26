@@ -21,11 +21,11 @@ class DeviceRepository {
 
     private fun detectReachabilityStatus(ipAddress: String): String {
         val normalizedIp = ipAddress.trim()
-        if (normalizedIp.isBlank()) return "Not Reachable"
+        if (normalizedIp.isBlank()) return "Unreachable"
         return runCatching {
             val address = InetAddress.getByName(normalizedIp)
             if (address.isReachable(1500)) "Online" else "Offline"
-        }.getOrElse { "Not Reachable" }
+        }.getOrElse { "Unreachable" }
     }
 
     private fun deriveStatus(fallbackStatus: String = "Online", cpuUsage: Int? = null, memoryUsage: Int? = null): String {
@@ -70,7 +70,7 @@ class DeviceRepository {
                     cpuUsage = live.cpuUsagePercent?.toInt()?.coerceIn(0, 100) ?: current.cpuUsage,
                     memoryUsage = live.memoryUsagePercent?.toInt()?.coerceIn(0, 100) ?: current.memoryUsage,
                     status = deriveLiveStatus(live),
-                    lastSeen = live.lastSeen.ifBlank { current.lastSeen }
+                    lastSeen = if (live.reachable) live.lastSeen.ifBlank { current.lastSeen } else current.lastSeen
                 )
             }
         }
@@ -121,8 +121,8 @@ class DeviceRepository {
             val row = DevicesTable.selectAll().where { DevicesTable.ipAddress eq peer.ipAddress }.singleOrNull() ?: return@forEach
             DevicesTable.update({ DevicesTable.id eq row[DevicesTable.id] }) {
                 it[deviceName] = peer.hostname.ifBlank { row[DevicesTable.deviceName] }
-                it[status] = if (peer.reachable) deriveStatus(cpuUsage = row[DevicesTable.cpuUsage], memoryUsage = row[DevicesTable.memoryUsage]) else "Offline"
-                it[lastSeen] = now
+                it[status] = if (peer.reachable) deriveStatus(cpuUsage = row[DevicesTable.cpuUsage], memoryUsage = row[DevicesTable.memoryUsage]) else "Unreachable"
+                it[lastSeen] = if (peer.reachable) now else row[DevicesTable.lastSeen]
             }
         }
         list()
@@ -153,7 +153,7 @@ class DeviceRepository {
 
 
     private fun deriveLiveStatus(live: LanDeviceDto): String {
-        if (!live.reachable) return "Offline"
+        if (!live.reachable) return "Unreachable"
 
         val cpu = live.cpuUsagePercent ?: 0.0
         val memory = live.memoryUsagePercent ?: 0.0
