@@ -39,6 +39,9 @@ class MonitoringService(private val deviceRepository: DeviceRepository) {
 
     fun lanDevices(): List<LanDeviceDto> {
         val host = hostTelemetry()
+        val reachabilityCache = mutableMapOf<String, Boolean>()
+        fun isReachable(ip: String): Boolean = reachabilityCache.getOrPut(ip) { isDeviceReachable(ip) }
+
         val hostDevice = LanDeviceDto(
             id = "host-${host.ipAddress}",
             hostname = host.hostname,
@@ -53,11 +56,12 @@ class MonitoringService(private val deviceRepository: DeviceRepository) {
 
         val fromAgents = devices().map {
             val hasTelemetry = it.cpuUsage > 0 || it.memoryUsage > 0
+            val reachable = isReachable(it.ipAddress)
             LanDeviceDto(
                 id = "device-${it.id}",
                 hostname = it.deviceName,
                 ipAddress = it.ipAddress,
-                reachable = true,
+                reachable = reachable,
                 telemetryAvailable = hasTelemetry,
                 telemetrySourceType = if (hasTelemetry) "AGENT" else "UNAVAILABLE",
                 cpuUsagePercent = if (hasTelemetry) it.cpuUsage.toDouble() else null,
@@ -67,11 +71,12 @@ class MonitoringService(private val deviceRepository: DeviceRepository) {
         }
 
         val discovered = discoverLanPeers().map { peer ->
+            val reachable = isReachable(peer.ipAddress)
             LanDeviceDto(
                 id = "peer-${peer.ipAddress}",
                 hostname = peer.hostname,
                 ipAddress = peer.ipAddress,
-                reachable = true,
+                reachable = reachable,
                 telemetryAvailable = false,
                 telemetrySourceType = "DISCOVERED",
                 cpuUsagePercent = null,
@@ -135,4 +140,9 @@ class MonitoringService(private val deviceRepository: DeviceRepository) {
         val second = octets.getOrNull(1)?.toIntOrNull() ?: return false
         return octets[0] == "172" && second in 16..31
     }
+
+    private fun isDeviceReachable(ip: String): Boolean = runCatching {
+        if (!isLanIp(ip)) return false
+        InetAddress.getByName(ip).isReachable(1200)
+    }.getOrDefault(false)
 }

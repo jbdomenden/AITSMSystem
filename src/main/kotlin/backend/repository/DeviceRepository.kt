@@ -121,7 +121,7 @@ class DeviceRepository {
             val row = DevicesTable.selectAll().where { DevicesTable.ipAddress eq peer.ipAddress }.singleOrNull() ?: return@forEach
             DevicesTable.update({ DevicesTable.id eq row[DevicesTable.id] }) {
                 it[deviceName] = peer.hostname.ifBlank { row[DevicesTable.deviceName] }
-                it[status] = if (peer.reachable) deriveStatus(cpuUsage = row[DevicesTable.cpuUsage], memoryUsage = row[DevicesTable.memoryUsage]) else "Not Reachable"
+                it[status] = if (peer.reachable) deriveStatus(cpuUsage = row[DevicesTable.cpuUsage], memoryUsage = row[DevicesTable.memoryUsage]) else "Offline"
                 it[lastSeen] = now
             }
         }
@@ -153,7 +153,7 @@ class DeviceRepository {
 
 
     private fun deriveLiveStatus(live: LanDeviceDto): String {
-        if (!live.reachable) return "Not Reachable"
+        if (!live.reachable) return "Offline"
 
         val cpu = live.cpuUsagePercent ?: 0.0
         val memory = live.memoryUsagePercent ?: 0.0

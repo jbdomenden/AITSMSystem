@@ -149,6 +149,16 @@ function renderMonitorTable(devices) {
   </tr>`).join('');
 }
 
+function renderLanIpSuggestions(devices) {
+  const suggestions = document.getElementById('lanIpSuggestions');
+  if (!suggestions) return;
+
+  const uniqueIps = [...new Set((devices || []).map((device) => (device.ipAddress || '').trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+
+  suggestions.innerHTML = uniqueIps.map((ip) => `<option value="${ip}"></option>`).join('');
+}
+
 function setRefreshDiscoveryBusy(isBusy) {
   const button = document.getElementById('refreshDiscoveryBtn');
   if (!button) return;
@@ -199,6 +209,7 @@ async function loadMonitoring({ force = false, source = 'manual' } = {}) {
     renderMonitoringHealthPanel(summaryRes.ok ? summary : null, safeDevices);
     renderMonitorCards(safeDevices);
     renderMonitorTable(safeDevices);
+    renderLanIpSuggestions(safeDevices);
 
     monitoringLastUpdatedAt = new Date();
     updateMonitoringLiveStatus('live', source === 'discovery' ? 'Discovery refreshed just now' : undefined);
@@ -364,7 +375,11 @@ async function loadDevices() {
     return;
   }
 
-  const safe = Array.isArray(data) ? data : [];
+  const safe = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.data)
+      ? data.data
+      : [];
   deviceRegistry = safe;
   rows.innerHTML = safe.map(d => `<tr>
     <td>${d.deviceName || '-'}</td>
