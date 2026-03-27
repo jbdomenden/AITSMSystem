@@ -6,7 +6,9 @@ import backend.repository.DeviceRepository
 import backend.repository.KnowledgeRepository
 import backend.repository.TicketRepository
 import backend.repository.UserRepository
+import backend.queries.SystemSettingsQueries
 import backend.services.AIService
+import backend.services.AssetDetectionService
 import backend.services.AuthService
 import backend.services.KnowledgeService
 import backend.services.MonitoringService
@@ -22,13 +24,15 @@ class ServiceContainer(application: Application) {
     val auditRepo = AuditRepository()
     val userRepo = UserRepository()
     val ticketRepo = TicketRepository()
-    val deviceRepo = DeviceRepository()
+    val systemSettingsQueries = SystemSettingsQueries()
+    val assetDetectionService = AssetDetectionService(systemSettingsQueries)
+    val deviceRepo = DeviceRepository(assetDetectionService)
     val knowledgeRepo = KnowledgeRepository()
     val aiConversationRepository = AIConversationRepository()
 
     val authService = AuthService(userRepo, auditRepo)
     val ticketService = TicketService(ticketRepo, auditRepo)
-    val monitoringService = MonitoringService(deviceRepo)
+    val monitoringService = MonitoringService(deviceRepo, assetDetectionService)
     val aiService = AIService()
     val aiConfigService = AIConfigService(application.environment.config)
     val aiChatService = AIChatService(OllamaProvider(), aiConfigService, aiConversationRepository)

@@ -12,8 +12,11 @@ import java.net.NetworkInterface
 import java.util.Locale
 import java.time.LocalDateTime
 
-class MonitoringService(private val deviceRepository: DeviceRepository) {
-    fun devices() = deviceRepository.list().filter { isLanIp(it.ipAddress) }
+class MonitoringService(
+    private val deviceRepository: DeviceRepository,
+    private val assetDetectionService: AssetDetectionService
+) {
+    fun devices() = deviceRepository.list().filter { assetDetectionService.matches(it.ipAddress) }
     fun cpu() = devices().map { mapOf("device" to it.deviceName, "cpu" to it.cpuUsage.toString()) }
     fun alerts() = devices().filter { it.cpuUsage > 85 || it.memoryUsage > 90 || it.status.equals("critical", true) }
         .map { mapOf("device" to it.deviceName, "message" to "High resource usage detected") }
@@ -111,7 +114,7 @@ class MonitoringService(private val deviceRepository: DeviceRepository) {
     fun lanPeerIps(): List<String> = discoverLanPeers()
         .map { it.ipAddress.trim() }
         .plus(devices().map { it.ipAddress.trim() })
-        .filter { isLanIp(it) }
+        .filter { assetDetectionService.matches(it) }
         .distinct()
         .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it })
 
@@ -122,7 +125,7 @@ class MonitoringService(private val deviceRepository: DeviceRepository) {
             .filter { it.isUp && !it.isLoopback }
             .flatMap { ni -> ni.inetAddresses.toList().mapNotNull { addr ->
                 val ip = addr.hostAddress.substringBefore('%')
-                if (!isLanIp(ip)) null else Peer(ni.displayName.ifBlank { "LAN Host" }, ip)
+                if (!assetDetectionService.matches(ip)) null else Peer(ni.displayName.ifBlank { "LAN Host" }, ip)
             }}
 
         val arpPeers = discoverArpPeers()
@@ -156,7 +159,7 @@ class MonitoringService(private val deviceRepository: DeviceRepository) {
 
     private fun parsePeerIp(line: String): String? {
         val directToken = line.substringBefore(' ').trim().removePrefix("(").removeSuffix(")")
-        if (isLanIp(directToken) && !line.contains("FAILED", ignoreCase = true)) {
+        if (assetDetectionService.matches(directToken) && !line.contains("FAILED", ignoreCase = true)) {
             return directToken
         }
 
@@ -166,19 +169,11 @@ class MonitoringService(private val deviceRepository: DeviceRepository) {
             ?.trim()
             ?: return null
 
-        return candidate.takeIf { isLanIp(it) }
-    }
-
-    private fun isLanIp(ip: String): Boolean {
-        if (ip.startsWith("10.") || ip.startsWith("192.168.")) return true
-        val octets = ip.split(".")
-        if (octets.size != 4) return false
-        val second = octets.getOrNull(1)?.toIntOrNull() ?: return false
-        return octets[0] == "172" && second in 16..31
+        return candidate.takeIf { assetDetectionService.matches(it) }
     }
 
     private fun isDeviceReachable(ip: String): Boolean = runCatching {
-        if (!isLanIp(ip)) return false
+        if (!assetDetectionService.matches(ip)) return false
         InetAddress.getByName(ip).isReachable(1200)
     }.getOrDefault(false)
 }

@@ -38,8 +38,17 @@
       </article>
 
       <article class='card'>
-        <div class='card-head'><h3 class='section-title'>Notifications</h3><span class='card-icon'>🔔</span></div>
-        <div id='settingsNotificationSummary' class='small'>Loading notification summary...</div>
+        <div class='card-head'><h3 class='section-title'>Asset Detection Configuration</h3><span class='card-icon'>🧭</span></div>
+        <div class='form-grid single-col'>
+          <div class='form-group'>
+            <label for='assetIpPrefixes'>IP Prefix List</label>
+            <textarea id='assetIpPrefixes' rows='5' placeholder='192.168.\n10.0.\n172.16.'></textarea>
+            <div class='small'>System will detect devices whose IP starts with these prefixes.</div>
+          </div>
+          <div class='inline-actions'>
+            <button class='btn btn-primary' type='button' onclick='saveAssetDetectionPrefixes()'>Save Prefixes</button>
+          </div>
+        </div>
       </article>
 
       <article class='card ollama-card'>
