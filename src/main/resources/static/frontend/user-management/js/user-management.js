@@ -124,11 +124,15 @@ async function openAddAdminFromUserManagement(targetEmail) {
 async function loadUserManagement() {
   const rows = document.getElementById('userMgmtRows');
   if (!rows) return;
-
-  rows.innerHTML = "<tr><td colspan='5' class='small'>Loading users...</td></tr>";
+  showTableSkeleton(rows, { rowCount: 6, columnCount: 5, hasActions: true });
 
   try {
     const users = await fetchJsonOrThrow('/api/users');
+    clearTableSkeleton(rows);
+    if (!users.length) {
+      renderTableEmptyState(rows, 5, 'No users found.');
+      return;
+    }
     rows.innerHTML = users.map(u => {
       const currentUserId = Number(localStorage.getItem('userId') || 0);
       const canChange = u.role !== 'superadmin' && u.id !== currentUserId;
@@ -154,7 +158,9 @@ async function loadUserManagement() {
       </tr>`;
     }).join('');
   } catch (error) {
-    rows.innerHTML = `<tr><td colspan='5' class='small text-danger'>${error.message}</td></tr>`;
+    renderTableErrorState(rows, 5, error.message);
+  } finally {
+    clearTableSkeleton(rows);
   }
 }
 

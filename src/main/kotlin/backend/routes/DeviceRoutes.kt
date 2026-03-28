@@ -1,6 +1,7 @@
 package backend.routes
 
 import backend.models.DeviceRequest
+import backend.models.InventoryUpsertDetectedRequest
 import backend.models.PaginatedResponse
 import backend.models.PaginationMeta
 import backend.models.UserRole
@@ -8,6 +9,7 @@ import backend.repository.DeviceRepository
 import backend.repository.UserRepository
 import backend.security.requireRole
 import backend.services.AssetDetectionService
+import backend.services.InventoryService
 import backend.services.MonitoringService
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -38,12 +40,27 @@ fun Route.deviceRoutes(
     deviceRepository: DeviceRepository,
     userRepository: UserRepository,
     monitoringService: MonitoringService,
-    assetDetectionService: AssetDetectionService
+    assetDetectionService: AssetDetectionService,
+    inventoryService: InventoryService
 ) {
     route("/api/devices") {
         post {
             if (!call.requireRole(UserRole.ADMIN)) return@post
-            val created = deviceRepository.create(call.receive<DeviceRequest>())
+            val request = call.receive<DeviceRequest>()
+            val created = deviceRepository.create(request)
+            runCatching {
+                inventoryService.upsertDetectedAsset(
+                    InventoryUpsertDetectedRequest(
+                        deviceName = request.deviceName,
+                        hostname = request.deviceName,
+                        ipAddress = request.ipAddress,
+                        assignedDepartment = request.department,
+                        assignedUser = request.assignedUser,
+                        status = request.status,
+                        connectionSource = "manual"
+                    )
+                )
+            }
             call.respond(HttpStatusCode.Created, created)
         }
         get {
@@ -103,13 +120,40 @@ fun Route.deviceRoutes(
                     )
                 }
             val synced = deviceRepository.syncDiscoveredDevices(peers)
+            peers.forEach { peer ->
+                runCatching {
+                    inventoryService.upsertDetectedAsset(
+                        InventoryUpsertDetectedRequest(
+                            hostname = peer.hostname,
+                            deviceName = peer.hostname,
+                            ipAddress = peer.ipAddress,
+                            status = if (peer.reachable) "online" else "offline",
+                            connectionSource = "lan-detected"
+                        )
+                    )
+                }
+            }
             call.respond(DeviceSyncResponse(message = "Device registry synchronized", devices = synced.size))
         }
 
         put("/{id}") {
             if (!call.requireRole(UserRole.ADMIN)) return@put
             val id = call.parameters["id"]?.toIntOrNull() ?: return@put call.respond(HttpStatusCode.BadRequest)
-            val updated = deviceRepository.update(id, call.receive<DeviceRequest>()) ?: return@put call.respond(HttpStatusCode.NotFound)
+            val request = call.receive<DeviceRequest>()
+            val updated = deviceRepository.update(id, request) ?: return@put call.respond(HttpStatusCode.NotFound)
+            runCatching {
+                inventoryService.upsertDetectedAsset(
+                    InventoryUpsertDetectedRequest(
+                        deviceName = request.deviceName,
+                        hostname = request.deviceName,
+                        ipAddress = request.ipAddress,
+                        assignedDepartment = request.department,
+                        assignedUser = request.assignedUser,
+                        status = request.status,
+                        connectionSource = "manual"
+                    )
+                )
+            }
             call.respond(updated)
         }
 

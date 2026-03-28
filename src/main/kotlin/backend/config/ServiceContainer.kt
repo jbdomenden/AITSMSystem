@@ -7,9 +7,11 @@ import backend.repository.KnowledgeRepository
 import backend.repository.TicketRepository
 import backend.repository.UserRepository
 import backend.queries.SystemSettingsQueries
+import backend.queries.InventoryQueries
 import backend.services.AIService
 import backend.services.AssetDetectionService
 import backend.services.AuthService
+import backend.services.InventoryService
 import backend.services.KnowledgeService
 import backend.services.MonitoringService
 import backend.services.NotificationService
@@ -25,6 +27,7 @@ class ServiceContainer(application: Application) {
     val userRepo = UserRepository()
     val ticketRepo = TicketRepository()
     val systemSettingsQueries = SystemSettingsQueries()
+    val inventoryQueries = InventoryQueries()
     val assetDetectionService = AssetDetectionService(systemSettingsQueries)
     val deviceRepo = DeviceRepository(assetDetectionService)
     val knowledgeRepo = KnowledgeRepository()
@@ -39,4 +42,5 @@ class ServiceContainer(application: Application) {
     val slaService = SLAService()
     val notificationService = NotificationService()
     val knowledgeService = KnowledgeService(knowledgeRepo, auditRepo)
+    val inventoryService = InventoryService(inventoryQueries, assetDetectionService)
 }

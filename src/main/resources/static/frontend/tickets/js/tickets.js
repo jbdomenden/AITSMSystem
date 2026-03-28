@@ -105,21 +105,37 @@ async function loadTickets() {
   const rows = document.getElementById('ticketRows');
   if (!rows) return;
   const role = (localStorage.getItem('role') || '').toLowerCase();
-  const res = await fetch('/api/tickets', { headers: authHeaders() });
-  const data = await res.json();
-  if(!res.ok){ rows.innerHTML = `<tr><td colspan='6' class='small text-danger'>${data.error||'Unable to load tickets'}</td></tr>`; return; }
-  const tickets = normalizeListResponse(data);
+  showTableSkeleton(rows, { rowCount: 6, columnCount: 6, hasActions: true });
+  try {
+    const res = await fetch('/api/tickets', { headers: authHeaders() });
+    const data = await res.json();
+    if (!res.ok) {
+      renderTableErrorState(rows, 6, data.error || 'Unable to load tickets');
+      return;
+    }
+    const tickets = normalizeListResponse(data);
 
-  rows.innerHTML = tickets.map(t => {
-    const klass = (t.status || 'Open').toLowerCase().replace(/\s+/g, '-');
-    const actions = role === 'end-user' ? `<td>${actionMenu(t)}</td>` : '<td>-</td>';
-    return `<tr data-ticket-id='${t.id}'>
-      <td><a class='ticket-link' href='${userTicketHref(t.id)}'>#${t.id}</a></td><td><a class='ticket-link ticket-link-title' href='${userTicketHref(t.id)}' title='${t.title || '-'}'>${t.title || '-'}</a></td><td>${t.priority}</td><td><span class='badge ${klass}'>${t.status}</span></td>
-      <td style='color:${t.overdue ? "var(--danger)" : "inherit"}'>${t.slaRemainingMinutes ?? '-'} min</td>
-      ${actions}
-    </tr>`;
-  }).join('') || `<tr><td colspan='6' class='small'>No tickets found.</td></tr>`;
-  focusRequestedTicket();
+    clearTableSkeleton(rows);
+    if (!tickets.length) {
+      renderTableEmptyState(rows, 6, 'No tickets found.');
+      return;
+    }
+
+    rows.innerHTML = tickets.map(t => {
+      const klass = (t.status || 'Open').toLowerCase().replace(/\s+/g, '-');
+      const actions = role === 'end-user' ? `<td>${actionMenu(t)}</td>` : '<td>-</td>';
+      return `<tr data-ticket-id='${t.id}'>
+        <td><a class='ticket-link' href='${userTicketHref(t.id)}'>#${t.id}</a></td><td><a class='ticket-link ticket-link-title' href='${userTicketHref(t.id)}' title='${t.title || '-'}'>${t.title || '-'}</a></td><td>${t.priority}</td><td><span class='badge ${klass}'>${t.status}</span></td>
+        <td style='color:${t.overdue ? "var(--danger)" : "inherit"}'>${t.slaRemainingMinutes ?? '-'} min</td>
+        ${actions}
+      </tr>`;
+    }).join('');
+    focusRequestedTicket();
+  } catch {
+    renderTableErrorState(rows, 6, 'Unable to load tickets');
+  } finally {
+    clearTableSkeleton(rows);
+  }
 }
 
 document.addEventListener('click', () => closeAllRowMenus());
