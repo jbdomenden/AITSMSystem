@@ -5,6 +5,7 @@ import backend.models.ClientMetricsRequest
 import backend.models.Device
 import backend.models.DeviceRequest
 import backend.models.LanDeviceDto
+import backend.services.AssetDetectionService
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.deleteWhere
@@ -15,9 +16,8 @@ import org.jetbrains.exposed.sql.update
 import java.net.InetAddress
 import java.time.LocalDateTime
 
-class DeviceRepository {
+class DeviceRepository(private val assetDetectionService: AssetDetectionService) {
     data class DiscoveredPeer(val ipAddress: String, val hostname: String, val reachable: Boolean)
-    private val privateNetworks = listOf("10.", "192.168.", "172.16.", "172.17.", "172.18.", "172.19.", "172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.", "172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.")
 
     private fun detectReachabilityStatus(ipAddress: String): String {
         val normalizedIp = ipAddress.trim()
@@ -39,7 +39,7 @@ class DeviceRepository {
     }
 
     fun create(req: DeviceRequest): Device = transaction {
-        require(privateNetworks.any { req.ipAddress.startsWith(it) }) { "Only LAN devices are monitorable." }
+        require(assetDetectionService.matches(req.ipAddress)) { "Only LAN devices are monitorable." }
         val derivedStatus = detectReachabilityStatus(req.ipAddress)
         val id = DevicesTable.insert {
             it[deviceName] = req.deviceName
@@ -83,7 +83,7 @@ class DeviceRepository {
 
 
     fun upsertClientMetrics(req: ClientMetricsRequest): Device = transaction {
-        require(privateNetworks.any { req.ipAddress.startsWith(it) }) { "Only LAN devices are monitorable." }
+        require(assetDetectionService.matches(req.ipAddress)) { "Only LAN devices are monitorable." }
         val derivedStatus = deriveStatus(cpuUsage = req.cpuUsage, memoryUsage = req.memoryUsage)
 
         val existing = DevicesTable.selectAll().where { DevicesTable.ipAddress eq req.ipAddress }.singleOrNull()
@@ -117,7 +117,7 @@ class DeviceRepository {
     fun syncDiscoveredDevices(discovered: List<DiscoveredPeer>): List<Device> = transaction {
         val now = LocalDateTime.now()
         discovered.forEach { peer ->
-            if (!privateNetworks.any { peer.ipAddress.startsWith(it) }) return@forEach
+            if (!assetDetectionService.matches(peer.ipAddress)) return@forEach
             val row = DevicesTable.selectAll().where { DevicesTable.ipAddress eq peer.ipAddress }.singleOrNull() ?: return@forEach
             DevicesTable.update({ DevicesTable.id eq row[DevicesTable.id] }) {
                 it[deviceName] = peer.hostname.ifBlank { row[DevicesTable.deviceName] }
@@ -129,7 +129,7 @@ class DeviceRepository {
     }
 
     fun update(id: Int, req: DeviceRequest): Device? = transaction {
-        require(privateNetworks.any { req.ipAddress.startsWith(it) }) { "Only LAN devices are monitorable." }
+        require(assetDetectionService.matches(req.ipAddress)) { "Only LAN devices are monitorable." }
         val existing = DevicesTable.selectAll().where { DevicesTable.id eq id }.singleOrNull()
         val derivedStatus = deriveStatus(
             fallbackStatus = detectReachabilityStatus(req.ipAddress),
