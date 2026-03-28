@@ -43,12 +43,10 @@ class AssetDetectionService(private val settingsQueries: SystemSettingsQueries) 
             }
             .distinct()
 
-        normalized.forEach { prefix ->
-            require(PREFIX_REGEX.matches(prefix)) { "Invalid prefix format: $prefix" }
+        return normalized.filter { prefix ->
+            if (!PREFIX_REGEX.matches(prefix)) return@filter false
             val octets = prefix.removeSuffix(".").split(".")
-            require(octets.all { (it.toIntOrNull() ?: -1) in 0..255 }) { "Invalid prefix octets: $prefix" }
+            octets.all { (it.toIntOrNull() ?: -1) in 0..255 }
         }
-
-        return normalized
     }
 }
