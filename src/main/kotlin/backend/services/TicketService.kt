@@ -50,15 +50,8 @@ class TicketService(
             }
         }
 
-        return repository.updateStatus(id, status.name, actor)?.also { updated ->
+        return repository.updateStatus(id, status.name, actor)?.also {
             audit.log(userId, "Changed ticket #$id to ${status.name}", "tickets")
-            val normalizedLabel = status.name.lowercase().replace('_', ' ').replaceFirstChar { it.titlecase() }
-            notifications.push(updated.userId, "Ticket #${updated.id} status changed to $normalizedLabel.", "info")
-            if (!admin) {
-                notifyAdmins("Ticket #${updated.id} requested update to $normalizedLabel by end-user.", "warning")
-            } else {
-                notifyAdmins("Ticket #${updated.id} updated to $normalizedLabel.", "info")
-            }
         }
     }
 
