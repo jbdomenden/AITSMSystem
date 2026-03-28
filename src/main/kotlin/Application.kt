@@ -12,6 +12,7 @@ import backend.routes.deviceRoutes
 import backend.routes.knowledgeRoutes
 import backend.routes.monitoringRoutes
 import backend.routes.notificationRoutes
+import backend.routes.inventoryRoutes
 import backend.routes.settingsRoutes
 import backend.routes.slaRoutes
 import backend.routes.ticketRoutes
@@ -142,6 +143,7 @@ fun Application.module() {
         get("/create-ticket.html") { call.respondRedirect("/create-ticket/html/create-ticket.html") }
         get("/assets.html") { call.respondRedirect("/assets/html/assets.html") }
         get("/monitoring.html") { call.respondRedirect("/monitoring/html/monitoring.html") }
+        get("/inventory.html") { call.respondRedirect("/inventory/html/inventory.html") }
         get("/knowledge.html") { call.respondRedirect("/knowledge/html/knowledge.html") }
         get("/knowledge-library.html") { call.respondRedirect("/knowledge-library/html/knowledge-library.html") }
         get("/settings.html") { call.respondRedirect("/settings/html/settings.html") }
@@ -159,11 +161,12 @@ fun Application.module() {
         staticResources("/", "static/frontend")
         authRoutes(container.authService)
         ticketRoutes(container.ticketService)
-        monitoringRoutes(container.monitoringService, container.deviceRepo, container.assetDetectionService)
+        monitoringRoutes(container.monitoringService, container.deviceRepo, container.assetDetectionService, container.inventoryService)
         analyticsRoutes(container.ticketService, container.monitoringService, container.aiService)
-        deviceRoutes(container.deviceRepo, container.userRepo, container.monitoringService, container.assetDetectionService)
+        deviceRoutes(container.deviceRepo, container.userRepo, container.monitoringService, container.assetDetectionService, container.inventoryService)
         notificationRoutes(container.notificationService)
         knowledgeRoutes(container.knowledgeService)
+        inventoryRoutes(container.inventoryService)
         slaRoutes(container.slaService)
         settingsRoutes(container.assetDetectionService)
         aiRoutes(container.aiChatService, container.aiConfigService)

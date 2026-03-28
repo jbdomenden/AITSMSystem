@@ -121,6 +121,56 @@ object AIConversationMessagesTable : Table("ai_conversation_messages") {
     override val primaryKey = PrimaryKey(id)
 }
 
+object InventoryAssetsTable : Table("inventory_assets") {
+    val id = integer("id").autoIncrement()
+    val assetTag = varchar("asset_tag", 120).nullable().uniqueIndex()
+    val hostname = varchar("hostname", 200).nullable().index()
+    val fullDeviceName = varchar("full_device_name", 255).nullable()
+    val manufacturer = varchar("manufacturer", 150).nullable()
+    val model = varchar("model", 180).nullable()
+    val processorName = varchar("processor_name", 255).nullable()
+    val processorSpeed = varchar("processor_speed", 100).nullable()
+    val installedRam = varchar("installed_ram", 100).nullable()
+    val usableRam = varchar("usable_ram", 100).nullable()
+    val ramSpeed = varchar("ram_speed", 100).nullable()
+    val gpuName = varchar("gpu_name", 255).nullable()
+    val gpuMemory = varchar("gpu_memory", 100).nullable()
+    val storageTotal = varchar("storage_total", 100).nullable()
+    val storageUsed = varchar("storage_used", 100).nullable()
+    val storageFree = varchar("storage_free", 100).nullable()
+    val storageBreakdownJson = text("storage_breakdown_json").nullable()
+    val systemType = varchar("system_type", 180).nullable()
+    val osName = varchar("os_name", 180).nullable()
+    val osEdition = varchar("os_edition", 180).nullable()
+    val osVersion = varchar("os_version", 120).nullable()
+    val osBuild = varchar("os_build", 120).nullable()
+    val installedOn = varchar("installed_on", 120).nullable()
+    val domainOrWorkgroup = varchar("domain_or_workgroup", 160).nullable()
+    val deviceUuid = varchar("device_uuid", 160).nullable().index()
+    val productId = varchar("product_id", 160).nullable()
+    val penTouchSupport = varchar("pen_touch_support", 120).nullable()
+    val ipAddress = varchar("ip_address", 45).nullable().index()
+    val macAddress = varchar("mac_address", 80).nullable()
+    val connectionSource = varchar("connection_source", 80).nullable().index()
+    val status = varchar("status", 50).index()
+    val assignedDepartment = varchar("assigned_department", 150).nullable().index()
+    val assignedUser = varchar("assigned_user", 180).nullable().index()
+    val notes = text("notes").nullable()
+    val lastSeenAt = datetime("last_seen_at").nullable().index()
+    val createdAt = datetime("created_at").index()
+    val updatedAt = datetime("updated_at").index()
+    override val primaryKey = PrimaryKey(id)
+}
+
+object InventoryAssetSnapshotsTable : Table("inventory_asset_snapshots") {
+    val id = integer("id").autoIncrement()
+    val assetId = integer("asset_id").references(InventoryAssetsTable.id, onDelete = ReferenceOption.CASCADE).index()
+    val snapshotSource = varchar("snapshot_source", 80)
+    val payloadJson = text("payload_json")
+    val createdAt = datetime("created_at").index()
+    override val primaryKey = PrimaryKey(id)
+}
+
 object DatabaseFactory {
     fun init() {
         val dbUrl = Env.get("DB_URL") ?: error("DB_URL is required")
@@ -153,7 +203,9 @@ object DatabaseFactory {
                 SystemSettingsTable,
                 KnowledgeArticlesTable,
                 AuditLogsTable,
-                AIConversationMessagesTable
+                AIConversationMessagesTable,
+                InventoryAssetsTable,
+                InventoryAssetSnapshotsTable
             )
         }
     }

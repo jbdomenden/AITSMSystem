@@ -1,0 +1,111 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset='utf-8'>
+  <meta name='viewport' content='width=device-width,initial-scale=1'>
+  <title>Inventory | AITSM</title>
+  <link rel='stylesheet' href='/shared/css/styles.css'>
+  <link rel='stylesheet' href='/modules/common/css/table-skeleton.css'>
+  <link rel='stylesheet' href='/inventory/css/inventory.css'>
+</head>
+<body>
+<div class='app-layout'>
+  <aside id='adminSidebar' class='sidebar'></aside>
+  <main class='content'>
+    <section id='utilityHeader' class='utility-bar card'></section>
+
+    <div class='topbar'>
+      <div>
+        <h1 class='page-title'>Inventory</h1>
+        <p class='page-subtitle'>Connected asset inventory with passive LAN detection and client-reported machine details.</p>
+      </div>
+      <div class='inline-actions'>
+        <button id='inventoryRefreshBtn' class='btn btn-ghost' type='button'>Refresh</button>
+      </div>
+    </div>
+
+    <section id='inventoryStats' class='grid stats inventory-stats'></section>
+
+    <section class='card' style='margin-top:16px'>
+      <div class='form-grid inventory-filter-grid'>
+        <div class='form-group'>
+          <label>Search</label>
+          <input id='inventorySearch' placeholder='Hostname, IP, OS, processor...'>
+        </div>
+        <div class='form-group'>
+          <label>Status</label>
+          <select id='inventoryStatusFilter'>
+            <option value=''>All</option>
+            <option value='online'>Online</option>
+            <option value='offline'>Offline</option>
+            <option value='stale'>Stale</option>
+          </select>
+        </div>
+        <div class='form-group'>
+          <label>Department</label>
+          <input id='inventoryDepartmentFilter' placeholder='Finance'>
+        </div>
+        <div class='form-group'>
+          <label>Source</label>
+          <select id='inventorySourceFilter'>
+            <option value=''>All</option>
+            <option value='lan-detected'>LAN detected</option>
+            <option value='manual'>Manual</option>
+            <option value='agent'>Agent</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section class='card' style='margin-top:16px'>
+      <div class='table-wrap'>
+        <table>
+          <thead><tr><th>Device Name</th><th>IP Address</th><th>Manufacturer</th><th>Model</th><th>Processor</th><th>RAM</th><th>Storage</th><th>OS</th><th>Status</th><th>Last Seen</th><th>Assigned Department</th><th>Actions</th></tr></thead>
+          <tbody id='inventoryRows'></tbody>
+        </table>
+      </div>
+      <div class='inventory-pagination'>
+        <button id='inventoryPrevBtn' class='btn btn-ghost' type='button'>Previous</button>
+        <span id='inventoryPageLabel' class='small'>Page 1</span>
+        <button id='inventoryNextBtn' class='btn btn-ghost' type='button'>Next</button>
+      </div>
+    </section>
+
+    <div id='inventoryDetailModal' class='modal-overlay hidden'>
+      <div class='modal-card inventory-detail-modal'>
+        <div class='card-head'>
+          <div>
+            <h3 id='inventoryDetailTitle' class='section-title'>Asset Detail</h3>
+            <p id='inventoryDetailSubtitle' class='section-subtitle'></p>
+          </div>
+          <button class='btn btn-ghost' type='button' onclick='closeInventoryDetail()'>Close</button>
+        </div>
+
+        <section id='inventoryDetailSummary' class='grid stats inventory-summary-cards'></section>
+
+        <section class='inventory-detail-grid'>
+          <article class='card inventory-detail-card'><h4>Overview</h4><div id='inventoryOverviewFields' class='inventory-fields'></div></article>
+          <article class='card inventory-detail-card'><h4>Hardware</h4><div id='inventoryHardwareFields' class='inventory-fields'></div></article>
+          <article class='card inventory-detail-card'><h4>Storage</h4><div id='inventoryStorageFields' class='inventory-fields'></div></article>
+          <article class='card inventory-detail-card'><h4>Graphics</h4><div id='inventoryGraphicsFields' class='inventory-fields'></div></article>
+          <article class='card inventory-detail-card'><h4>Operating System</h4><div id='inventoryOsFields' class='inventory-fields'></div></article>
+          <article class='card inventory-detail-card'><h4>Network & Assignment</h4><div id='inventoryNetworkFields' class='inventory-fields'></div></article>
+        </section>
+
+        <section class='card inventory-notes-card'>
+          <div class='card-head'>
+            <h4 class='section-title'>Administrative Notes</h4>
+            <button id='inventorySaveNotesBtn' class='btn btn-primary' type='button'>Save Notes</button>
+          </div>
+          <textarea id='inventoryNotesInput' rows='4' placeholder='Add operational notes'></textarea>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+<script src='/modules/sidebar/js/admin-shell.js'></script>
+<script src='/modules/common/js/app.js'></script>
+<script src='/modules/common/js/table-skeleton.js'></script>
+<script src='/inventory/js/inventory.js'></script>
+</body>
+</html>

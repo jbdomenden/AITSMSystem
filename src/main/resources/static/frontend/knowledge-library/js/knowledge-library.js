@@ -73,7 +73,7 @@ function renderKnowledgeLibrary(items) {
   if (!host) return;
 
   if (!items.length) {
-    host.innerHTML = `<tr><td colspan='4' class='small'>No matching articles found.</td></tr>`;
+    renderTableEmptyState(host, 4, 'No matching articles found.');
     return;
   }
 
@@ -89,13 +89,16 @@ function renderKnowledgeLibrary(items) {
 
 async function loadKnowledgeLibrary() {
   const host = document.getElementById('knowledgeList');
-  if (host) host.innerHTML = `<tr><td colspan='4' class='small'>Loading articles...</td></tr>`;
+  if (host) showTableSkeleton(host, { rowCount: 6, columnCount: 4, hasActions: true });
 
   try {
     knowledgeLibraryArticles = await fetchKnowledgeLibrary();
+    if (host) clearTableSkeleton(host);
     renderKnowledgeLibrary(filterKnowledgeLibrary(knowledgeLibraryArticles));
   } catch (error) {
-    if (host) host.innerHTML = `<tr><td colspan='4' class='small text-danger'>${error.message}</td></tr>`;
+    if (host) renderTableErrorState(host, 4, error.message);
+  } finally {
+    if (host) clearTableSkeleton(host);
   }
 }
 

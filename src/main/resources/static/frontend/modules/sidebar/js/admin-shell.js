@@ -6,6 +6,7 @@ function adminIcon(name) {
     knowledge: "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M5 4.5A2.5 2.5 0 0 1 7.5 2H20v17H7.5A2.5 2.5 0 0 0 5 21.5V4.5zm2.5-.5A1.5 1.5 0 0 0 6 5.5V18a3.5 3.5 0 0 1 1.5-.34H18V4H7.5zM8 7h7v1.5H8zm0 3h7V11.5H8zm0 3h5v1.5H8z'/></svg>",
     settings: "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M19.14 12.94a7.96 7.96 0 0 0 .05-.94 7.96 7.96 0 0 0-.05-.94l2.03-1.58-1.92-3.32-2.39.96a7.49 7.49 0 0 0-1.63-.94L14.96 2h-3.92l-.27 2.18c-.58.22-1.12.53-1.63.94l-2.39-.96-1.92 3.32 2.03 1.58a7.96 7.96 0 0 0-.05.94c0 .32.02.63.05.94l-2.03 1.58 1.92 3.32 2.39-.96c.5.41 1.05.72 1.63.94l.27 2.18h3.92l.27-2.18c.58-.22 1.12-.53 1.63-.94l2.39.96 1.92-3.32-2.03-1.58zM13 15.5A3.5 3.5 0 1 1 13 8.5a3.5 3.5 0 0 1 0 7z'/></svg>",
     assets: "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 6.5 12 3l8 3.5v11L12 21l-8-3.5v-11zm8-.96L6 7.97v8.06l6 2.63 6-2.63V7.97l-6-2.43z'/></svg>",
+    inventory: "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 5h16v4H4V5zm0 5h16v4H4v-4zm0 5h16v4H4v-4zm2-9v2h3V6H6zm0 5v2h3v-2H6zm0 5v2h3v-2H6z'/></svg>",
     users: "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M16 11a4 4 0 1 0-3.999-4A4 4 0 0 0 16 11zm-8 1a3 3 0 1 0-3-3 3 3 0 0 0 3 3zm8 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4zM8 14c-.43 0-.9.03-1.39.08C4.57 14.33 1 15.35 1 18v2h6v-2c0-1.2.62-2.23 1.72-3A7.63 7.63 0 0 0 8 14z'/></svg>",
     menu: "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 7h16v2H4zm0 8h16v2H4zm0-4h16v2H4z'/></svg>",
     bell: "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-5V11a7 7 0 1 0-14 0v6l-2 2v1h18v-1l-2-2z'/></svg>",
@@ -23,6 +24,7 @@ function adminNavItems() {
       { page: 'dashboard-admin.html', href: '/dashboard-admin.html', icon: 'overview', label: 'Overview' },
       { page: 'ticket-management.html', href: '/ticket-management.html', icon: 'tickets', label: 'Ticket Management' },
       { page: 'monitoring.html', href: '/monitoring.html', icon: 'monitoring', label: 'LAN Monitoring' },
+      { page: 'inventory.html', href: '/inventory.html', icon: 'inventory', label: 'Inventory' },
       { page: 'knowledge.html', href: '/knowledge.html', icon: 'knowledge', label: 'Knowledge Base' }
     ]},
     { section: 'System', items: [

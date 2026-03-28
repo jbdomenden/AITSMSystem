@@ -27,7 +27,7 @@ function redirectForRole(role) {
 function enforcePageAccess() {
   const role = currentRole();
   const page = location.pathname.split('/').pop() || 'index.html';
-  const adminOnlyPages = ['dashboard-admin.html', 'ticket-management.html', 'monitoring.html', 'assets.html', 'settings.html', 'user-management.html', 'knowledge.html'];
+  const adminOnlyPages = ['dashboard-admin.html', 'ticket-management.html', 'monitoring.html', 'inventory.html', 'assets.html', 'settings.html', 'user-management.html', 'knowledge.html'];
   const endUserOnlyPages = ['dashboard-user.html', 'create-ticket.html', 'tickets.html', 'knowledge-library.html', 'ai-assistant.html', 'signup.html'];
 
   if (!role && page !== 'login.html' && page !== 'index.html' && page !== 'signup.html') {
