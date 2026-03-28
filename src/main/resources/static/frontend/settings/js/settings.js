@@ -33,10 +33,20 @@ async function saveProfileSettings() {
 async function loadSlaPolicies() {
   const rows = document.getElementById('slaRows');
   if (!rows) return;
-
-  const policies = await fetchJsonOrThrow('/api/sla');
-  rows.innerHTML = policies.map((p) => `<tr><td>${p.priority}</td><td>${p.responseTime}</td><td>${p.resolutionTime}</td></tr>`).join('')
-    || "<tr><td colspan='3' class='small'>No SLA policies found.</td></tr>";
+  showTableSkeleton(rows, { rowCount: 4, columnCount: 3 });
+  try {
+    const policies = await fetchJsonOrThrow('/api/sla');
+    clearTableSkeleton(rows);
+    if (!policies.length) {
+      renderTableEmptyState(rows, 3, 'No SLA policies found.');
+      return;
+    }
+    rows.innerHTML = policies.map((p) => `<tr><td>${p.priority}</td><td>${p.responseTime}</td><td>${p.resolutionTime}</td></tr>`).join('');
+  } catch (error) {
+    renderTableErrorState(rows, 3, error.message || 'Unable to load SLA policies');
+  } finally {
+    clearTableSkeleton(rows);
+  }
 }
 
 async function loadAssetDetectionPrefixes() {

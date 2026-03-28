@@ -6,20 +6,31 @@ import backend.models.TicketStatus
 import backend.models.UserRole
 import backend.repository.AuditRepository
 import backend.repository.TicketRepository
+import backend.repository.UserRepository
 import java.time.Duration
 import java.time.LocalDateTime
 
-class TicketService(private val repository: TicketRepository, private val audit: AuditRepository) {
+class TicketService(
+    private val repository: TicketRepository,
+    private val audit: AuditRepository,
+    private val notifications: NotificationService,
+    private val users: UserRepository
+) {
     private val followUpThresholdHours = 24L
 
-    fun create(userId: Int, req: TicketRequest): Ticket = repository.create(userId, req).also { audit.log(userId, "Created ticket #${it.id}", "tickets") }
+    fun create(userId: Int, req: TicketRequest): Ticket = repository.create(userId, req).also {
+        audit.log(userId, "Created ticket #${it.id}", "tickets")
+        notifyAdmins("New ticket #${it.id} filed: ${it.title}", "info")
+        notifications.push(userId, "Your ticket #${it.id} has been created.", "success")
+    }
     fun list(userId: Int?, admin: Boolean, limit: Int, offset: Long) = repository.list(userId, admin, limit, offset)
     fun get(id: Int): Ticket? = repository.get(id)
 
     fun update(id: Int, req: TicketRequest, userId: Int?) = repository.update(id, req).also { audit.log(userId, "Updated ticket #$id", "tickets") }
 
-    fun updateStatus(id: Int, status: TicketStatus, actor: String, userId: Int?, role: UserRole): Ticket? {
+    fun updateStatus(id: Int, statusValue: String, actor: String, userId: Int?, role: UserRole): Ticket? {
         val existing = repository.get(id) ?: return null
+        val status = parseStatus(statusValue)
         val admin = role in setOf(UserRole.ADMIN, UserRole.SUPERADMIN)
 
         when {
@@ -39,6 +50,27 @@ class TicketService(private val repository: TicketRepository, private val audit:
             }
         }
 
-        return repository.updateStatus(id, status.name, actor).also { audit.log(userId, "Changed ticket #$id to ${status.name}", "tickets") }
+        return repository.updateStatus(id, status.name, actor)?.also {
+            audit.log(userId, "Changed ticket #$id to ${status.name}", "tickets")
+        }
+    }
+
+    private fun parseStatus(raw: String): TicketStatus {
+        val normalized = raw.trim().lowercase()
+        return when (normalized) {
+            "open" -> TicketStatus.OPEN
+            "in progress", "in-progress", "pending", "follow-up requested", "follow up requested" -> TicketStatus.PENDING
+            "resolved" -> TicketStatus.RESOLVED
+            "closed", "cancelled", "canceled" -> TicketStatus.CLOSED
+            else -> throw IllegalArgumentException("Unsupported ticket status: $raw")
+        }
+    }
+
+    private fun notifyAdmins(message: String, type: String) {
+        val adminIds = users.listUsers()
+            .filter { it.role == UserRole.ADMIN || it.role == UserRole.SUPERADMIN }
+            .map { it.id }
+
+        adminIds.forEach { notifications.push(it, message, type) }
     }
 }

@@ -116,7 +116,7 @@ data class Ticket(
 )
 
 @Serializable data class TicketRequest(val title: String, val description: String, val priority: String, val category: String, val deviceId: Int? = null)
-@Serializable data class TicketStatusUpdate(val status: TicketStatus)
+@Serializable data class TicketStatusUpdate(val status: String)
 
 @Serializable
 data class Device(

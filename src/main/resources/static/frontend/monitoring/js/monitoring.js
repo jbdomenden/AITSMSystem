@@ -134,7 +134,7 @@ function renderMonitorTable(devices) {
   if (!rows) return;
 
   if (!devices.length) {
-    rows.innerHTML = `<tr><td colspan='7' class='small'>No LAN devices discovered yet.</td></tr>`;
+    renderTableEmptyState(rows, 7, 'No LAN devices discovered yet.');
     return;
   }
 
@@ -194,6 +194,8 @@ async function loadMonitoring({ force = false, source = 'manual' } = {}) {
   if (monitoringRefreshInFlight && !force) return;
   monitoringRefreshInFlight = true;
   updateMonitoringLiveStatus('loading');
+  const monitorRows = document.getElementById('monitorTableRows');
+  if (monitorRows) showTableSkeleton(monitorRows, { rowCount: 6, columnCount: 7 });
 
   try {
     const [summaryRes, devicesRes, peerIpsRes] = await Promise.all([
@@ -211,14 +213,17 @@ async function loadMonitoring({ force = false, source = 'manual' } = {}) {
     renderMonitorSummary(summaryRes.ok ? summary : null);
     renderMonitoringHealthPanel(summaryRes.ok ? summary : null, safeDevices);
     renderMonitorCards(safeDevices);
+    if (monitorRows) clearTableSkeleton(monitorRows);
     renderMonitorTable(safeDevices);
     renderLanIpSuggestions(safePeerIps);
 
     monitoringLastUpdatedAt = new Date();
     updateMonitoringLiveStatus('live', source === 'discovery' ? 'Discovery refreshed just now' : undefined);
   } catch {
+    if (monitorRows) renderTableErrorState(monitorRows, 7, 'Unable to load monitoring table data.');
     updateMonitoringLiveStatus('error');
   } finally {
+    if (monitorRows) clearTableSkeleton(monitorRows);
     monitoringRefreshInFlight = false;
   }
 }
@@ -370,11 +375,12 @@ async function registerDevice() {
 async function loadDevices() {
   const rows = document.getElementById('deviceList');
   if (!rows) return;
+  showTableSkeleton(rows, { rowCount: 6, columnCount: 9, hasActions: true });
 
   const res = await fetch('/api/devices', { headers: authHeaders() });
   const data = await res.json();
   if (!res.ok) {
-    rows.innerHTML = `<tr><td colspan='9' class='small text-danger'>${data.error || 'Failed to load devices.'}</td></tr>`;
+    renderTableErrorState(rows, 9, data.error || 'Failed to load devices.');
     return;
   }
 
@@ -384,6 +390,11 @@ async function loadDevices() {
       ? data.data
       : [];
   deviceRegistry = safe;
+  clearTableSkeleton(rows);
+  if (!safe.length) {
+    renderTableEmptyState(rows, 9, 'No devices registered yet.');
+    return;
+  }
   rows.innerHTML = safe.map(d => `<tr>
     <td>${d.deviceName || '-'}</td>
     <td>${d.ipAddress || '-'}</td>
@@ -403,7 +414,7 @@ async function loadDevices() {
         </button>
       </div>
     </td>
-  </tr>`).join('') || `<tr><td colspan='9' class='small'>No devices registered yet.</td></tr>`;
+  </tr>`).join('');
 }
 
 function stopMonitoringAutoRefresh() {
