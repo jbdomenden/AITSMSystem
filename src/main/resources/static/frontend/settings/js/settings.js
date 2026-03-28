@@ -39,15 +39,35 @@ async function loadSlaPolicies() {
     || "<tr><td colspan='3' class='small'>No SLA policies found.</td></tr>";
 }
 
-async function loadNotificationSummary() {
-  const host = document.getElementById('settingsNotificationSummary');
-  if (!host) return;
+async function loadAssetDetectionPrefixes() {
+  const area = document.getElementById('assetIpPrefixes');
+  if (!area) return;
+  const data = await fetchJsonOrThrow('/settings/asset-ip-prefixes');
+  area.value = Array.isArray(data.prefixes) ? data.prefixes.join('\n') : '';
+}
 
-  const items = await fetchJsonOrThrow('/api/notifications');
-  const total = items.length;
-  const critical = items.filter((n) => ['error', 'critical'].includes((n.type || '').toLowerCase())).length;
-  const latest = items[0]?.createdAt ? new Date(items[0].createdAt).toLocaleString() : 'N/A';
-  host.innerHTML = `Total notifications: <strong>${total}</strong><br>Critical notifications: <strong>${critical}</strong><br>Latest update: <strong>${latest}</strong>`;
+function parsePrefixTextarea(value) {
+  return (value || '')
+    .split(/\r?\n|,/)
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
+async function saveAssetDetectionPrefixes() {
+  const area = document.getElementById('assetIpPrefixes');
+  if (!area) return;
+  const prefixes = parsePrefixTextarea(area.value);
+  if (!prefixes.length) {
+    alert('Please add at least one IP prefix.');
+    return;
+  }
+
+  const data = await fetchJsonOrThrow('/settings/asset-ip-prefixes', {
+    method: 'POST',
+    body: JSON.stringify({ prefixes })
+  });
+  area.value = Array.isArray(data.prefixes) ? data.prefixes.join('\n') : '';
+  alert(data.message || 'Asset detection prefixes saved.');
 }
 
 function setAiMessage(text, isError = false) {
@@ -211,7 +231,7 @@ function wireAiSettingsEvents() {
 
 document.addEventListener('DOMContentLoaded', async () => {
   try {
-    await Promise.all([loadProfileSettings(), loadSlaPolicies(), loadNotificationSummary()]);
+    await Promise.all([loadProfileSettings(), loadSlaPolicies(), loadAssetDetectionPrefixes()]);
     wireAiSettingsEvents();
     await loadAiConfig();
   } catch (error) {
