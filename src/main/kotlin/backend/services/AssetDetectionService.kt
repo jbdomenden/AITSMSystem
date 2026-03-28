@@ -7,7 +7,7 @@ import kotlinx.serialization.json.Json
 class AssetDetectionService(private val settingsQueries: SystemSettingsQueries) {
     companion object {
         const val ASSET_IP_PREFIXES_KEY = "asset_ip_prefixes"
-        private val PREFIX_REGEX = Regex("""^\d{1,3}\.\d{1,3}\.?$""")
+        private val PREFIX_REGEX = Regex("""^\d{1,3}(?:\.\d{1,3}){0,3}\.?$""")
         private val DEFAULT_PREFIXES = listOf("10.", "192.168.") + (16..31).map { "172.$it." }
     }
 
@@ -33,14 +33,20 @@ class AssetDetectionService(private val settingsQueries: SystemSettingsQueries) 
         val normalized = prefixes
             .map { it.trim() }
             .filter { it.isNotBlank() }
-            .map { if (it.endsWith('.')) it else "$it." }
+            .map { raw ->
+                val dotCount = raw.count { it == '.' }
+                when {
+                    raw.endsWith('.') -> raw
+                    dotCount >= 3 -> raw
+                    else -> "$raw."
+                }
+            }
             .distinct()
 
         normalized.forEach { prefix ->
             require(PREFIX_REGEX.matches(prefix)) { "Invalid prefix format: $prefix" }
-            val first = prefix.substringBefore('.').toIntOrNull() ?: -1
-            val second = prefix.substringAfter('.', "").substringBefore('.').toIntOrNull() ?: -1
-            require(first in 0..255 && second in 0..255) { "Invalid prefix octets: $prefix" }
+            val octets = prefix.removeSuffix(".").split(".")
+            require(octets.all { (it.toIntOrNull() ?: -1) in 0..255 }) { "Invalid prefix octets: $prefix" }
         }
 
         return normalized
