@@ -1,10 +1,10 @@
 package backend.services
 
-import backend.queries.SystemSettingsQueries
+import backend.queries.SystemSettingsStore
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-class AssetDetectionService(private val settingsQueries: SystemSettingsQueries) {
+class AssetDetectionService(private val settingsQueries: SystemSettingsStore) {
     companion object {
         const val ASSET_IP_PREFIXES_KEY = "asset_ip_prefixes"
         private val PREFIX_REGEX = Regex("""^\d{1,3}(?:\.\d{1,3}){0,3}\.?$""")
@@ -19,7 +19,7 @@ class AssetDetectionService(private val settingsQueries: SystemSettingsQueries) 
 
     fun savePrefixes(prefixes: List<String>) {
         val normalized = normalizePrefixes(prefixes)
-        require(normalized.isNotEmpty()) { "At least one IP prefix is required" }
+        if (normalized.isEmpty()) return
         settingsQueries.upsert(ASSET_IP_PREFIXES_KEY, Json.encodeToString(normalized))
     }
 
