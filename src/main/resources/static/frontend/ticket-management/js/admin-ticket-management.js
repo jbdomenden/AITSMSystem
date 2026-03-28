@@ -76,7 +76,7 @@ function actionMenu(ticket){
     <div id='adminTicketRowMenu-${ticket.id}' class='row-action-menu hidden'>
       <button type='button' onclick='updateTicketStatusAdmin(${ticket.id}, "In Progress")'>Set In Progress</button>
       <button type='button' onclick='updateTicketStatusAdmin(${ticket.id}, "Resolved")'>Set Resolved</button>
-      <button type='button' onclick='updateTicketStatusAdmin(${ticket.id}, "Cancelled")'>Set Cancelled</button>
+      <button type='button' onclick='updateTicketStatusAdmin(${ticket.id}, "Closed")'>Set Closed</button>
     </div>
   </div>`;
 }

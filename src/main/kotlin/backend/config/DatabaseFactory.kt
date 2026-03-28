@@ -72,9 +72,13 @@ object TicketHistoryTable : Table("ticket_history") {
 object NotificationsTable : Table("notifications") {
     val id = integer("id").autoIncrement()
     val userId = integer("user_id").references(UsersTable.id, onDelete = ReferenceOption.CASCADE).index()
+    val title = varchar("title", 180).default("Notification")
     val message = text("message")
     val type = varchar("type", 40)
+    val relatedTicketId = integer("related_ticket_id").nullable().index()
+    val isRead = bool("is_read").default(false).index()
     val createdAt = datetime("created_at").index()
+    val readAt = datetime("read_at").nullable().index()
     override val primaryKey = PrimaryKey(id)
 }
 

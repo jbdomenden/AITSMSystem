@@ -20,8 +20,12 @@ class TicketService(
 
     fun create(userId: Int, req: TicketRequest): Ticket = repository.create(userId, req).also {
         audit.log(userId, "Created ticket #${it.id}", "tickets")
-        notifyAdmins("New ticket #${it.id} filed: ${it.title}", "info")
-        notifications.push(userId, "Your ticket #${it.id} has been created.", "success")
+        notifyAdminsOncePerTicket(
+            eventType = "ticket_created",
+            ticketId = it.id,
+            title = "New Ticket Created",
+            message = "Ticket #${it.id} created by user #$userId"
+        )
     }
     fun list(userId: Int?, admin: Boolean, limit: Int, offset: Long) = repository.list(userId, admin, limit, offset)
     fun get(id: Int): Ticket? = repository.get(id)
@@ -30,15 +34,26 @@ class TicketService(
 
     fun updateStatus(id: Int, statusValue: String, actor: String, userId: Int?, role: UserRole): Ticket? {
         val existing = repository.get(id) ?: return null
+        val requestedAction = statusValue.trim().lowercase()
         val status = parseStatus(statusValue)
         val admin = role in setOf(UserRole.ADMIN, UserRole.SUPERADMIN)
+        if (existing.status == status) return existing
 
         when {
-            admin -> require(status in setOf(TicketStatus.OPEN, TicketStatus.PENDING, TicketStatus.RESOLVED, TicketStatus.CLOSED)) { "Unsupported status for admin" }
+            admin -> {
+                require(status in setOf(TicketStatus.OPEN, TicketStatus.PENDING, TicketStatus.RESOLVED, TicketStatus.CLOSED)) { "Unsupported status for admin" }
+                require(requestedAction !in setOf("cancelled", "canceled", "cancel")) { "Admin cannot cancel tickets" }
+            }
             else -> {
                 require(existing.userId == (userId ?: -1)) { "You can only modify your own tickets" }
                 when (status) {
-                    TicketStatus.CLOSED -> require(existing.status == TicketStatus.RESOLVED) { "Only resolved tickets can be closed" }
+                    TicketStatus.CLOSED -> {
+                        if (requestedAction in setOf("cancelled", "canceled", "cancel")) {
+                            require(existing.status in setOf(TicketStatus.OPEN, TicketStatus.PENDING)) { "Only open or pending tickets can be cancelled" }
+                        } else {
+                            require(existing.status == TicketStatus.RESOLVED) { "Only resolved tickets can be closed" }
+                        }
+                    }
                     TicketStatus.PENDING -> {
                         require(existing.status != TicketStatus.RESOLVED && existing.status != TicketStatus.CLOSED) { "Resolved/closed tickets cannot move to pending" }
                         val updatedAt = runCatching { LocalDateTime.parse(existing.updatedAt) }.getOrNull() ?: LocalDateTime.now()
@@ -47,11 +62,25 @@ class TicketService(
                     }
                     TicketStatus.OPEN, TicketStatus.RESOLVED -> error("Unsupported status for end-user")
                 }
+
+                if (requestedAction in setOf("closed", "close")) {
+                    require(existing.status == TicketStatus.RESOLVED) { "Only resolved tickets can be closed" }
+                }
             }
         }
 
-        return repository.updateStatus(id, status.name, actor)?.also {
+        return repository.updateStatus(id, status.name, actor)?.also { updated ->
             audit.log(userId, "Changed ticket #$id to ${status.name}", "tickets")
+            if (admin) {
+                val displayStatus = status.name.lowercase().replace('_', ' ').replaceFirstChar { it.titlecase() }
+                notifications.pushOncePerTicketEvent(
+                    userId = updated.userId,
+                    eventType = "ticket_status_updated_${status.name.lowercase()}",
+                    ticketId = updated.id,
+                    title = "Ticket Status Updated",
+                    message = "Ticket #${updated.id} updated to $displayStatus"
+                )
+            }
         }
     }
 
@@ -66,11 +95,24 @@ class TicketService(
         }
     }
 
-    private fun notifyAdmins(message: String, type: String) {
+    private fun notifyAdminsOncePerTicket(
+        eventType: String,
+        ticketId: Int,
+        title: String,
+        message: String
+    ) {
         val adminIds = users.listUsers()
             .filter { it.role == UserRole.ADMIN || it.role == UserRole.SUPERADMIN }
             .map { it.id }
 
-        adminIds.forEach { notifications.push(it, message, type) }
+        adminIds.forEach {
+            notifications.pushOncePerTicketEvent(
+                userId = it,
+                eventType = eventType,
+                ticketId = ticketId,
+                title = title,
+                message = message
+            )
+        }
     }
 }

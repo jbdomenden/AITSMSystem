@@ -63,11 +63,15 @@ function toggleRowActionMenu(event, id) {
 }
 
 function actionMenu(ticket){
-  const status = ticket.status || '';
-  const canFollowUp = !['Resolved','Closed','Cancelled'].includes(status) && hoursSince(ticket.updatedAt) >= FOLLOW_UP_HOURS;
+  const rawStatus = String(ticket.status || '').trim();
+  const status = rawStatus.toLowerCase();
+  const isResolved = status === 'resolved';
+  const isOpen = status === 'open';
+  const isPending = status === 'pending' || status === 'in progress' || status === 'follow-up requested';
+  const canFollowUp = !['resolved', 'closed', 'cancelled'].includes(status) && hoursSince(ticket.updatedAt) >= FOLLOW_UP_HOURS;
   const items = [];
-  if(status === 'Resolved') items.push(`<button type='button' onclick='updateMyTicketStatus(${ticket.id}, "Closed")'>Close ticket</button>`);
-  if(['Open','In Progress','Follow-up Requested'].includes(status)) items.push(`<button type='button' onclick='updateMyTicketStatus(${ticket.id}, "Cancelled")'>Cancel ticket</button>`);
+  if (isResolved) items.push(`<button type='button' onclick='updateMyTicketStatus(${ticket.id}, "Closed")'>Close ticket</button>`);
+  if (isOpen || isPending) items.push(`<button type='button' onclick='updateMyTicketStatus(${ticket.id}, "Cancelled")'>Cancel ticket</button>`);
   if(canFollowUp) items.push(`<button type='button' onclick='updateMyTicketStatus(${ticket.id}, "Follow-up Requested")'>Request follow-up</button>`);
   if (!items.length) return '-';
   return `<div class='row-action-wrap'>

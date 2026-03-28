@@ -59,9 +59,13 @@ CREATE TABLE IF NOT EXISTS ticket_history (
 CREATE TABLE IF NOT EXISTS notifications (
   id SERIAL PRIMARY KEY,
   user_id INT REFERENCES users(id),
+  title VARCHAR(180) NOT NULL DEFAULT 'Notification',
   message TEXT NOT NULL,
   type VARCHAR(40) NOT NULL,
-  created_at TIMESTAMP NOT NULL
+  related_ticket_id INT REFERENCES tickets(id),
+  is_read BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMP NOT NULL,
+  read_at TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS sla_policies (

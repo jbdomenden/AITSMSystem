@@ -67,15 +67,37 @@ async function loadHeaderNotifications(){
   const count = document.getElementById('adminNotifCount');
   if(!list || !count) return;
   try {
-    const res = await fetch('/api/notifications', { headers: authHeaders() });
+    const [res, unreadRes] = await Promise.all([
+      fetch('/api/notifications', { headers: authHeaders() }),
+      fetch('/api/notifications/unread-count', { headers: authHeaders() })
+    ]);
     const data = await res.json();
+    const unreadPayload = await unreadRes.json();
     if(!res.ok) throw new Error(data.error || 'Unable to load notifications');
     const items = (Array.isArray(data)?data:[]).slice(0,8);
-    count.textContent = String(items.length);
-    list.innerHTML = items.map(n=>`<div class='small' style='padding:8px;border-bottom:1px solid #1f325f'>${n.message || 'Notification'}<br><span style='opacity:.7'>${n.createdAt || ''}</span></div>`).join('') || "<div class='small'>No notifications.</div>";
+    count.textContent = String(Number(unreadPayload?.unreadCount || 0));
+    list.innerHTML = `
+      <div style='display:flex;justify-content:flex-end;padding:8px;border-bottom:1px solid #1f325f'>
+        <button class='btn btn-ghost' style='padding:4px 8px' onclick='markAllNotificationsRead()'>Mark all read</button>
+      </div>
+      ${items.map(n=>`<button type='button' class='small' style='display:block;width:100%;text-align:left;padding:8px;border:none;border-bottom:1px solid #1f325f;background:${n.isRead ? 'transparent' : 'rgba(37,99,235,.12)'};color:inherit' onclick='markNotificationRead(${n.id})'>
+        <strong style='display:block'>${n.title || 'Notification'}</strong>
+        <span>${n.message || 'Notification'}</span><br>
+        <span style='opacity:.7'>${n.createdAt || ''}</span>
+      </button>`).join('') || "<div class='small' style='padding:8px'>No notifications.</div>"}\n`;
   } catch {
     list.innerHTML = "<div class='small'>Unable to load notifications.</div>";
   }
+}
+
+async function markNotificationRead(notificationId) {
+  await fetch(`/api/notifications/${notificationId}/read`, { method: 'PATCH', headers: authHeaders() });
+  await loadHeaderNotifications();
+}
+
+async function markAllNotificationsRead() {
+  await fetch('/api/notifications/read-all', { method: 'PATCH', headers: authHeaders() });
+  await loadHeaderNotifications();
 }
 
 function renderUtilityHeader() {
