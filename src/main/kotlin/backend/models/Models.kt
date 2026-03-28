@@ -76,6 +76,7 @@ data class RegisterRequest(
 @Serializable data class PasswordResetRequest(val newPassword: String, val confirmPassword: String)
 @Serializable data class ChangeOwnPasswordRequest(val currentPassword: String, val newPassword: String, val confirmPassword: String)
 @Serializable data class AssetIpPrefixesRequest(val prefixes: List<String>)
+@Serializable data class AssetIpPrefixesResponse(val prefixes: List<String>, val message: String? = null)
 @Serializable data class EmailApprovalRequest(val approved: Boolean)
 @Serializable data class EmailVerificationUpdateRequest(val approved: Boolean)
 @Serializable data class InternalUserCreateRequest(
