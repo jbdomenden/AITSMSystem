@@ -78,7 +78,7 @@ function renderInventoryRows(items) {
   if (!rows) return;
 
   if (!items.length) {
-    renderTableEmptyState(rows, 12, 'No inventory assets found for the selected filters.');
+    renderTableEmptyState(rows, 12, 'No registered assets found for the selected filters.');
     return;
   }
 
