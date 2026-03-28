@@ -26,24 +26,34 @@ fun Route.settingsRoutes(assetDetectionService: AssetDetectionService) {
 
         post("/asset-ip-prefixes") {
             if (!call.requireRole(UserRole.ADMIN)) return@post
-            val rawBody = call.receiveText()
-            val payload = runCatching { Json.parseToJsonElement(rawBody).jsonObject }.getOrDefault(kotlinx.serialization.json.buildJsonObject { })
-            val prefixes = when (val value = payload["prefixes"]) {
-                is JsonArray -> value.mapNotNull { runCatching { it.jsonPrimitive.content }.getOrNull() }
-                null -> emptyList()
-                else -> listOf(value.jsonPrimitive.content)
-                    .flatMap { it.split('\n', ',') }
-                    .map { it.trim() }
-                    .filter { it.isNotBlank() }
-            }
-            assetDetectionService.savePrefixes(AssetIpPrefixesRequest(prefixes = prefixes).prefixes)
-            call.respond(
-                HttpStatusCode.OK,
+            runCatching {
+                val rawBody = call.receiveText()
+                val payload = runCatching { Json.parseToJsonElement(rawBody).jsonObject }
+                    .getOrDefault(kotlinx.serialization.json.buildJsonObject { })
+                val prefixes = when (val value = payload["prefixes"]) {
+                    is JsonArray -> value.mapNotNull { runCatching { it.jsonPrimitive.content }.getOrNull() }
+                    null -> emptyList()
+                    else -> listOf(value.jsonPrimitive.content)
+                        .flatMap { it.split('\n', ',') }
+                        .map { it.trim() }
+                        .filter { it.isNotBlank() }
+                }
+                assetDetectionService.savePrefixes(AssetIpPrefixesRequest(prefixes = prefixes).prefixes)
                 AssetIpPrefixesResponse(
                     prefixes = assetDetectionService.getPrefixes(),
                     message = "Asset detection prefixes saved"
                 )
-            )
+            }.onSuccess { response ->
+                call.respond(HttpStatusCode.OK, response)
+            }.onFailure { error ->
+                call.respond(
+                    HttpStatusCode.OK,
+                    AssetIpPrefixesResponse(
+                        prefixes = assetDetectionService.getPrefixes(),
+                        message = "Prefixes unchanged: ${error.message ?: "invalid input"}"
+                    )
+                )
+            }
         }
     }
 }
