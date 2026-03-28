@@ -76,7 +76,7 @@ function actionMenu(ticket){
     <div id='adminTicketRowMenu-${ticket.id}' class='row-action-menu hidden'>
       <button type='button' onclick='updateTicketStatusAdmin(${ticket.id}, "In Progress")'>Set In Progress</button>
       <button type='button' onclick='updateTicketStatusAdmin(${ticket.id}, "Resolved")'>Set Resolved</button>
-      <button type='button' onclick='updateTicketStatusAdmin(${ticket.id}, "Cancelled")'>Set Cancelled</button>
+      <button type='button' onclick='updateTicketStatusAdmin(${ticket.id}, "Closed")'>Set Closed</button>
     </div>
   </div>`;
 }
@@ -84,17 +84,32 @@ function actionMenu(ticket){
 async function loadAdminTicketManagement(){
   const rows=document.getElementById('adminTicketRows');
   if(!rows) return;
-  const res = await fetch('/api/tickets', { headers: authHeaders() });
-  const data = await res.json();
-  if(!res.ok){ rows.innerHTML=`<tr><td colspan='7' class='small text-danger'>${data.error||'Unable to load tickets'}</td></tr>`; return; }
-  const tickets = normalizeListResponse(data);
-  rows.innerHTML = tickets.map(t => `<tr data-ticket-id='${t.id}'>
-    <td><a class='ticket-link' href='${adminTicketHref(t.id)}'>#${t.id}</a></td><td>${t.userId}</td><td><a class='ticket-link ticket-link-title' href='${adminTicketHref(t.id)}' title='${t.title || '-'}'>${t.title||'-'}</a></td><td>${t.priority||'-'}</td>
-    <td><span class='badge ${badge(t.status)}'>${t.status||'-'}</span></td>
-    <td>${fmt(t.updatedAt)}</td>
-    <td>${actionMenu(t)}</td>
-  </tr>`).join('') || `<tr><td colspan='7' class='small'>No tickets found.</td></tr>`;
-  focusRequestedAdminTicket();
+  showTableSkeleton(rows, { rowCount: 6, columnCount: 7, hasActions: true });
+  try {
+    const res = await fetch('/api/tickets', { headers: authHeaders() });
+    const data = await res.json();
+    if (!res.ok) {
+      renderTableErrorState(rows, 7, data.error || 'Unable to load tickets');
+      return;
+    }
+    const tickets = normalizeListResponse(data);
+    clearTableSkeleton(rows);
+    if (!tickets.length) {
+      renderTableEmptyState(rows, 7, 'No tickets found.');
+      return;
+    }
+    rows.innerHTML = tickets.map(t => `<tr data-ticket-id='${t.id}'>
+      <td><a class='ticket-link' href='${adminTicketHref(t.id)}'>#${t.id}</a></td><td>${t.userId}</td><td><a class='ticket-link ticket-link-title' href='${adminTicketHref(t.id)}' title='${t.title || '-'}'>${t.title||'-'}</a></td><td>${t.priority||'-'}</td>
+      <td><span class='badge ${badge(t.status)}'>${t.status||'-'}</span></td>
+      <td>${fmt(t.updatedAt)}</td>
+      <td>${actionMenu(t)}</td>
+    </tr>`).join('');
+    focusRequestedAdminTicket();
+  } catch {
+    renderTableErrorState(rows, 7, 'Unable to load tickets');
+  } finally {
+    clearTableSkeleton(rows);
+  }
 }
 
 document.addEventListener('click', () => closeAdminRowMenus());

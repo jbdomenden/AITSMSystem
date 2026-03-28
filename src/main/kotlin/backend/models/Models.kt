@@ -116,7 +116,7 @@ data class Ticket(
 )
 
 @Serializable data class TicketRequest(val title: String, val description: String, val priority: String, val category: String, val deviceId: Int? = null)
-@Serializable data class TicketStatusUpdate(val status: TicketStatus)
+@Serializable data class TicketStatusUpdate(val status: String)
 
 @Serializable
 data class Device(
@@ -167,7 +167,18 @@ data class Device(
     val timestamp: String
 )
 
-@Serializable data class Notification(val id: Int, val userId: Int, val message: String, val type: String, val createdAt: String)
+@Serializable
+data class Notification(
+    val id: Int,
+    val userId: Int,
+    val title: String,
+    val message: String,
+    val type: String,
+    val relatedTicketId: Int? = null,
+    val isRead: Boolean = false,
+    val createdAt: String,
+    val readAt: String? = null
+)
 @Serializable data class SLA(val id: Int, val priority: String, val responseTime: Int, val resolutionTime: Int)
 @Serializable data class KnowledgeArticle(val id: Int, val title: String, val content: String, val category: String, val createdAt: String)
 @Serializable data class KnowledgeRequest(val title: String, val content: String, val category: String)

@@ -2,16 +2,23 @@ package backend.routes
 
 import backend.models.UserRole
 import backend.models.ClientMetricsRequest
+import backend.models.InventoryUpsertDetectedRequest
 import backend.repository.DeviceRepository
 import backend.security.requireRole
 import backend.services.AssetDetectionService
+import backend.services.InventoryService
 import backend.services.MonitoringService
 import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
-fun Route.monitoringRoutes(service: MonitoringService, deviceRepository: DeviceRepository, assetDetectionService: AssetDetectionService) {
+fun Route.monitoringRoutes(
+    service: MonitoringService,
+    deviceRepository: DeviceRepository,
+    assetDetectionService: AssetDetectionService,
+    inventoryService: InventoryService
+) {
     route("/api/monitoring") {
         post("/client-metrics") {
             val remoteHost = call.request.local.remoteHost
@@ -25,6 +32,19 @@ fun Route.monitoringRoutes(service: MonitoringService, deviceRepository: DeviceR
             }
 
             val saved = deviceRepository.upsertClientMetrics(req)
+            runCatching {
+                inventoryService.upsertDetectedAsset(
+                    InventoryUpsertDetectedRequest(
+                        deviceName = req.deviceName,
+                        hostname = req.deviceName,
+                        ipAddress = req.ipAddress,
+                        assignedDepartment = req.department,
+                        assignedUser = req.assignedUser,
+                        status = if (req.status.isBlank()) "online" else req.status,
+                        connectionSource = "agent"
+                    )
+                )
+            }
             call.respond(HttpStatusCode.Accepted, saved)
         }
 
@@ -46,6 +66,22 @@ fun Route.monitoringRoutes(service: MonitoringService, deviceRepository: DeviceR
         }
         post("/refresh-discovery") {
             if (!call.requireRole(UserRole.ADMIN)) return@post
+            service.lanDevices()
+                .filter { it.telemetrySourceType != "HOST" }
+                .forEach { device ->
+                    runCatching {
+                        inventoryService.upsertDetectedAsset(
+                            InventoryUpsertDetectedRequest(
+                                deviceName = device.hostname,
+                                hostname = device.hostname,
+                                ipAddress = device.ipAddress,
+                                status = if (device.reachable) "online" else "offline",
+                                connectionSource = if (device.telemetryAvailable) "agent" else "lan-detected",
+                                lastSeenAt = device.lastSeen
+                            )
+                        )
+                    }
+                }
             call.respond(service.refreshDiscovery())
         }
 

@@ -59,9 +59,13 @@ CREATE TABLE IF NOT EXISTS ticket_history (
 CREATE TABLE IF NOT EXISTS notifications (
   id SERIAL PRIMARY KEY,
   user_id INT REFERENCES users(id),
+  title VARCHAR(180) NOT NULL DEFAULT 'Notification',
   message TEXT NOT NULL,
   type VARCHAR(40) NOT NULL,
-  created_at TIMESTAMP NOT NULL
+  related_ticket_id INT REFERENCES tickets(id),
+  is_read BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMP NOT NULL,
+  read_at TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS sla_policies (
@@ -85,4 +89,52 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   action VARCHAR(160) NOT NULL,
   entity VARCHAR(80) NOT NULL,
   timestamp TIMESTAMP NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS inventory_assets (
+  id SERIAL PRIMARY KEY,
+  asset_tag VARCHAR(120) UNIQUE,
+  hostname VARCHAR(200),
+  full_device_name VARCHAR(255),
+  manufacturer VARCHAR(150),
+  model VARCHAR(180),
+  processor_name VARCHAR(255),
+  processor_speed VARCHAR(100),
+  installed_ram VARCHAR(100),
+  usable_ram VARCHAR(100),
+  ram_speed VARCHAR(100),
+  gpu_name VARCHAR(255),
+  gpu_memory VARCHAR(100),
+  storage_total VARCHAR(100),
+  storage_used VARCHAR(100),
+  storage_free VARCHAR(100),
+  storage_breakdown_json TEXT,
+  system_type VARCHAR(180),
+  os_name VARCHAR(180),
+  os_edition VARCHAR(180),
+  os_version VARCHAR(120),
+  os_build VARCHAR(120),
+  installed_on VARCHAR(120),
+  domain_or_workgroup VARCHAR(160),
+  device_uuid VARCHAR(160),
+  product_id VARCHAR(160),
+  pen_touch_support VARCHAR(120),
+  ip_address VARCHAR(45),
+  mac_address VARCHAR(80),
+  connection_source VARCHAR(80),
+  status VARCHAR(50) NOT NULL DEFAULT 'offline',
+  assigned_department VARCHAR(150),
+  assigned_user VARCHAR(180),
+  notes TEXT,
+  last_seen_at TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS inventory_asset_snapshots (
+  id SERIAL PRIMARY KEY,
+  asset_id INT NOT NULL REFERENCES inventory_assets(id) ON DELETE CASCADE,
+  snapshot_source VARCHAR(80) NOT NULL,
+  payload_json TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
