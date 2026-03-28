@@ -4,6 +4,7 @@ import backend.config.DatabaseFactory
 import backend.config.Env
 import backend.config.ServiceContainer
 import backend.models.ApiErrorResponse
+import backend.models.AssetIpPrefixesResponse
 import backend.routes.aiRoutes
 import backend.routes.analyticsRoutes
 import backend.routes.authRoutes
@@ -83,6 +84,16 @@ fun Application.module() {
     }
     install(StatusPages) {
         exception<IllegalArgumentException> { call, cause ->
+            if (call.request.path() == "/settings/asset-ip-prefixes") {
+                call.respond(
+                    HttpStatusCode.OK,
+                    AssetIpPrefixesResponse(
+                        prefixes = emptyList(),
+                        message = "Prefixes unchanged: ${cause.message ?: "invalid input"}"
+                    )
+                )
+                return@exception
+            }
             call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(HttpStatusCode.BadRequest.value, cause.message ?: "Invalid request"))
         }
         exception<IllegalStateException> { call, cause ->
