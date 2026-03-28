@@ -186,7 +186,7 @@ function renderRecentAdminTickets(tickets) {
     .slice(0, 6);
 
   if (!relevant.length) {
-    rows.innerHTML = "<tr><td colspan='5' class='small'>No recent high-priority tickets found.</td></tr>";
+    renderTableEmptyState(rows, 5, 'No recent high-priority tickets found.');
     return;
   }
 
@@ -298,9 +298,11 @@ function setAnalyticsBuffering(isLoading) {
 
 async function loadAdminDashboard() {
   const summary = document.getElementById('summaryCards');
+  const recentRows = document.getElementById('recentAdminTicketRows');
   if (!summary) return;
 
   setAnalyticsBuffering(true);
+  if (recentRows) showTableSkeleton(recentRows, { rowCount: 5, columnCount: 5 });
 
   try {
     const [tickets, monitorSummary, lanDevices, notifications] = await Promise.all([
@@ -352,6 +354,7 @@ async function loadAdminDashboard() {
       { label: 'Last updated', value: formatDateTime(monitorSummary?.timestamp) }
     ]);
 
+    if (recentRows) clearTableSkeleton(recentRows);
     renderRecentAdminTickets(safeTickets);
     renderAdminOpsFeed(criticalAlerts, notifications);
   } catch (error) {
@@ -367,9 +370,10 @@ async function loadAdminDashboard() {
       { time: '20:00', cpu: 0, memory: 0, telemetry: 0 }
     ]);
     renderHealthInsights([]);
-    renderRecentAdminTickets([]);
+    if (recentRows) renderTableErrorState(recentRows, 5, error.message || 'Unable to load recent tickets');
     renderAdminOpsFeed([], []);
   } finally {
+    if (recentRows) clearTableSkeleton(recentRows);
     setAnalyticsBuffering(false);
   }
 }

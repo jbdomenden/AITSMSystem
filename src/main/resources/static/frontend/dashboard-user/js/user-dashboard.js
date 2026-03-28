@@ -47,7 +47,7 @@ function renderRecentTickets(tickets) {
 
   const safeTickets = Array.isArray(tickets) ? tickets : [];
   if (!safeTickets.length) {
-    rows.innerHTML = "<tr><td colspan='5' class='small'>No tickets yet. Create your first ticket to get started.</td></tr>";
+    renderTableEmptyState(rows, 5, 'No tickets yet. Create your first ticket to get started.');
     return;
   }
 
@@ -93,7 +93,7 @@ async function fetchJsonOrThrow(url) {
 async function loadUserDashboard() {
   const rows = document.getElementById('recentTicketRows');
   const notifications = document.getElementById('userNotifications');
-  if (rows) rows.innerHTML = "<tr><td colspan='5' class='small'>Loading tickets...</td></tr>";
+  if (rows) showTableSkeleton(rows, { rowCount: 5, columnCount: 5 });
   if (notifications) notifications.innerHTML = "<p class='small'>Loading notifications...</p>";
 
   try {
@@ -106,12 +106,15 @@ async function loadUserDashboard() {
     const sortedNotifications = [...userNotifications].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     renderUserSummary(sortedTickets);
+    if (rows) clearTableSkeleton(rows);
     renderRecentTickets(sortedTickets);
     renderNotifications(sortedNotifications);
   } catch (error) {
     renderUserSummary([]);
-    if (rows) rows.innerHTML = `<tr><td colspan='5' class='small'>${error.message}</td></tr>`;
+    if (rows) renderTableErrorState(rows, 5, error.message);
     if (notifications) notifications.innerHTML = `<p class='small text-danger'>${error.message}</p>`;
+  } finally {
+    if (rows) clearTableSkeleton(rows);
   }
 }
 
