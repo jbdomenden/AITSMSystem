@@ -9,10 +9,14 @@ import java.io.InputStreamReader
 import java.lang.management.ManagementFactory
 import java.net.InetAddress
 import java.net.NetworkInterface
+import java.util.Locale
 import java.time.LocalDateTime
 
-class MonitoringService(private val deviceRepository: DeviceRepository) {
-    fun devices() = deviceRepository.list().filter { isLanIp(it.ipAddress) }
+class MonitoringService(
+    private val deviceRepository: DeviceRepository,
+    private val assetDetectionService: AssetDetectionService
+) {
+    fun devices() = deviceRepository.list().filter { assetDetectionService.matches(it.ipAddress) }
     fun cpu() = devices().map { mapOf("device" to it.deviceName, "cpu" to it.cpuUsage.toString()) }
     fun alerts() = devices().filter { it.cpuUsage > 85 || it.memoryUsage > 90 || it.status.equals("critical", true) }
         .map { mapOf("device" to it.deviceName, "message" to "High resource usage detected") }
@@ -109,7 +113,8 @@ class MonitoringService(private val deviceRepository: DeviceRepository) {
 
     fun lanPeerIps(): List<String> = discoverLanPeers()
         .map { it.ipAddress.trim() }
-        .filter { isLanIp(it) }
+        .plus(devices().map { it.ipAddress.trim() })
+        .filter { assetDetectionService.matches(it) }
         .distinct()
         .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it })
 
@@ -120,35 +125,55 @@ class MonitoringService(private val deviceRepository: DeviceRepository) {
             .filter { it.isUp && !it.isLoopback }
             .flatMap { ni -> ni.inetAddresses.toList().mapNotNull { addr ->
                 val ip = addr.hostAddress.substringBefore('%')
-                if (!isLanIp(ip)) null else Peer(ni.displayName.ifBlank { "LAN Host" }, ip)
+                if (!assetDetectionService.matches(ip)) null else Peer(ni.displayName.ifBlank { "LAN Host" }, ip)
             }}
 
-        val ipNeighPeers = runCatching {
-            val process = ProcessBuilder("sh", "-c", "ip neigh").start()
-            BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
-                reader.readLines().mapNotNull { line ->
-                    val ip = line.substringBefore(' ').trim()
-                    if (!isLanIp(ip)) return@mapNotNull null
-                    val state = line.substringAfterLast(' ', "")
-                    if (state.equals("FAILED", true)) return@mapNotNull null
-                    Peer("LAN Peer", ip)
-                }
-            }
-        }.getOrElse { emptyList() }
+        val arpPeers = discoverArpPeers()
 
-        return (ifacePeers + ipNeighPeers).distinctBy { it.ipAddress }
+        return (ifacePeers + arpPeers).distinctBy { it.ipAddress }
     }
 
-    private fun isLanIp(ip: String): Boolean {
-        if (ip.startsWith("10.") || ip.startsWith("192.168.")) return true
-        val octets = ip.split(".")
-        if (octets.size != 4) return false
-        val second = octets.getOrNull(1)?.toIntOrNull() ?: return false
-        return octets[0] == "172" && second in 16..31
+    private fun discoverArpPeers(): List<Peer> {
+        val osName = System.getProperty("os.name", "").lowercase(Locale.getDefault())
+        val commands = if ("windows" in osName) {
+            listOf(listOf("cmd", "/c", "arp -a"))
+        } else {
+            listOf(
+                listOf("sh", "-c", "ip neigh"),
+                listOf("sh", "-c", "arp -an")
+            )
+        }
+
+        return commands.asSequence()
+            .flatMap { command -> executeCommand(command).asSequence() }
+            .mapNotNull { parsePeerIp(it) }
+            .distinct()
+            .map { Peer("LAN Peer", it) }
+            .toList()
+    }
+
+    private fun executeCommand(command: List<String>): List<String> = runCatching {
+        val process = ProcessBuilder(command).start()
+        BufferedReader(InputStreamReader(process.inputStream)).use { it.readLines() }
+    }.getOrElse { emptyList() }
+
+    private fun parsePeerIp(line: String): String? {
+        val directToken = line.substringBefore(' ').trim().removePrefix("(").removeSuffix(")")
+        if (assetDetectionService.matches(directToken) && !line.contains("FAILED", ignoreCase = true)) {
+            return directToken
+        }
+
+        val candidate = Regex("""\b(?:\d{1,3}\.){3}\d{1,3}\b""")
+            .find(line)
+            ?.value
+            ?.trim()
+            ?: return null
+
+        return candidate.takeIf { assetDetectionService.matches(it) }
     }
 
     private fun isDeviceReachable(ip: String): Boolean = runCatching {
-        if (!isLanIp(ip)) return false
+        if (!assetDetectionService.matches(ip)) return false
         InetAddress.getByName(ip).isReachable(1200)
     }.getOrDefault(false)
 }

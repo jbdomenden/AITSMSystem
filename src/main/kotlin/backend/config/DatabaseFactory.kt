@@ -86,6 +86,14 @@ object SLAPoliciesTable : Table("sla_policies") {
     override val primaryKey = PrimaryKey(id)
 }
 
+object SystemSettingsTable : Table("system_settings") {
+    val id = integer("id").autoIncrement()
+    val key = varchar("key", 120).uniqueIndex()
+    val value = text("value")
+    val updatedAt = datetime("updated_at")
+    override val primaryKey = PrimaryKey(id)
+}
+
 object KnowledgeArticlesTable : Table("knowledge_articles") {
     val id = integer("id").autoIncrement()
     val title = varchar("title", 200)
@@ -142,6 +150,7 @@ object DatabaseFactory {
                 TicketHistoryTable,
                 NotificationsTable,
                 SLAPoliciesTable,
+                SystemSettingsTable,
                 KnowledgeArticlesTable,
                 AuditLogsTable,
                 AIConversationMessagesTable
