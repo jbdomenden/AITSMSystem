@@ -11,6 +11,7 @@ import backend.routes.deviceRoutes
 import backend.routes.knowledgeRoutes
 import backend.routes.monitoringRoutes
 import backend.routes.notificationRoutes
+import backend.routes.settingsRoutes
 import backend.routes.slaRoutes
 import backend.routes.ticketRoutes
 import backend.security.PasswordHasher
@@ -147,12 +148,13 @@ fun Application.module() {
         staticResources("/", "static/frontend")
         authRoutes(container.authService)
         ticketRoutes(container.ticketService)
-        monitoringRoutes(container.monitoringService, container.deviceRepo)
+        monitoringRoutes(container.monitoringService, container.deviceRepo, container.assetDetectionService)
         analyticsRoutes(container.ticketService, container.monitoringService, container.aiService)
-        deviceRoutes(container.deviceRepo, container.userRepo, container.monitoringService)
+        deviceRoutes(container.deviceRepo, container.userRepo, container.monitoringService, container.assetDetectionService)
         notificationRoutes(container.notificationService)
         knowledgeRoutes(container.knowledgeService)
         slaRoutes(container.slaService)
+        settingsRoutes(container.assetDetectionService)
         aiRoutes(container.aiChatService, container.aiConfigService)
     }
 }

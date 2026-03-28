@@ -90,6 +90,7 @@ Admins can see CPU analytics based on real LAN client reports.
 - Clients post metrics to `POST /api/monitoring/client-metrics` from the same LAN only.
 - The endpoint accepts device metadata + CPU/memory values and upserts by LAN IP.
 - Admin analytics (`/api/monitoring/cpu`, `/api/analytics/system-health`) use these stored LAN metrics.
+- Optional: admins can configure allowed asset-detection prefixes from **Settings → Asset Detection Configuration**; values are stored in `system_settings` under key `asset_ip_prefixes`.
 
 Example payload:
 
