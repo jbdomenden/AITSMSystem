@@ -34,13 +34,13 @@ class ServiceContainer(application: Application) {
     val aiConversationRepository = AIConversationRepository()
 
     val authService = AuthService(userRepo, auditRepo)
-    val ticketService = TicketService(ticketRepo, auditRepo)
+    val notificationService = NotificationService()
+    val ticketService = TicketService(ticketRepo, auditRepo, notificationService, userRepo)
     val monitoringService = MonitoringService(deviceRepo, assetDetectionService)
     val aiService = AIService()
     val aiConfigService = AIConfigService(application.environment.config)
     val aiChatService = AIChatService(OllamaProvider(), aiConfigService, aiConversationRepository)
     val slaService = SLAService()
-    val notificationService = NotificationService()
     val knowledgeService = KnowledgeService(knowledgeRepo, auditRepo)
     val inventoryService = InventoryService(inventoryQueries, assetDetectionService)
 }
