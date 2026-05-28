@@ -22,6 +22,15 @@ function normalizeListResponse(payload) {
   return [];
 }
 
+function setCreateTicketMessage(message = '', tone = 'info') {
+  const el = document.getElementById('createTicketMessage');
+  if (!el) return;
+  el.textContent = message;
+  el.classList.remove('text-success', 'text-danger');
+  if (tone === 'success') el.classList.add('text-success');
+  if (tone === 'danger') el.classList.add('text-danger');
+}
+
 function closeAllRowMenus() {
   document.querySelectorAll('.row-action-menu').forEach((el) => el.classList.add('hidden'));
   document.getElementById('actionMenuBackdrop')?.classList.add('hidden');
@@ -81,17 +90,32 @@ function actionMenu(ticket){
 }
 
 async function createTicket() {
+  setCreateTicketMessage('');
   const body = {
     title: title.value.trim(),
     description: description.value.trim(),
     priority: priority.value,
     category: category.value
   };
-  if (body.description.length < 10) return alert('Description must be at least 10 characters.');
+  if (body.title.length < 5) {
+    setCreateTicketMessage('Title must be at least 5 characters.', 'danger');
+    return;
+  }
+  if (body.description.length < 10) {
+    setCreateTicketMessage('Description must be at least 10 characters.', 'danger');
+    return;
+  }
+  if (!body.priority || !body.category) {
+    setCreateTicketMessage('Priority and category are required.', 'danger');
+    return;
+  }
   const res = await fetch('/api/tickets', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
   const data = await res.json();
-  if (!res.ok) return alert(data.error || 'Unable to create ticket');
-  alert(`Ticket #${data.id} created successfully.`);
+  if (!res.ok) {
+    setCreateTicketMessage(data.error || 'Unable to create ticket', 'danger');
+    return;
+  }
+  setCreateTicketMessage(`Ticket #${data.id} created successfully. Redirecting...`, 'success');
   location.href = '/tickets.html';
 }
 

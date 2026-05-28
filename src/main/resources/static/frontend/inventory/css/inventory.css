@@ -4,7 +4,11 @@
 }
 
 .inventory-filter-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.inventory-filter-grid .form-group:first-child {
+  grid-column: span 2;
 }
 
 .inventory-pagination {
@@ -71,6 +75,10 @@
   .inventory-filter-grid,
   .inventory-detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  .inventory-filter-grid .form-group:first-child {
+    grid-column: span 1;
   }
 
   .inventory-field {

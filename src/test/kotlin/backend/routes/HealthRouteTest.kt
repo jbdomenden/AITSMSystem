@@ -2,8 +2,10 @@ package backend.routes
 
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
@@ -17,7 +19,7 @@ class HealthRouteTest {
         application {
             routing {
                 get("/api/health") {
-                    call.respond(mapOf("status" to "ok"))
+                    call.respondText("""{"status":"ok"}""", ContentType.Application.Json)
                 }
             }
         }

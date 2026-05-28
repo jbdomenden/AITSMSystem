@@ -4,6 +4,7 @@ import backend.models.KnowledgeRequest
 import backend.models.PaginatedResponse
 import backend.models.PaginationMeta
 import backend.models.UserRole
+import backend.security.requireAuthenticated
 import backend.security.requireRole
 import backend.security.userId
 import backend.services.KnowledgeService
@@ -16,6 +17,7 @@ import io.ktor.server.routing.*
 fun Route.knowledgeRoutes(service: KnowledgeService) {
     route("/api/knowledge") {
         get {
+            if (!call.requireAuthenticated()) return@get
             val limit = (call.request.queryParameters["limit"]?.toIntOrNull() ?: 20).coerceIn(1, 100)
             val offset = (call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L).coerceAtLeast(0)
             val page = service.list(limit, offset)

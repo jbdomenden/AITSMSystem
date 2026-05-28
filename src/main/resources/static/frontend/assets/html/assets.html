@@ -30,8 +30,18 @@
           <input id='ipAddress' list='lanIpSuggestions' placeholder='192.168.x.x'>
           <datalist id='lanIpSuggestions'></datalist>
         </div>
-        <div class='form-group'><label>Department</label><input id='department' placeholder='Finance'></div>
-        <div class='form-group'><label>Assigned User</label><input id='assignedUser' placeholder='jane.doe'></div>
+        <div class='form-group'>
+          <label>Department</label>
+          <select id='department'>
+            <option value=''>Select department</option>
+          </select>
+        </div>
+        <div class='form-group'>
+          <label>Assigned User</label>
+          <select id='assignedUser'>
+            <option value=''>Select user</option>
+          </select>
+        </div>
         <div class='form-group'>
           <label>Status</label>
           <input id='statusDisplay' placeholder='Auto-detected from monitoring and reachability' readonly>
@@ -42,6 +52,7 @@
         <button class='btn btn-primary' onclick='registerDevice()'>Register Device</button>
         <button id='cancelDeviceEditBtn' class='btn btn-ghost hidden' type='button' onclick='resetDeviceForm()'>Cancel Edit</button>
       </div>
+      <p id='assetFormMessage' class='small' style='margin-top:10px'></p>
     </section>
 
     <section class='card' style='margin-top:16px'>

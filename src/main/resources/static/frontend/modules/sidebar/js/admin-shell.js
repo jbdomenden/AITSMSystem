@@ -8,6 +8,7 @@ function adminIcon(name) {
     assets: "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 6.5 12 3l8 3.5v11L12 21l-8-3.5v-11zm8-.96L6 7.97v8.06l6 2.63 6-2.63V7.97l-6-2.43z'/></svg>",
     inventory: "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 5h16v4H4V5zm0 5h16v4H4v-4zm0 5h16v4H4v-4zm2-9v2h3V6H6zm0 5v2h3v-2H6zm0 5v2h3v-2H6z'/></svg>",
     users: "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M16 11a4 4 0 1 0-3.999-4A4 4 0 0 0 16 11zm-8 1a3 3 0 1 0-3-3 3 3 0 0 0 3 3zm8 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4zM8 14c-.43 0-.9.03-1.39.08C4.57 14.33 1 15.35 1 18v2h6v-2c0-1.2.62-2.23 1.72-3A7.63 7.63 0 0 0 8 14z'/></svg>",
+    profile: "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.42 0-8 1.79-8 4v2h16v-2c0-2.21-3.58-4-8-4z'/></svg>",
     menu: "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 7h16v2H4zm0 8h16v2H4zm0-4h16v2H4z'/></svg>",
     bell: "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-5V11a7 7 0 1 0-14 0v6l-2 2v1h18v-1l-2-2z'/></svg>",
     more: "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M12 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4z' transform='translate(0 -3)'/></svg>",
@@ -29,6 +30,7 @@ function adminNavItems() {
     ]},
     { section: 'System', items: [
       { page: 'settings.html', href: '/settings.html', icon: 'settings', label: 'Settings' },
+      { page: 'profile.html', href: '/profile.html', icon: 'profile', label: 'Profile' },
       { page: 'assets.html', href: '/assets.html', icon: 'assets', label: 'Asset Management' },
       { page: 'user-management.html', href: '/user-management.html', icon: 'users', label: 'User Management' }
     ]}
@@ -59,7 +61,7 @@ function toggleAdminSidebar(forceHidden) {
 }
 
 function openAdminHelp() {
-  alert('How to use AITSM Admin\n1) Monitor LAN/asset telemetry.\n2) Manage ticket statuses in Ticket Management.\n3) Manage users in User Management.\n4) Use Settings for profile and SLA review.');
+  alert('How to use AITSM Admin\n1) Monitor LAN and asset telemetry.\n2) Manage ticket statuses in Ticket Management.\n3) Use Settings for system policies and integrations.\n4) Use Profile for account information updates.');
 }
 
 async function loadHeaderNotifications(){

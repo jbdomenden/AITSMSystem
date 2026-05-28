@@ -10,25 +10,16 @@
     <div class='topbar'>
       <div>
         <h1 class='page-title'>Settings</h1>
-        <p class='page-subtitle'>Profile and policy settings connected to backend services.</p>
+        <p class='page-subtitle'>System-wide configuration for policies, integrations, and detection rules.</p>
       </div>
-      <div class='inline-actions'><button class='btn btn-ghost' onclick='logout()'>Logout</button></div>
+      <div class='inline-actions'>
+        <a class='btn btn-ghost' href='/profile.html'>Open Profile</a>
+      </div>
     </div>
 
     <section class='settings-grid'>
       <article class='card'>
-        <div class='card-head'><h3 class='section-title'>Profile</h3><span class='card-icon'>👤</span></div>
-        <div class='form-grid'>
-          <div class='form-group'><label>Display Name</label><input id='settingsFullName'></div>
-          <div class='form-group'><label>Email</label><input id='settingsEmail' readonly></div>
-          <div class='form-group'><label>Company</label><input id='settingsCompany'></div>
-          <div class='form-group'><label>Department</label><input id='settingsDepartment'></div>
-        </div>
-        <div class='inline-actions' style='margin-top:12px'><button class='btn btn-primary' onclick='saveProfileSettings()'>Save Profile</button></div>
-      </article>
-
-      <article class='card'>
-        <div class='card-head'><h3 class='section-title'>SLA Policies</h3><span class='card-icon'>⏱</span></div>
+        <div class='card-head'><h3 class='section-title'>SLA Policies</h3><span class='card-icon'>SLA</span></div>
         <div class='table-wrap'>
           <table>
             <thead><tr><th>Priority</th><th>Response (min)</th><th>Resolution (min)</th></tr></thead>
@@ -38,7 +29,7 @@
       </article>
 
       <article class='card'>
-        <div class='card-head'><h3 class='section-title'>Asset Detection Configuration</h3><span class='card-icon'>🧭</span></div>
+        <div class='card-head'><h3 class='section-title'>Asset Detection Configuration</h3><span class='card-icon'>LAN</span></div>
         <div class='form-grid single-col'>
           <div class='form-group'>
             <label for='assetIpPrefixes'>IP Prefix List</label>
@@ -52,7 +43,7 @@
       </article>
 
       <article class='card ollama-card'>
-        <div class='card-head'><h3 class='section-title'>Ollama AI Configuration</h3><span class='card-icon'>🤖</span></div>
+        <div class='card-head'><h3 class='section-title'>Ollama AI Configuration</h3><span class='card-icon'>AI</span></div>
         <div class='form-grid single-col'>
           <div class='form-group'>
             <label for='aiBaseUrl'>Base URL</label>
@@ -61,7 +52,7 @@
           <div class='form-group'>
             <label for='aiModelSelect'>Model</label>
             <select id='aiModelSelect'></select>
-            <div id='aiModelHint' class='small'>Click “Refresh Models” to load installed models.</div>
+            <div id='aiModelHint' class='small'>Click Refresh Models to load installed models.</div>
           </div>
           <div class='inline-actions'>
             <button id='aiRefreshModelsBtn' class='btn btn-ghost' type='button'>Refresh Models</button>

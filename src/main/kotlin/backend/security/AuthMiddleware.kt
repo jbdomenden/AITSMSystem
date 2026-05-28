@@ -9,7 +9,19 @@ import io.ktor.server.response.*
 fun ApplicationCall.userId(): Int? = request.headers["X-User-Id"]?.toIntOrNull()
 fun ApplicationCall.userRole(): UserRole = UserRole.from(request.headers["X-User-Role"])
 
+suspend fun ApplicationCall.requireAuthenticated(): Boolean {
+    if (userId() == null) {
+        respond(HttpStatusCode.Unauthorized, ApiErrorResponse(HttpStatusCode.Unauthorized.value, "Authentication required"))
+        return false
+    }
+    return true
+}
+
 suspend fun ApplicationCall.requireRole(role: UserRole): Boolean {
+    if (userId() == null) {
+        respond(HttpStatusCode.Unauthorized, ApiErrorResponse(HttpStatusCode.Unauthorized.value, "Authentication required"))
+        return false
+    }
     val callerRole = userRole()
     val allowed = when (role) {
         UserRole.ADMIN -> callerRole == UserRole.ADMIN || callerRole == UserRole.SUPERADMIN

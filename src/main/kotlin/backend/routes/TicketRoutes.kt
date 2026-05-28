@@ -5,6 +5,7 @@ import backend.models.PaginationMeta
 import backend.models.TicketRequest
 import backend.models.TicketStatusUpdate
 import backend.models.UserRole
+import backend.security.requireAuthenticated
 import backend.security.requireRole
 import backend.security.userId
 import backend.security.userRole
@@ -26,6 +27,7 @@ fun Route.ticketRoutes(ticketService: TicketService) {
             call.respond(HttpStatusCode.Created, ticketService.create(userId, call.receive<TicketRequest>()))
         }
         get {
+            if (!call.requireAuthenticated()) return@get
             val uid = call.userId()
             val admin = setOf(UserRole.ADMIN, UserRole.SUPERADMIN).contains(call.userRole())
             val limit = (call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_LIMIT).coerceIn(1, MAX_LIMIT)
@@ -44,16 +46,26 @@ fun Route.ticketRoutes(ticketService: TicketService) {
             )
         }
         get("/{id}") {
+            if (!call.requireAuthenticated()) return@get
+            val actorId = call.userId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
+            val admin = setOf(UserRole.ADMIN, UserRole.SUPERADMIN).contains(call.userRole())
             val id = call.parameters["id"]?.toIntOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
             val ticket = ticketService.get(id) ?: return@get call.respond(HttpStatusCode.NotFound)
+            if (!admin && ticket.userId != actorId) return@get call.respond(HttpStatusCode.Forbidden)
             call.respond(ticket)
         }
         put("/{id}") {
+            if (!call.requireAuthenticated()) return@put
+            val actorId = call.userId() ?: return@put call.respond(HttpStatusCode.Unauthorized)
+            val admin = setOf(UserRole.ADMIN, UserRole.SUPERADMIN).contains(call.userRole())
             val id = call.parameters["id"]?.toIntOrNull() ?: return@put call.respond(HttpStatusCode.BadRequest)
-            val updated = ticketService.update(id, call.receive<TicketRequest>(), call.userId()) ?: return@put call.respond(HttpStatusCode.NotFound)
+            val existing = ticketService.get(id) ?: return@put call.respond(HttpStatusCode.NotFound)
+            if (!admin && existing.userId != actorId) return@put call.respond(HttpStatusCode.Forbidden)
+            val updated = ticketService.update(id, call.receive<TicketRequest>(), actorId) ?: return@put call.respond(HttpStatusCode.NotFound)
             call.respond(updated)
         }
         put("/{id}/status") {
+            if (!call.requireAuthenticated()) return@put
             val id = call.parameters["id"]?.toIntOrNull() ?: return@put call.respond(HttpStatusCode.BadRequest)
             val req = call.receive<TicketStatusUpdate>()
             val actor = "${call.userRole()}-${call.userId() ?: 0}"

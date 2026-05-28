@@ -19,6 +19,31 @@ import java.time.LocalDateTime
 class DeviceRepository(private val assetDetectionService: AssetDetectionService) {
     data class DiscoveredPeer(val ipAddress: String, val hostname: String, val reachable: Boolean)
 
+    private fun validateDeviceRequest(req: DeviceRequest) {
+        require(req.deviceName.trim().isNotBlank()) { "Device name is required" }
+        require(req.department.trim().isNotBlank()) { "Department is required" }
+        require(req.assignedUser.trim().isNotBlank()) { "Assigned user is required" }
+        require(isValidIpv4(req.ipAddress.trim())) { "Invalid IP address format" }
+    }
+
+    private fun validateClientMetricsRequest(req: ClientMetricsRequest) {
+        require(req.deviceName.trim().isNotBlank()) { "Device name is required" }
+        require(req.department.trim().isNotBlank()) { "Department is required" }
+        require(req.assignedUser.trim().isNotBlank()) { "Assigned user is required" }
+        require(isValidIpv4(req.ipAddress.trim())) { "Invalid IP address format" }
+        require(req.cpuUsage in 0..100) { "CPU usage must be between 0 and 100" }
+        require(req.memoryUsage in 0..100) { "Memory usage must be between 0 and 100" }
+    }
+
+    private fun isValidIpv4(ipAddress: String): Boolean {
+        val parts = ipAddress.split('.')
+        if (parts.size != 4) return false
+        return parts.all { token ->
+            val number = token.toIntOrNull() ?: return false
+            number in 0..255
+        }
+    }
+
     private fun detectReachabilityStatus(ipAddress: String): String {
         val normalizedIp = ipAddress.trim()
         if (normalizedIp.isBlank()) return "Unreachable"
@@ -39,13 +64,21 @@ class DeviceRepository(private val assetDetectionService: AssetDetectionService)
     }
 
     fun create(req: DeviceRequest): Device = transaction {
-        require(assetDetectionService.matches(req.ipAddress)) { "Only LAN devices are monitorable." }
-        val derivedStatus = detectReachabilityStatus(req.ipAddress)
+        val normalized = req.copy(
+            deviceName = req.deviceName.trim(),
+            ipAddress = req.ipAddress.trim(),
+            department = req.department.trim(),
+            assignedUser = req.assignedUser.trim(),
+            status = req.status.trim()
+        )
+        validateDeviceRequest(normalized)
+        require(assetDetectionService.matches(normalized.ipAddress)) { "Only LAN devices are monitorable." }
+        val derivedStatus = detectReachabilityStatus(normalized.ipAddress)
         val id = DevicesTable.insert {
-            it[deviceName] = req.deviceName
-            it[ipAddress] = req.ipAddress
-            it[department] = req.department
-            it[assignedUser] = req.assignedUser
+            it[deviceName] = normalized.deviceName
+            it[ipAddress] = normalized.ipAddress
+            it[department] = normalized.department
+            it[assignedUser] = normalized.assignedUser
             it[cpuUsage] = (15..70).random()
             it[memoryUsage] = (20..80).random()
             it[status] = derivedStatus
@@ -83,18 +116,26 @@ class DeviceRepository(private val assetDetectionService: AssetDetectionService)
 
 
     fun upsertClientMetrics(req: ClientMetricsRequest): Device = transaction {
-        require(assetDetectionService.matches(req.ipAddress)) { "Only LAN devices are monitorable." }
-        val derivedStatus = deriveStatus(cpuUsage = req.cpuUsage, memoryUsage = req.memoryUsage)
+        val normalized = req.copy(
+            deviceName = req.deviceName.trim(),
+            ipAddress = req.ipAddress.trim(),
+            department = req.department.trim(),
+            assignedUser = req.assignedUser.trim(),
+            status = req.status.trim()
+        )
+        validateClientMetricsRequest(normalized)
+        require(assetDetectionService.matches(normalized.ipAddress)) { "Only LAN devices are monitorable." }
+        val derivedStatus = deriveStatus(cpuUsage = normalized.cpuUsage, memoryUsage = normalized.memoryUsage)
 
-        val existing = DevicesTable.selectAll().where { DevicesTable.ipAddress eq req.ipAddress }.singleOrNull()
+        val existing = DevicesTable.selectAll().where { DevicesTable.ipAddress eq normalized.ipAddress }.singleOrNull()
         if (existing == null) {
             val id = DevicesTable.insert {
-                it[deviceName] = req.deviceName
-                it[ipAddress] = req.ipAddress
-                it[department] = req.department
-                it[assignedUser] = req.assignedUser
-                it[cpuUsage] = req.cpuUsage.coerceIn(0, 100)
-                it[memoryUsage] = req.memoryUsage.coerceIn(0, 100)
+                it[deviceName] = normalized.deviceName
+                it[ipAddress] = normalized.ipAddress
+                it[department] = normalized.department
+                it[assignedUser] = normalized.assignedUser
+                it[cpuUsage] = normalized.cpuUsage.coerceIn(0, 100)
+                it[memoryUsage] = normalized.memoryUsage.coerceIn(0, 100)
                 it[status] = derivedStatus
                 it[lastSeen] = LocalDateTime.now()
             }[DevicesTable.id]
@@ -102,11 +143,11 @@ class DeviceRepository(private val assetDetectionService: AssetDetectionService)
         }
 
         DevicesTable.update({ DevicesTable.id eq existing[DevicesTable.id] }) {
-            it[deviceName] = req.deviceName
-            it[department] = req.department
-            it[assignedUser] = req.assignedUser
-            it[cpuUsage] = req.cpuUsage.coerceIn(0, 100)
-            it[memoryUsage] = req.memoryUsage.coerceIn(0, 100)
+            it[deviceName] = normalized.deviceName
+            it[department] = normalized.department
+            it[assignedUser] = normalized.assignedUser
+            it[cpuUsage] = normalized.cpuUsage.coerceIn(0, 100)
+            it[memoryUsage] = normalized.memoryUsage.coerceIn(0, 100)
             it[status] = derivedStatus
             it[lastSeen] = LocalDateTime.now()
         }
@@ -129,18 +170,26 @@ class DeviceRepository(private val assetDetectionService: AssetDetectionService)
     }
 
     fun update(id: Int, req: DeviceRequest): Device? = transaction {
-        require(assetDetectionService.matches(req.ipAddress)) { "Only LAN devices are monitorable." }
+        val normalized = req.copy(
+            deviceName = req.deviceName.trim(),
+            ipAddress = req.ipAddress.trim(),
+            department = req.department.trim(),
+            assignedUser = req.assignedUser.trim(),
+            status = req.status.trim()
+        )
+        validateDeviceRequest(normalized)
+        require(assetDetectionService.matches(normalized.ipAddress)) { "Only LAN devices are monitorable." }
         val existing = DevicesTable.selectAll().where { DevicesTable.id eq id }.singleOrNull()
         val derivedStatus = deriveStatus(
-            fallbackStatus = detectReachabilityStatus(req.ipAddress),
+            fallbackStatus = detectReachabilityStatus(normalized.ipAddress),
             cpuUsage = existing?.get(DevicesTable.cpuUsage),
             memoryUsage = existing?.get(DevicesTable.memoryUsage)
         )
         DevicesTable.update({ DevicesTable.id eq id }) {
-            it[deviceName] = req.deviceName
-            it[ipAddress] = req.ipAddress
-            it[department] = req.department
-            it[assignedUser] = req.assignedUser
+            it[deviceName] = normalized.deviceName
+            it[ipAddress] = normalized.ipAddress
+            it[department] = normalized.department
+            it[assignedUser] = normalized.assignedUser
             it[status] = derivedStatus
             it[lastSeen] = LocalDateTime.now()
         }

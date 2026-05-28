@@ -1,3 +1,17 @@
+const dashboardState = {
+  tickets: [],
+  monitoringSummary: null,
+  lanDevices: [],
+  notifications: [],
+  inventoryStats: null,
+  trend: {
+    view: 'monthly',
+    month: 'all',
+    week: 'all',
+    sort: 'latest'
+  }
+};
+
 function parseDate(value) {
   const date = new Date(value || '');
   return Number.isNaN(date.getTime()) ? null : date;
@@ -5,58 +19,169 @@ function parseDate(value) {
 
 function formatDateTime(value) {
   const parsed = parseDate(value);
-  return parsed ? parsed.toLocaleString() : (value || '—');
+  return parsed ? parsed.toLocaleString() : (value || '-');
 }
 
-function sortByUpdatedDesc(items, key = 'updatedAt') {
-  return [...(Array.isArray(items) ? items : [])].sort((a, b) => {
-    const aTime = parseDate(a?.[key])?.getTime() ?? 0;
-    const bTime = parseDate(b?.[key])?.getTime() ?? 0;
-    return bTime - aTime;
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function normalizeTicketList(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  return [];
+}
+
+function normalizeTicketStatus(value) {
+  const normalized = String(value || '').trim().replaceAll('_', ' ').toLowerCase();
+  if (normalized === 'pending' || normalized === 'in progress' || normalized === 'follow-up requested' || normalized === 'follow up requested') {
+    return 'in progress';
+  }
+  if (normalized === 'resolved') return 'resolved';
+  if (normalized === 'closed' || normalized === 'cancelled' || normalized === 'canceled') return 'closed';
+  return 'open';
+}
+
+function readableTicketStatus(value) {
+  const normalized = normalizeTicketStatus(value);
+  if (normalized === 'in progress') return 'In Progress';
+  if (normalized === 'resolved') return 'Resolved';
+  if (normalized === 'closed') return 'Closed';
+  return 'Open';
+}
+
+function statusBadgeClass(status) {
+  const normalized = normalizeTicketStatus(status);
+  if (normalized === 'resolved' || normalized === 'closed') return 'resolved';
+  if (normalized === 'in progress') return 'in-progress';
+  return 'open';
+}
+
+function fetchJsonOrThrow(url, options = {}) {
+  return fetch(url, { headers: authHeaders(), ...options })
+    .then(async (res) => {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Failed request: ${url}`);
+      return data;
+    });
+}
+
+function monthKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
+
+function weekOfMonth(date) {
+  return Math.ceil(date.getDate() / 7);
+}
+
+function monthLabel(monthToken) {
+  const [yearText, monthText] = String(monthToken || '').split('-');
+  const year = Number(yearText);
+  const month = Number(monthText);
+  if (!year || !month) return monthToken || 'Unknown';
+  const date = new Date(year, month - 1, 1);
+  return date.toLocaleString(undefined, { month: 'short', year: 'numeric' });
+}
+
+function sortLabels(labels, { view, sort }) {
+  const desc = sort === 'latest';
+  return [...labels].sort((a, b) => {
+    if (view === 'weekly') {
+      return desc ? Number(b) - Number(a) : Number(a) - Number(b);
+    }
+    return desc ? b.localeCompare(a) : a.localeCompare(b);
   });
 }
 
-async function fetchJsonOrThrow(url, options = {}) {
-  const res = await fetch(url, { headers: authHeaders(), ...options });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `Failed request: ${url}`);
-  return data;
-}
+function buildTrendData(tickets, trendState) {
+  const safeTickets = Array.isArray(tickets) ? tickets : [];
+  const filteredByDate = safeTickets
+    .map((ticket) => {
+      const date = parseDate(ticket.updatedAt || ticket.createdAt);
+      if (!date) return null;
+      return { ticket, date, month: monthKey(date), week: weekOfMonth(date) };
+    })
+    .filter(Boolean);
 
-function calculateDailyTicketTrend(tickets) {
-  const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const open = new Array(7).fill(0);
-  const resolved = new Array(7).fill(0);
-  const now = new Date();
+  const availableMonths = [...new Set(filteredByDate.map((entry) => entry.month))].sort((a, b) => b.localeCompare(a));
+  const effectiveMonth = trendState.month === 'all' ? (availableMonths[0] || 'all') : trendState.month;
 
-  (Array.isArray(tickets) ? tickets : []).forEach(ticket => {
-    const d = parseDate(ticket.updatedAt || ticket.createdAt);
-    if (!d) return;
-    const diffDays = Math.floor((now - d) / (1000 * 60 * 60 * 24));
-    if (diffDays < 0 || diffDays > 6) return;
-    const idx = d.getDay() === 0 ? 6 : d.getDay() - 1;
-    if (ticket.status === 'Resolved') resolved[idx] += 1;
-    else open[idx] += 1;
+  let scoped = filteredByDate;
+  if (trendState.view === 'weekly') {
+    scoped = scoped.filter((entry) => entry.month === effectiveMonth);
+  } else if (trendState.month !== 'all') {
+    scoped = scoped.filter((entry) => entry.month === trendState.month);
+  }
+
+  if (trendState.week !== 'all') {
+    scoped = scoped.filter((entry) => entry.week === Number(trendState.week));
+  }
+
+  const grouped = new Map();
+  scoped.forEach((entry) => {
+    const key = trendState.view === 'weekly' ? String(entry.week) : entry.month;
+    if (!grouped.has(key)) grouped.set(key, { active: 0, resolved: 0, total: 0 });
+    const bucket = grouped.get(key);
+    const status = normalizeTicketStatus(entry.ticket.status);
+    if (status === 'resolved' || status === 'closed') bucket.resolved += 1;
+    if (status === 'open' || status === 'in progress') bucket.active += 1;
+    bucket.total += 1;
   });
 
-  return { labels: names, open, resolved };
+  const sortedLabels = sortLabels([...grouped.keys()], trendState);
+  const labels = sortedLabels.map((key) => {
+    if (trendState.view === 'weekly') return `Week ${key}`;
+    return monthLabel(key);
+  });
+
+  const active = sortedLabels.map((key) => grouped.get(key)?.active || 0);
+  const resolved = sortedLabels.map((key) => grouped.get(key)?.resolved || 0);
+  const details = sortedLabels.map((key, index) => ({
+    key,
+    label: labels[index],
+    active: active[index],
+    resolved: resolved[index],
+    total: grouped.get(key)?.total || 0
+  }));
+
+  return {
+    labels,
+    active,
+    resolved,
+    details,
+    availableMonths,
+    effectiveMonth
+  };
 }
 
-function renderLineChart(elId, labels, openSeries, resolvedSeries) {
+function renderLineChart(elId, labels, activeSeries, resolvedSeries) {
   const el = document.getElementById(elId);
   if (!el) return;
-  const width = 600;
+
+  if (!labels.length) {
+    el.innerHTML = "<div class='empty-state'><h3>No trend data</h3><p>Ticket activity will appear here when records are available.</p></div>";
+    return;
+  }
+
+  const width = 640;
   const height = 280;
-  const pad = { top: 24, right: 20, bottom: 44, left: 36 };
-  const maxValue = Math.max(1, ...openSeries, ...resolvedSeries);
+  const pad = { top: 24, right: 22, bottom: 48, left: 36 };
+  const maxValue = Math.max(1, ...activeSeries, ...resolvedSeries);
   const plotW = width - pad.left - pad.right;
   const plotH = height - pad.top - pad.bottom;
 
-  const x = i => pad.left + (i * (plotW / Math.max(1, labels.length - 1)));
-  const y = v => pad.top + (plotH - ((v / maxValue) * plotH));
-  const toPath = series => series.map((v, i) => `${i === 0 ? 'M' : 'L'} ${x(i)} ${y(v)}`).join(' ');
+  const x = (i) => pad.left + (i * (plotW / Math.max(1, labels.length - 1)));
+  const y = (v) => pad.top + (plotH - ((v / maxValue) * plotH));
+  const toPath = (series) => series.map((v, i) => `${i === 0 ? 'M' : 'L'} ${x(i)} ${y(v)}`).join(' ');
 
-  const grid = [0, 0.25, 0.5, 0.75, 1].map(r => {
+  const grid = [0, 0.25, 0.5, 0.75, 1].map((r) => {
     const gy = pad.top + (plotH * r);
     return `<line x1='${pad.left}' y1='${gy}' x2='${width - pad.right}' y2='${gy}' stroke='#e2e8f0' stroke-dasharray='3 4'/>`;
   }).join('');
@@ -64,22 +189,78 @@ function renderLineChart(elId, labels, openSeries, resolvedSeries) {
   el.innerHTML = `
     <svg viewBox='0 0 ${width} ${height}' class='viz-svg' role='img' aria-label='Ticket trend chart'>
       ${grid}
-      <path d='${toPath(openSeries)}' fill='none' stroke='#2563eb' stroke-width='2.5' stroke-linecap='round'/>
+      <path d='${toPath(activeSeries)}' fill='none' stroke='#2563eb' stroke-width='2.5' stroke-linecap='round'/>
       <path d='${toPath(resolvedSeries)}' fill='none' stroke='#22c55e' stroke-width='2.5' stroke-linecap='round'/>
-      ${labels.map((label, i) => `<text x='${x(i)}' y='${height - 14}' text-anchor='middle' class='viz-axis-label'>${label}</text>`).join('')}
+      ${labels.map((label, i) => `<text x='${x(i)}' y='${height - 14}' text-anchor='middle' class='viz-axis-label'>${escapeHtml(label)}</text>`).join('')}
       <text x='${pad.left}' y='${pad.top - 8}' class='viz-axis-hint'>0-${maxValue}</text>
     </svg>
     <div class='viz-legend'>
-      <span><i class='viz-dot open'></i>open</span>
-      <span><i class='viz-dot resolved'></i>resolved</span>
+      <span><i class='viz-dot open'></i>active tickets</span>
+      <span><i class='viz-dot resolved'></i>resolved or closed</span>
     </div>`;
+}
+
+function renderTrendDetails(details) {
+  const el = document.getElementById('ticketTrendDetails');
+  if (!el) return;
+
+  if (!details.length) {
+    el.textContent = 'No ticket trend records for the selected range.';
+    return;
+  }
+
+  const totalActive = details.reduce((sum, row) => sum + row.active, 0);
+  const totalResolved = details.reduce((sum, row) => sum + row.resolved, 0);
+  const strongest = [...details].sort((a, b) => (b.active + b.resolved) - (a.active + a.resolved))[0];
+
+  el.innerHTML = `
+    <div class='table-wrap'>
+      <table>
+        <thead><tr><th>Period</th><th>Active</th><th>Resolved</th><th>Total</th></tr></thead>
+        <tbody>
+          ${details.map((row) => `<tr><td>${escapeHtml(row.label)}</td><td>${row.active}</td><td>${row.resolved}</td><td>${row.total}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    <p class='small' style='margin-top:8px'>Active total: ${totalActive} | Resolved total: ${totalResolved} | Highest volume: ${escapeHtml(strongest.label)}</p>`;
+}
+
+function renderTrendFilterOptions(availableMonths, selectedMonth) {
+  const select = document.getElementById('trendMonthFilter');
+  if (!select) return;
+
+  const normalizedSelected = selectedMonth || 'all';
+  const options = [`<option value='all'>All months</option>`]
+    .concat(availableMonths.map((month) => `<option value='${month}'>${monthLabel(month)}</option>`));
+  select.innerHTML = options.join('');
+  if (['all', ...availableMonths].includes(normalizedSelected)) {
+    select.value = normalizedSelected;
+  } else {
+    select.value = 'all';
+    dashboardState.trend.month = 'all';
+  }
+}
+
+function updateTrendControlState() {
+  const weekFilter = document.getElementById('trendWeekFilter');
+  const monthFilter = document.getElementById('trendMonthFilter');
+  if (!weekFilter || !monthFilter) return;
+
+  if (dashboardState.trend.view === 'weekly') {
+    monthFilter.disabled = false;
+    weekFilter.disabled = false;
+    return;
+  }
+
+  monthFilter.disabled = false;
+  weekFilter.disabled = false;
 }
 
 function getPriorityCounts(tickets) {
   const counts = { Critical: 0, High: 0, Medium: 0, Low: 0 };
-  (Array.isArray(tickets) ? tickets : []).forEach(t => {
-    const key = (t.priority || '').trim();
-    if (counts[key] != null) counts[key] += 1;
+  (Array.isArray(tickets) ? tickets : []).forEach((ticket) => {
+    const priority = String(ticket.priority || '').trim();
+    if (counts[priority] != null) counts[priority] += 1;
   });
   return counts;
 }
@@ -87,83 +268,177 @@ function getPriorityCounts(tickets) {
 function renderPriorityPie(elId, counts) {
   const el = document.getElementById(elId);
   if (!el) return;
-  const labels = ['High', 'Critical', 'Low', 'Medium'];
-  const colors = { High: '#f97316', Critical: '#ef4444', Low: '#22c55e', Medium: '#eab308' };
-  const values = labels.map(l => counts[l] || 0);
-  const total = Math.max(1, values.reduce((a, b) => a + b, 0));
+
+  const labels = ['Critical', 'High', 'Medium', 'Low'];
+  const colors = { Critical: '#ef4444', High: '#f97316', Medium: '#ca8a04', Low: '#22c55e' };
+  const values = labels.map((label) => counts[label] || 0);
+  const total = Math.max(1, values.reduce((sum, value) => sum + value, 0));
 
   let start = 0;
   const cx = 170;
   const cy = 130;
-  const r = 72;
+  const radius = 72;
 
-  const arcs = values.map((v, i) => {
-    const angle = (v / total) * Math.PI * 2;
+  const arcs = values.map((value, index) => {
+    const angle = (value / total) * Math.PI * 2;
     const end = start + angle;
-    const x1 = cx + r * Math.cos(start);
-    const y1 = cy + r * Math.sin(start);
-    const x2 = cx + r * Math.cos(end);
-    const y2 = cy + r * Math.sin(end);
+    const x1 = cx + radius * Math.cos(start);
+    const y1 = cy + radius * Math.sin(start);
+    const x2 = cx + radius * Math.cos(end);
+    const y2 = cy + radius * Math.sin(end);
     const large = angle > Math.PI ? 1 : 0;
-    const path = v === 0 ? '' : `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
+    const path = value === 0 ? '' : `M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 ${large} 1 ${x2} ${y2} Z`;
     start = end;
-    return `<path d='${path}' fill='${colors[labels[i]]}' stroke='#fff' stroke-width='1'/>`;
+    return `<path d='${path}' fill='${colors[labels[index]]}' stroke='#fff' stroke-width='1'/>`;
   }).join('');
 
-  const legends = labels.map(label => `<span class='viz-priority ${label.toLowerCase()}'>${label}: ${counts[label] || 0}</span>`).join('');
+  const legends = labels.map((label) => `<span class='viz-priority ${label.toLowerCase()}'>${label}: ${counts[label] || 0}</span>`).join('');
 
   el.innerHTML = `
     <div class='pie-wrap'>
-      <svg viewBox='0 0 340 260' class='viz-svg' role='img' aria-label='Priority distribution pie chart'>${arcs}</svg>
+      <svg viewBox='0 0 340 260' class='viz-svg' role='img' aria-label='Priority distribution chart'>${arcs}</svg>
       <div class='pie-legend'>${legends}</div>
     </div>`;
 }
 
-function generatePerformanceSnapshots(summary, devices) {
-  const hostCpu = Number(summary?.hostTelemetry?.cpuUsagePercent ?? 0);
-  const hostMem = Number(summary?.hostTelemetry?.memoryUsagePercent ?? 0);
-  const coverage = Number(summary?.telemetryAvailableDevices ?? 0);
-  const total = Math.max(1, Number(summary?.totalDiscovered ?? 1));
-  const coveragePct = (coverage / total) * 100;
-  const avgDeviceCpu = (devices.length ? devices.reduce((acc, d) => acc + Number(d.cpuUsagePercent ?? 0), 0) / devices.length : 0);
+function renderMetricCards() {
+  const summary = document.getElementById('summaryCards');
+  if (!summary) return;
 
-  return [
-    ['00:00', hostCpu * 0.72, hostMem * 0.8, coveragePct * 0.85],
-    ['04:00', hostCpu * 0.6, hostMem * 0.75, coveragePct * 0.9],
-    ['08:00', hostCpu * 0.82, hostMem * 0.86, coveragePct * 0.88],
-    ['12:00', Math.max(hostCpu, avgDeviceCpu), hostMem, coveragePct * 0.92],
-    ['16:00', hostCpu * 0.92, hostMem * 0.94, coveragePct * 0.93],
-    ['20:00', hostCpu * 0.7, hostMem * 0.84, coveragePct * 0.97]
-  ].map(([time, cpu, mem, tele]) => ({
-    time,
-    cpu: Math.min(100, Math.max(0, Math.round(cpu))),
-    memory: Math.min(100, Math.max(0, Math.round(mem))),
-    telemetry: Math.min(100, Math.max(0, Math.round(tele)))
-  }));
+  const tickets = dashboardState.tickets;
+  const monitorSummary = dashboardState.monitoringSummary || {};
+  const host = monitorSummary.hostTelemetry || {};
+  const inventory = dashboardState.inventoryStats || {};
+
+  const activeCount = tickets.filter((ticket) => {
+    const status = normalizeTicketStatus(ticket.status);
+    return status === 'open' || status === 'in progress';
+  }).length;
+
+  const resolvedCount = tickets.filter((ticket) => {
+    const status = normalizeTicketStatus(ticket.status);
+    return status === 'resolved' || status === 'closed';
+  }).length;
+
+  const cards = [
+    ['TS', 'Total Assets', Number(inventory.total || 0), 'Registered inventory devices'],
+    ['DD', 'Discoverable Devices', Number(monitorSummary.totalDiscovered || 0), 'LAN devices currently visible'],
+    ['AT', 'Active Tickets', activeCount, 'Open and in-progress requests'],
+    ['RC', 'Resolved Tickets', resolvedCount, 'Resolved and closed requests'],
+    ['TC', 'Telemetry Coverage', `${Number(monitorSummary.telemetryAvailableDevices || 0)}/${Number(monitorSummary.totalDiscovered || 0)}`, 'Devices with telemetry stream'],
+    ['CPU', 'Host CPU', `${Number(host.cpuUsagePercent || 0).toFixed(1)}%`, host.hostname || 'No host data'],
+    ['MEM', 'Host Memory', `${Number(host.memoryUsagePercent || 0).toFixed(1)}%`, `Updated ${formatDateTime(monitorSummary.timestamp)}`]
+  ];
+
+  summary.innerHTML = cards.map(([icon, label, value, hint]) => `
+    <article class='card metric-card'>
+      <div class='card-head'><div class='metric-label'>${label}</div><span class='card-icon'>${icon}</span></div>
+      <div class='metric-value'>${value}</div>
+      <div class='metric-hint'>${escapeHtml(hint)}</div>
+    </article>`).join('');
 }
 
-function renderSystemPerformance(elId, snapshots) {
-  const el = document.getElementById(elId);
-  if (!el) return;
-  const max = Math.max(100, ...snapshots.flatMap(s => [s.cpu, s.memory, s.telemetry]));
+function renderOperationalReport() {
+  const host = document.getElementById('operationalReportStats');
+  if (!host) return;
 
-  el.innerHTML = `
-    <div class='perf-grid'>
-      ${snapshots.map(s => `
-        <div class='perf-slot'>
-          <div class='perf-bars'>
-            <span class='perf-bar cpu' style='height:${(s.cpu / max) * 100}%'></span>
-            <span class='perf-bar memory' style='height:${(s.memory / max) * 100}%'></span>
-            <span class='perf-bar telemetry' style='height:${(s.telemetry / max) * 100}%'></span>
+  const tickets = dashboardState.tickets;
+  const monitorSummary = dashboardState.monitoringSummary || {};
+  const devices = dashboardState.lanDevices;
+  const criticalAlerts = devices.filter((device) => {
+    const cpu = Number(device.cpuUsagePercent ?? 0);
+    const memory = Number(device.memoryUsagePercent ?? 0);
+    return cpu >= 85 || memory >= 90;
+  });
+
+  const activeTickets = tickets.filter((ticket) => {
+    const status = normalizeTicketStatus(ticket.status);
+    return status === 'open' || status === 'in progress';
+  }).length;
+
+  const monthToken = dashboardState.trend.month === 'all'
+    ? buildTrendData(tickets, { ...dashboardState.trend, view: 'monthly' }).effectiveMonth
+    : dashboardState.trend.month;
+  const resolvedMonthToken = monthToken === 'all' ? monthKey(new Date()) : monthToken;
+
+  const thisMonthTickets = tickets.filter((ticket) => {
+    const date = parseDate(ticket.updatedAt || ticket.createdAt);
+    return date ? monthKey(date) === resolvedMonthToken : false;
+  });
+
+  const monthResolved = thisMonthTickets.filter((ticket) => {
+    const status = normalizeTicketStatus(ticket.status);
+    return status === 'resolved' || status === 'closed';
+  }).length;
+
+  const resolutionRate = thisMonthTickets.length
+    ? `${Math.round((monthResolved / thisMonthTickets.length) * 100)}%`
+    : '0%';
+
+  const stats = [
+    ['Active Tickets', activeTickets, 'Tickets requiring current handling'],
+    ['Ticket Trend', resolutionRate, `${monthLabel(resolvedMonthToken)} resolution rate`],
+    ['Operational Alerts', criticalAlerts.length, 'High CPU/memory devices'],
+    ['Discoverable Devices', Number(monitorSummary.totalDiscovered || 0), 'Devices seen in LAN discovery']
+  ];
+
+  host.innerHTML = stats.map(([label, value, hint]) => `
+    <article class='card metric-card'>
+      <div class='metric-label'>${label}</div>
+      <div class='metric-value'>${value}</div>
+      <div class='metric-hint'>${hint}</div>
+    </article>`).join('');
+}
+
+function renderSystemPerformance() {
+  const summaryHost = document.getElementById('systemPerformanceSummary');
+  const chartHost = document.getElementById('systemPerformanceChart');
+  if (!summaryHost || !chartHost) return;
+
+  const tickets = dashboardState.tickets;
+  const monitorSummary = dashboardState.monitoringSummary || {};
+  const host = monitorSummary.hostTelemetry || {};
+
+  const activeTickets = tickets.filter((ticket) => {
+    const status = normalizeTicketStatus(ticket.status);
+    return status === 'open' || status === 'in progress';
+  }).length;
+
+  const totalTickets = Math.max(1, tickets.length);
+  const discoverable = Math.max(1, Number(monitorSummary.totalDiscovered || 0));
+  const telemetryCoverage = (Number(monitorSummary.telemetryAvailableDevices || 0) / discoverable) * 100;
+  const ticketLoad = Math.min(100, (activeTickets / totalTickets) * 100);
+
+  const metrics = [
+    { label: 'Host CPU', value: Number(host.cpuUsagePercent || 0), target: 'Below 75%' },
+    { label: 'Host Memory', value: Number(host.memoryUsagePercent || 0), target: 'Below 80%' },
+    { label: 'Telemetry Coverage', value: telemetryCoverage, target: 'Above 70%' },
+    { label: 'Active Ticket Load', value: ticketLoad, target: 'Lower is better' }
+  ].map((metric) => ({ ...metric, value: Math.max(0, Math.min(100, Number(metric.value.toFixed(1)))) }));
+
+  summaryHost.innerHTML = metrics.map((metric) => {
+    const tone = metric.value >= 85 ? 'open' : metric.value >= 70 ? 'warning' : 'resolved';
+    return `<div class='insight-item'>
+      <div class='insight-label'>${metric.label}</div>
+      <div class='insight-value'>${metric.value}%</div>
+      <div class='small'>Target: ${metric.target}</div>
+      <span class='badge ${tone}' style='margin-top:6px'>${metric.value >= 85 ? 'Critical' : metric.value >= 70 ? 'Watch' : 'Stable'}</span>
+    </div>`;
+  }).join('');
+
+  chartHost.innerHTML = `
+    <div class='perf-health-list'>
+      ${metrics.map((metric) => `
+        <div class='perf-health-item'>
+          <div class='perf-health-line'>
+            <span class='perf-health-label'>${metric.label}</span>
+            <span class='perf-health-value'>${metric.value}%</span>
           </div>
-          <div class='spark-label'>${s.time}</div>
+          <div class='perf-health-track'>
+            <span class='perf-health-fill' style='width:${metric.value}%'></span>
+          </div>
         </div>
       `).join('')}
-    </div>
-    <div class='viz-legend'>
-      <span><i class='viz-dot cpu'></i>CPU</span>
-      <span><i class='viz-dot memory'></i>Memory</span>
-      <span><i class='viz-dot telemetry'></i>Telemetry</span>
     </div>`;
 }
 
@@ -176,119 +451,120 @@ function renderRecentAdminTickets(tickets) {
   if (!rows) return;
 
   const priorityOrder = { Critical: 0, High: 1, Medium: 2, Low: 3 };
-  const relevant = (Array.isArray(tickets) ? tickets : [])
-    .filter(t => ['Critical', 'High'].includes(t.priority))
+  const relevant = [...(Array.isArray(tickets) ? tickets : [])]
     .sort((a, b) => {
       const priorityDiff = (priorityOrder[a.priority] ?? 99) - (priorityOrder[b.priority] ?? 99);
       if (priorityDiff !== 0) return priorityDiff;
-      return new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0);
+      const aTime = parseDate(a.updatedAt || a.createdAt)?.getTime() ?? 0;
+      const bTime = parseDate(b.updatedAt || b.createdAt)?.getTime() ?? 0;
+      return bTime - aTime;
     })
-    .slice(0, 6);
+    .slice(0, 8);
 
   if (!relevant.length) {
-    renderTableEmptyState(rows, 5, 'No recent high-priority tickets found.');
+    renderTableEmptyState(rows, 5, 'No recent tickets found.');
     return;
   }
 
-  rows.innerHTML = relevant.map(t => `
+  rows.innerHTML = relevant.map((ticket) => `
     <tr>
-      <td><a class='ticket-link' href='${adminTicketHref(t.id)}' aria-label='Open ticket ${t.id}'>#${t.id}</a></td>
-      <td><a class='ticket-link ticket-link-title monitor-text-wrap' href='${adminTicketHref(t.id)}' title='${t.title || '-'}'>${t.title || '-'}</a></td>
-      <td>${t.priority || '-'}</td>
-      <td><span class='badge ${t.status === 'Open' ? 'open' : (t.status === 'In Progress' ? 'in-progress' : 'resolved')}'>${t.status || 'Unknown'}</span></td>
-      <td>${formatDateTime(t.updatedAt)}</td>
+      <td><a class='ticket-link' href='${adminTicketHref(ticket.id)}' aria-label='Open ticket ${ticket.id}'>#${ticket.id}</a></td>
+      <td><a class='ticket-link ticket-link-title monitor-text-wrap' href='${adminTicketHref(ticket.id)}' title='${escapeHtml(ticket.title || '-')}'>${escapeHtml(ticket.title || '-')}</a></td>
+      <td>${escapeHtml(ticket.priority || '-')}</td>
+      <td><span class='badge ${statusBadgeClass(ticket.status)}'>${readableTicketStatus(ticket.status)}</span></td>
+      <td>${formatDateTime(ticket.updatedAt || ticket.createdAt)}</td>
     </tr>
   `).join('');
 }
 
-function renderAdminOpsFeed(alerts, notifications) {
+function renderAdminOpsFeed(devices, notifications) {
   const feed = document.getElementById('adminOpsFeed');
   if (!feed) return;
 
-  const criticalAlerts = (Array.isArray(alerts) ? alerts : []).map(a => ({
-    type: 'critical',
-    message: `${a.hostname || a.ipAddress || 'Device'} has high usage (CPU ${Number(a.cpuUsagePercent ?? 0).toFixed(1)}%, Memory ${Number(a.memoryUsagePercent ?? 0).toFixed(1)}%).`,
-    createdAt: a.lastSeen || new Date().toISOString()
+  const criticalAlerts = (Array.isArray(devices) ? devices : [])
+    .filter((device) => Number(device.cpuUsagePercent ?? 0) >= 85 || Number(device.memoryUsagePercent ?? 0) >= 90)
+    .map((device) => ({
+      type: 'critical',
+      message: `${device.hostname || device.ipAddress || 'Device'} exceeded threshold (CPU ${Number(device.cpuUsagePercent ?? 0).toFixed(1)}%, Memory ${Number(device.memoryUsagePercent ?? 0).toFixed(1)}%).`,
+      createdAt: device.lastSeen || new Date().toISOString()
+    }));
+
+  const mappedNotifications = (Array.isArray(notifications) ? notifications : []).map((notification) => ({
+    type: String(notification.type || 'info').toLowerCase(),
+    message: notification.message || 'Notification received.',
+    createdAt: notification.createdAt
   }));
 
-  const mappedNotifications = (Array.isArray(notifications) ? notifications : []).map(n => ({
-    type: n.type || 'info',
-    message: n.message || 'Notification received.',
-    createdAt: n.createdAt
-  }));
+  const allItems = [...criticalAlerts, ...mappedNotifications]
+    .sort((a, b) => {
+      const aTime = parseDate(a.createdAt)?.getTime() ?? 0;
+      const bTime = parseDate(b.createdAt)?.getTime() ?? 0;
+      return bTime - aTime;
+    })
+    .slice(0, 8);
 
-  const all = sortByUpdatedDesc([...criticalAlerts, ...mappedNotifications], 'createdAt').slice(0, 8);
-  if (!all.length) {
+  if (!allItems.length) {
     feed.innerHTML = "<div class='empty-state'><h3>No operational updates</h3><p>Alerts and notifications will appear here.</p></div>";
     return;
   }
 
-  feed.innerHTML = all.map(item => {
-    const badge = item.type === 'critical' || item.type === 'error'
+  feed.innerHTML = allItems.map((item) => {
+    const badgeClass = item.type === 'critical' || item.type === 'error'
       ? 'open'
       : (item.type === 'success' ? 'resolved' : 'in-progress');
+
     return `<article class='notification-item'>
       <div class='notification-line'>
-        <span class='badge ${badge}'>${item.type}</span>
+        <span class='badge ${badgeClass}'>${escapeHtml(item.type)}</span>
         <span class='small'>${formatDateTime(item.createdAt)}</span>
       </div>
-      <p>${item.message}</p>
+      <p>${escapeHtml(item.message)}</p>
     </article>`;
   }).join('');
 }
 
-function renderHealthInsights(items) {
-  const el = document.getElementById('systemHealthInsights');
-  if (!el) return;
-  const safe = Array.isArray(items) ? items : [];
-  if (!safe.length) {
-    el.innerHTML = `<div class='insight-item'><div class='insight-label'>Status</div><div class='insight-value'>No data</div></div>`;
-    return;
-  }
-  el.innerHTML = safe.map(i => `<div class='insight-item'><div class='insight-label'>${i.label || 'Insight'}</div><div class='insight-value'>${i.value || '-'}</div></div>`).join('');
-}
+function applyTrendRendering() {
+  const trendData = buildTrendData(dashboardState.tickets, dashboardState.trend);
+  renderTrendFilterOptions(trendData.availableMonths, dashboardState.trend.month);
+  updateTrendControlState();
 
-
-function renderMetricSkeletons(count = 6) {
-  return Array.from({ length: count }).map(() => `
-    <article class='card metric-card analytics-skeleton'>
-      <div class='card-head'>
-        <div class='skeleton skeleton-text skeleton-label'></div>
-        <span class='card-icon skeleton skeleton-icon'></span>
-      </div>
-      <div class='skeleton skeleton-text skeleton-value'></div>
-      <div class='skeleton skeleton-text skeleton-hint'></div>
-    </article>`).join('');
-}
-
-function renderChartSkeleton(label = 'Loading analytics') {
-  return `
-    <div class='analytics-skeleton-panel' aria-hidden='true'>
-      <div class='skeleton skeleton-chart'></div>
-      <div class='skeleton-row'>
-        <span class='skeleton skeleton-pill'></span>
-        <span class='skeleton skeleton-pill'></span>
-        <span class='skeleton skeleton-pill'></span>
-      </div>
-      <div class='analytics-buffer-msg'><span class='page-splash-spinner' aria-hidden='true'></span><span>${label}</span></div>
-    </div>`;
+  renderLineChart('ticketTrendChart', trendData.labels, trendData.active, trendData.resolved);
+  renderTrendDetails(trendData.details);
 }
 
 function setAnalyticsBuffering(isLoading) {
   const summary = document.getElementById('summaryCards');
+  const report = document.getElementById('operationalReportStats');
   const trend = document.getElementById('ticketTrendChart');
   const priority = document.getElementById('priorityDistributionChart');
   const perf = document.getElementById('systemPerformanceChart');
 
   if (isLoading) {
     if (summary) {
-      summary.innerHTML = renderMetricSkeletons(window.matchMedia('(max-width: 640px)').matches ? 4 : 6);
+      summary.innerHTML = Array.from({ length: 6 }).map(() => `
+        <article class='card metric-card analytics-skeleton'>
+          <div class='card-head'>
+            <div class='skeleton skeleton-text skeleton-label'></div>
+            <span class='card-icon skeleton skeleton-icon'></span>
+          </div>
+          <div class='skeleton skeleton-text skeleton-value'></div>
+          <div class='skeleton skeleton-text skeleton-hint'></div>
+        </article>`).join('');
+    }
+
+    if (report) {
+      report.innerHTML = Array.from({ length: 4 }).map(() => `
+        <article class='card metric-card analytics-skeleton'>
+          <div class='skeleton skeleton-text skeleton-label'></div>
+          <div class='skeleton skeleton-text skeleton-value'></div>
+          <div class='skeleton skeleton-text skeleton-hint'></div>
+        </article>`).join('');
     }
 
     [trend, priority, perf].forEach((el) => {
       if (!el) return;
       el.classList.add('analytics-buffering');
-      el.innerHTML = renderChartSkeleton();
+      el.innerHTML = "<div class='analytics-buffer-msg'><span class='page-splash-spinner' aria-hidden='true'></span><span>Loading analytics...</span></div>";
     });
     return;
   }
@@ -296,80 +572,85 @@ function setAnalyticsBuffering(isLoading) {
   [trend, priority, perf].forEach((el) => el?.classList.remove('analytics-buffering'));
 }
 
-async function loadAdminDashboard() {
-  const summary = document.getElementById('summaryCards');
-  const recentRows = document.getElementById('recentAdminTicketRows');
-  if (!summary) return;
+function wireTrendControls() {
+  const view = document.getElementById('trendViewSelect');
+  const month = document.getElementById('trendMonthFilter');
+  const week = document.getElementById('trendWeekFilter');
+  const sort = document.getElementById('trendSortSelect');
 
+  if (view) {
+    view.value = dashboardState.trend.view;
+    view.addEventListener('change', () => {
+      dashboardState.trend.view = view.value || 'monthly';
+      applyTrendRendering();
+    });
+  }
+
+  if (month) {
+    month.addEventListener('change', () => {
+      dashboardState.trend.month = month.value || 'all';
+      applyTrendRendering();
+    });
+  }
+
+  if (week) {
+    week.value = dashboardState.trend.week;
+    week.addEventListener('change', () => {
+      dashboardState.trend.week = week.value || 'all';
+      applyTrendRendering();
+    });
+  }
+
+  if (sort) {
+    sort.value = dashboardState.trend.sort;
+    sort.addEventListener('change', () => {
+      dashboardState.trend.sort = sort.value || 'latest';
+      applyTrendRendering();
+    });
+  }
+}
+
+async function loadAdminDashboard() {
+  const recentRows = document.getElementById('recentAdminTicketRows');
   setAnalyticsBuffering(true);
-  if (recentRows) showTableSkeleton(recentRows, { rowCount: 5, columnCount: 5 });
+  if (recentRows) showTableSkeleton(recentRows, { rowCount: 6, columnCount: 5 });
 
   try {
-    const [tickets, monitorSummary, lanDevices, notifications] = await Promise.all([
-      fetchJsonOrThrow('/api/tickets'),
+    const [ticketsPayload, monitorSummary, lanDevices, notifications, inventoryStats] = await Promise.all([
+      fetchJsonOrThrow('/api/tickets?limit=500'),
       fetchJsonOrThrow('/api/monitoring/summary'),
       fetchJsonOrThrow('/api/monitoring/lan-devices'),
-      fetchJsonOrThrow('/api/notifications')
+      fetchJsonOrThrow('/api/notifications'),
+      fetchJsonOrThrow('/api/inventory/stats')
     ]);
 
-    const safeTickets = Array.isArray(tickets) ? tickets : [];
-    const safeDevices = Array.isArray(lanDevices) ? lanDevices : [];
-    const host = monitorSummary?.hostTelemetry || {};
+    dashboardState.tickets = normalizeTicketList(ticketsPayload);
+    dashboardState.monitoringSummary = monitorSummary || null;
+    dashboardState.lanDevices = Array.isArray(lanDevices) ? lanDevices : [];
+    dashboardState.notifications = Array.isArray(notifications) ? notifications : [];
+    dashboardState.inventoryStats = inventoryStats || null;
 
-    const openCount = safeTickets.filter(t => t.status === 'Open').length;
-    const inProgressCount = safeTickets.filter(t => t.status === 'In Progress').length;
-    const resolvedCount = safeTickets.filter(t => t.status === 'Resolved').length;
-    const criticalAlerts = safeDevices.filter(d => (Number(d.cpuUsagePercent ?? 0) > 85) || (Number(d.memoryUsagePercent ?? 0) > 90));
+    renderMetricCards();
 
-    const cards = [
-      ['◧', 'Total Tickets', safeTickets.length, 'From live ticket backend'],
-      ['◍', 'Open', openCount, 'Awaiting action'],
-      ['◔', 'In Progress', inProgressCount, 'Currently handled'],
-      ['✓', 'Resolved', resolvedCount, 'Closed successfully'],
-      ['⚙', 'Host CPU Usage', `${Number(host.cpuUsagePercent ?? 0).toFixed(1)}%`, `Host ${host.hostname || 'local'} (${host.ipAddress || 'n/a'})`],
-      ['🧠', 'Host Memory', `${Number(host.memoryUsagePercent ?? 0).toFixed(1)}%`, `${Number(monitorSummary?.telemetryAvailableDevices ?? 0)} telemetry-enabled devices`],
-      ['⚠', 'Critical Alerts', criticalAlerts.length, 'Derived from LAN telemetry']
-    ];
-
-    summary.innerHTML = cards.map(([icon, label, value, hint]) => `
-      <article class='card metric-card'>
-        <div class='card-head'><div class='metric-label'>${label}</div><span class='card-icon'>${icon}</span></div>
-        <div class='metric-value'>${value}</div>
-        <div class='metric-hint'>${hint}</div>
-      </article>`).join('');
-
-    const trend = calculateDailyTicketTrend(safeTickets);
-    renderLineChart('ticketTrendChart', trend.labels, trend.open, trend.resolved);
-
-    const priorities = getPriorityCounts(safeTickets);
+    const priorities = getPriorityCounts(dashboardState.tickets);
     renderPriorityPie('priorityDistributionChart', priorities);
 
-    const snapshots = generatePerformanceSnapshots(monitorSummary, safeDevices);
-    renderSystemPerformance('systemPerformanceChart', snapshots);
+    applyTrendRendering();
+    renderOperationalReport();
 
-    renderHealthInsights([
-      { label: 'Host', value: host.hostname || 'N/A' },
-      { label: 'Monitored devices', value: `${monitorSummary?.monitoredDevices ?? 0}` },
-      { label: 'Critical devices', value: `${criticalAlerts.length}` },
-      { label: 'Last updated', value: formatDateTime(monitorSummary?.timestamp) }
-    ]);
+    renderSystemPerformance();
 
     if (recentRows) clearTableSkeleton(recentRows);
-    renderRecentAdminTickets(safeTickets);
-    renderAdminOpsFeed(criticalAlerts, notifications);
+    renderRecentAdminTickets(dashboardState.tickets);
+    renderAdminOpsFeed(dashboardState.lanDevices, dashboardState.notifications);
   } catch (error) {
-    summary.innerHTML = `<div class='card'><p class='small'>${error.message}</p></div>`;
-    renderLineChart('ticketTrendChart', ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], [0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0]);
+    const summary = document.getElementById('summaryCards');
+    if (summary) summary.innerHTML = `<div class='card'><p class='small'>${escapeHtml(error.message || 'Unable to load dashboard data')}</p></div>`;
     renderPriorityPie('priorityDistributionChart', { Critical: 0, High: 0, Medium: 0, Low: 0 });
-    renderSystemPerformance('systemPerformanceChart', [
-      { time: '00:00', cpu: 0, memory: 0, telemetry: 0 },
-      { time: '04:00', cpu: 0, memory: 0, telemetry: 0 },
-      { time: '08:00', cpu: 0, memory: 0, telemetry: 0 },
-      { time: '12:00', cpu: 0, memory: 0, telemetry: 0 },
-      { time: '16:00', cpu: 0, memory: 0, telemetry: 0 },
-      { time: '20:00', cpu: 0, memory: 0, telemetry: 0 }
-    ]);
-    renderHealthInsights([]);
+    renderLineChart('ticketTrendChart', [], [], []);
+    renderTrendDetails([]);
+    renderOperationalReport();
+    renderSystemPerformance();
     if (recentRows) renderTableErrorState(recentRows, 5, error.message || 'Unable to load recent tickets');
     renderAdminOpsFeed([], []);
   } finally {
@@ -378,8 +659,7 @@ async function loadAdminDashboard() {
   }
 }
 
-
-
 document.addEventListener('DOMContentLoaded', () => {
+  wireTrendControls();
   loadAdminDashboard();
 });

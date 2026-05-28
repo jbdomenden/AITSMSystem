@@ -3,7 +3,8 @@ const inventoryState = {
   pageSize: 10,
   total: 0,
   selectedId: null,
-  loading: false
+  loading: false,
+  searchDebounceTimer: null
 };
 
 function inventoryStatusBadge(status) {
@@ -30,6 +31,10 @@ function buildInventoryQuery() {
   const status = (document.getElementById('inventoryStatusFilter')?.value || '').trim();
   const department = (document.getElementById('inventoryDepartmentFilter')?.value || '').trim();
   const source = (document.getElementById('inventorySourceFilter')?.value || '').trim();
+  const sortValue = (document.getElementById('inventorySortFilter')?.value || 'lastSeen-desc').trim();
+  const [sortByRaw, sortOrderRaw] = sortValue.split('-');
+  const sortBy = sortByRaw || 'lastSeen';
+  const sortOrder = sortOrderRaw || 'desc';
 
   if (search) params.set('search', search);
   if (status) params.set('status', status);
@@ -38,10 +43,29 @@ function buildInventoryQuery() {
 
   params.set('page', String(inventoryState.page));
   params.set('pageSize', String(inventoryState.pageSize));
-  params.set('sortBy', 'lastSeen');
-  params.set('sortOrder', 'desc');
+  params.set('sortBy', sortBy);
+  params.set('sortOrder', sortOrder);
 
   return params.toString();
+}
+
+function populateDepartmentFilterOptions(items) {
+  const select = document.getElementById('inventoryDepartmentFilter');
+  if (!select) return;
+
+  const current = select.value || '';
+  const departments = [...new Set((Array.isArray(items) ? items : [])
+    .map((item) => String(item.assignedDepartment || '').trim())
+    .filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
+
+  select.innerHTML = [`<option value=''>All</option>`]
+    .concat(departments.map((department) => `<option value='${department}'>${department}</option>`))
+    .join('');
+
+  if (current && departments.includes(current)) {
+    select.value = current;
+  }
 }
 
 function renderInventoryStats(stats) {
@@ -124,6 +148,7 @@ async function loadInventory() {
 
     const normalized = parseListResponse(listPayload);
     clearTableSkeleton(rows);
+    populateDepartmentFilterOptions(normalized.data || []);
     renderInventoryRows(normalized.data || []);
     updateInventoryPagination(normalized.meta);
     renderInventoryStats(statsRes.ok ? statsPayload : null);
@@ -271,11 +296,13 @@ async function saveInventoryNotes() {
 function bindInventoryEvents() {
   document.getElementById('inventoryRefreshBtn')?.addEventListener('click', () => loadInventory());
 
-  ['inventorySearch', 'inventoryStatusFilter', 'inventoryDepartmentFilter', 'inventorySourceFilter'].forEach((id) => {
-    document.getElementById(id)?.addEventListener('input', () => {
-      inventoryState.page = 1;
-      loadInventory();
-    });
+  document.getElementById('inventorySearch')?.addEventListener('input', () => {
+    inventoryState.page = 1;
+    if (inventoryState.searchDebounceTimer) window.clearTimeout(inventoryState.searchDebounceTimer);
+    inventoryState.searchDebounceTimer = window.setTimeout(() => loadInventory(), 220);
+  });
+
+  ['inventoryStatusFilter', 'inventoryDepartmentFilter', 'inventorySourceFilter', 'inventorySortFilter'].forEach((id) => {
     document.getElementById(id)?.addEventListener('change', () => {
       inventoryState.page = 1;
       loadInventory();

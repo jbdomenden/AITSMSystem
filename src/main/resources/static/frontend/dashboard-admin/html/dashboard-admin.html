@@ -13,10 +13,30 @@
         <div class='card-head'>
           <div>
             <h3 class='section-title'>Ticket Trend</h3>
-            <p class='section-subtitle'>Open vs resolved tickets over time.</p>
+            <p class='section-subtitle'>Monthly and weekly movement of active and resolved tickets.</p>
+          </div>
+          <div class='inline-actions dashboard-trend-controls'>
+            <select id='trendViewSelect' aria-label='Ticket trend view'>
+              <option value='monthly'>Monthly</option>
+              <option value='weekly'>Weekly</option>
+            </select>
+            <select id='trendMonthFilter' aria-label='Ticket trend month filter'></select>
+            <select id='trendWeekFilter' aria-label='Ticket trend week filter'>
+              <option value='all'>All weeks</option>
+              <option value='1'>Week 1</option>
+              <option value='2'>Week 2</option>
+              <option value='3'>Week 3</option>
+              <option value='4'>Week 4</option>
+              <option value='5'>Week 5</option>
+            </select>
+            <select id='trendSortSelect' aria-label='Ticket trend sort order'>
+              <option value='latest'>Latest first</option>
+              <option value='oldest'>Oldest first</option>
+            </select>
           </div>
         </div>
         <div id='ticketTrendChart' class='chart-placeholder admin-chart'></div>
+        <div id='ticketTrendDetails' class='small' style='margin-top:12px'></div>
       </article>
       <article class='card'>
         <div class='card-head'>
@@ -29,15 +49,7 @@
       </article>
     </section>
 
-    <section class='card' style='margin-top:16px'>
-      <div class='card-head'>
-        <div>
-          <h3 class='section-title'>System Performance</h3>
-          <p class='section-subtitle'>CPU, Memory, and telemetry coverage over recent snapshots.</p>
-        </div>
-      </div>
-      <div id='systemPerformanceChart' class='chart-placeholder admin-chart'></div>
-    </section>
+    <section id='operationalReportStats' class='grid stats compact-grid' style='margin-top:16px'></section>
 
     <section class='grid admin-panels' style='margin-top:16px'>
       <article class='card'>
@@ -63,6 +75,17 @@
         </div>
         <div id='adminOpsFeed' class='notification-list'></div>
       </article>
+    </section>
+
+    <section class='card' style='margin-top:16px'>
+      <div class='card-head'>
+        <div>
+          <h3 class='section-title'>System Performance</h3>
+          <p class='section-subtitle'>Operational stability computed from host telemetry, discoverability, and ticket load.</p>
+        </div>
+      </div>
+      <div id='systemPerformanceSummary' class='insight-grid'></div>
+      <div id='systemPerformanceChart' class='chart-placeholder admin-chart' style='margin-top:12px'></div>
     </section>
 
   </main>

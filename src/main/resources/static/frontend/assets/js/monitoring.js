@@ -5,6 +5,8 @@ let monitoringRefreshInFlight = false;
 let monitoringLastUpdatedAt = null;
 let editingDeviceId = null;
 let deviceRegistry = [];
+let assetUserDirectory = [];
+let assetDepartmentDirectory = new Set();
 
 function statusBadge(status) {
   const s = String(status || '').toLowerCase();
@@ -35,6 +37,24 @@ function formatRelativeTime(value) {
   if (seconds < 60) return `Updated ${seconds}s ago`;
   const minutes = Math.round(seconds / 60);
   return `Updated ${minutes}m ago`;
+}
+
+function setAssetFormMessage(message = '', tone = 'info') {
+  const el = document.getElementById('assetFormMessage');
+  if (!el) return;
+  el.textContent = message;
+  el.classList.remove('text-success', 'text-danger');
+  if (tone === 'success') el.classList.add('text-success');
+  if (tone === 'danger') el.classList.add('text-danger');
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
 
 function updateMonitoringLiveStatus(state = 'idle', message) {
@@ -159,6 +179,80 @@ function renderLanIpSuggestions(ips) {
   suggestions.innerHTML = uniqueIps.map((ip) => `<option value="${ip}"></option>`).join('');
 }
 
+function updateDepartmentSelectOptions(selectedValue = '') {
+  const select = document.getElementById('department');
+  if (!select) return;
+  const departments = [...assetDepartmentDirectory].filter(Boolean).sort((a, b) => a.localeCompare(b));
+  select.innerHTML = [`<option value=''>Select department</option>`]
+    .concat(departments.map((department) => `<option value='${escapeHtml(department)}'>${escapeHtml(department)}</option>`))
+    .join('');
+  if (selectedValue && departments.includes(selectedValue)) select.value = selectedValue;
+}
+
+function updateAssignedUserSelectOptions(selectedValue = '') {
+  const select = document.getElementById('assignedUser');
+  if (!select) return;
+  const options = assetUserDirectory.map((user) => {
+    const value = user.fullName || user.email;
+    const label = user.email ? `${user.fullName || user.email} (${user.email})` : (user.fullName || 'User');
+    return { value, label };
+  }).filter((entry) => entry.value);
+
+  select.innerHTML = [`<option value=''>Select user</option>`]
+    .concat(options.map((entry) => `<option value='${escapeHtml(entry.value)}'>${escapeHtml(entry.label)}</option>`))
+    .join('');
+  if (selectedValue && options.some((entry) => entry.value === selectedValue)) select.value = selectedValue;
+}
+
+function includeDynamicFormOptionsFromDevices(devices) {
+  (Array.isArray(devices) ? devices : []).forEach((device) => {
+    const department = String(device.department || '').trim();
+    if (department) assetDepartmentDirectory.add(department);
+  });
+  updateDepartmentSelectOptions(document.getElementById('department')?.value || '');
+}
+
+async function loadAssetFormOptions() {
+  const defaultDepartments = ['Finance', 'HR', 'IT', 'Operations', 'Sales', 'Support'];
+  defaultDepartments.forEach((department) => assetDepartmentDirectory.add(department));
+
+  try {
+    const res = await fetch('/api/users', { headers: authHeaders() });
+    const users = await res.json();
+    if (res.ok && Array.isArray(users)) {
+      assetUserDirectory = users.map((user) => ({
+        fullName: String(user.fullName || '').trim(),
+        email: String(user.email || '').trim(),
+        department: String(user.department || '').trim()
+      }));
+      assetUserDirectory.forEach((user) => {
+        if (user.department) assetDepartmentDirectory.add(user.department);
+      });
+    }
+  } catch {
+    assetUserDirectory = [];
+  }
+
+  updateDepartmentSelectOptions();
+  updateAssignedUserSelectOptions();
+}
+
+function isValidLanIpAddress(ipAddress) {
+  const pattern = /^(\\d{1,3}\\.){3}\\d{1,3}$/;
+  if (!pattern.test(ipAddress)) return false;
+  return ipAddress.split('.').every((part) => Number(part) >= 0 && Number(part) <= 255);
+}
+
+function validateDeviceForm(body) {
+  if (!body.deviceName) return 'Device name is required. Use a discoverable LAN IP so the hostname can be detected.';
+  if (!body.ipAddress) return 'IP address is required.';
+  if (!isValidLanIpAddress(body.ipAddress)) return 'Enter a valid IPv4 address for the LAN device.';
+  if (!body.department) return 'Select a department.';
+  if (!body.assignedUser) return 'Select an assigned user.';
+  if (!body.status) return 'Device status is required.';
+  return null;
+}
+
 function setRefreshDiscoveryBusy(isBusy) {
   const button = document.getElementById('refreshDiscoveryBtn');
   if (!button) return;
@@ -246,7 +340,17 @@ async function autoFillDeviceContextByIp() {
     }
 
     if (data.deviceName) deviceInput.value = data.deviceName;
-    if (!assignedInput.value.trim() && data.assignedUser) assignedInput.value = data.assignedUser;
+    if (!assignedInput.value.trim() && data.assignedUser) {
+      const assigned = String(data.assignedUser || '').trim();
+      if (assigned) {
+        const exists = assetUserDirectory.some((entry) => entry.fullName === assigned || entry.email === assigned);
+        if (!exists) {
+          assetUserDirectory.push({ fullName: assigned, email: '', department: '' });
+          updateAssignedUserSelectOptions(assigned);
+        }
+        assignedInput.value = assigned;
+      }
+    }
     setStatusField(data.suggestedStatus);
   } catch {
     setStatusField('Unreachable');
@@ -256,18 +360,31 @@ async function autoFillDeviceContextByIp() {
 function seedAssignedUserFromSession() {
   const assignedInput = document.getElementById('assignedUser');
   if (!assignedInput) return;
-  if (assignedInput.value.trim()) return;
+  if ((assignedInput.value || '').trim()) return;
   const fullName = (localStorage.getItem('fullName') || '').trim();
   const email = (localStorage.getItem('email') || '').trim();
-  assignedInput.value = fullName || email;
+  const preferred = fullName || email;
+  if (!preferred) return;
+
+  const alreadyPresent = assetUserDirectory.some((entry) => entry.fullName === preferred || entry.email === preferred);
+  if (!alreadyPresent) {
+    assetUserDirectory.push({ fullName: preferred, email, department: '' });
+    updateAssignedUserSelectOptions(preferred);
+  }
+
+  assignedInput.value = preferred;
 }
 
 async function refreshAssetConnections() {
+  setAssetFormMessage('');
   const res = await fetch('/api/devices/sync-from-monitoring', { method: 'POST', headers: authHeaders() });
   const data = await res.json();
-  if (!res.ok) return alert(data.error || 'Unable to refresh device connections');
+  if (!res.ok) {
+    setAssetFormMessage(data.error || 'Unable to refresh device connections', 'danger');
+    return;
+  }
   await Promise.all([loadDevices(), loadMonitoring({ force: true, source: 'manual' })]);
-  alert(data.message || 'Asset connections refreshed');
+  setAssetFormMessage(data.message || 'Asset connections refreshed', 'success');
 }
 
 function bindAssetAutoFill() {
@@ -299,6 +416,7 @@ function resetDeviceForm() {
   const cancelButton = document.getElementById('cancelDeviceEditBtn');
   if (registerButton) registerButton.textContent = 'Register Device';
   cancelButton?.classList.add('hidden');
+  setAssetFormMessage('');
   ['deviceName', 'ipAddress', 'department', 'assignedUser'].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.value = '';
@@ -315,6 +433,17 @@ function startEditDevice(device) {
   const cancelButton = document.getElementById('cancelDeviceEditBtn');
   if (registerButton) registerButton.textContent = 'Save Changes';
   cancelButton?.classList.remove('hidden');
+  setAssetFormMessage('');
+
+  if (device.department) {
+    assetDepartmentDirectory.add(device.department);
+    updateDepartmentSelectOptions(device.department);
+  }
+  if (device.assignedUser) {
+    const existing = assetUserDirectory.some((entry) => entry.fullName === device.assignedUser || entry.email === device.assignedUser);
+    if (!existing) assetUserDirectory.push({ fullName: device.assignedUser, email: '', department: device.department || '' });
+    updateAssignedUserSelectOptions(device.assignedUser);
+  }
 
   document.getElementById('deviceName').value = device.deviceName || '';
   document.getElementById('ipAddress').value = device.ipAddress || '';
@@ -339,37 +468,45 @@ async function deleteDevice(id, label) {
 
   const res = await fetch(`/api/devices/${id}`, { method: 'DELETE', headers: authHeaders() });
   const data = await res.json();
-  if (!res.ok) return alert(data.error || 'Failed to delete device.');
+  if (!res.ok) {
+    setAssetFormMessage(data.error || 'Failed to delete device.', 'danger');
+    return;
+  }
 
   if (editingDeviceId === id) resetDeviceForm();
   await Promise.all([loadDevices(), loadMonitoring({ force: true, source: 'manual' })]);
-  alert(data.message || 'Device deleted');
+  setAssetFormMessage(data.message || 'Device deleted', 'success');
 }
 
 async function registerDevice() {
   const deviceNameEl = document.getElementById('deviceName');
   const ipAddressEl = document.getElementById('ipAddress');
+  setAssetFormMessage('');
 
   if (!(deviceNameEl?.value || '').trim() && (ipAddressEl?.value || '').trim()) {
     await autoFillDeviceContextByIp();
   }
 
   const body = currentDeviceFormBody();
-
-  if (!body.deviceName || !body.ipAddress || !body.department || !body.assignedUser || !body.status) {
-    return alert('All device fields are required.');
+  const validationError = validateDeviceForm(body);
+  if (validationError) {
+    setAssetFormMessage(validationError, 'danger');
+    return;
   }
 
   const endpoint = editingDeviceId ? `/api/devices/${editingDeviceId}` : '/api/devices';
   const method = editingDeviceId ? 'PUT' : 'POST';
   const res = await fetch(endpoint, { method, headers: authHeaders(), body: JSON.stringify(body) });
   const data = await res.json();
-  if (!res.ok) return alert(data.error || (editingDeviceId ? 'Failed to update device.' : 'Failed to register device (LAN only policy).'));
+  if (!res.ok) {
+    setAssetFormMessage(data.error || (editingDeviceId ? 'Failed to update device.' : 'Failed to register device (LAN only policy).'), 'danger');
+    return;
+  }
 
   const wasEditing = Boolean(editingDeviceId);
   resetDeviceForm();
   await Promise.all([loadDevices(), loadMonitoring({ force: true, source: 'manual' })]);
-  alert(wasEditing ? 'Device updated successfully.' : 'Device registered successfully.');
+  setAssetFormMessage(wasEditing ? 'Device updated successfully.' : 'Device registered successfully.', 'success');
 }
 
 async function loadDevices() {
@@ -390,6 +527,20 @@ async function loadDevices() {
       ? data.data
       : [];
   deviceRegistry = safe;
+  includeDynamicFormOptionsFromDevices(safe);
+  safe.forEach((device) => {
+    const label = String(device.assignedUser || '').trim();
+    if (!label) return;
+    const exists = assetUserDirectory.some((entry) => entry.fullName === label || entry.email === label);
+    if (!exists) {
+      assetUserDirectory.push({
+        fullName: label,
+        email: '',
+        department: String(device.department || '').trim()
+      });
+    }
+  });
+  updateAssignedUserSelectOptions(document.getElementById('assignedUser')?.value || '');
   clearTableSkeleton(rows);
   if (!safe.length) {
     renderTableEmptyState(rows, 9, 'No devices registered yet.');
@@ -428,11 +579,12 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden) loadMonitoring({ source: 'visibility' });
 });
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadAssetFormOptions();
+  seedAssignedUserFromSession();
   loadMonitoring({ source: 'initial' });
   loadDevices();
   bindAssetAutoFill();
-  seedAssignedUserFromSession();
   scheduleMonitoringAutoRefresh();
   window.setInterval(() => updateMonitoringLiveStatus('live'), 1000);
 });

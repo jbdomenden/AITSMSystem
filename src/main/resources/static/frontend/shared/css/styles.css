@@ -122,6 +122,8 @@ a { text-decoration: none; color: inherit; }
 .page-kicker { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .1em; color: #2563eb; font-weight: 700; }
 
 .inline-actions { display: flex; gap: 10px; align-items: center; }
+.dashboard-trend-controls { flex-wrap: wrap; justify-content: flex-end; }
+.dashboard-trend-controls select { min-width: 130px; }
 .monitor-actions { flex-wrap: wrap; justify-content: flex-end; }
 .live-status-chip {
   display: inline-flex;
@@ -194,6 +196,7 @@ a { text-decoration: none; color: inherit; }
 .metric-value { font-size: 36px; margin: 6px 0 2px; font-weight: 700; letter-spacing: -.01em; }
 .metric-hint { color: var(--muted); font-size: 13px; line-height: 1.5; }
 .metric-card { position: relative; overflow: hidden; min-height: 190px; display: flex; flex-direction: column; justify-content: space-between; }
+.compact-grid .metric-card { min-height: 150px; }
 .metric-card::after {
   content: "";
   position: absolute;
@@ -340,6 +343,13 @@ textarea { resize: vertical; min-height: 120px; }
 .perf-bar.cpu { background: linear-gradient(180deg, #3b82f6, #2563eb); }
 .perf-bar.memory { background: linear-gradient(180deg, #60a5fa, #3b82f6); }
 .perf-bar.telemetry { background: linear-gradient(180deg, #8b5cf6, #7c3aed); }
+.perf-health-list { display: grid; gap: 12px; }
+.perf-health-item { padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
+.perf-health-line { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.perf-health-label { font-size: 13px; color: #334155; font-weight: 600; }
+.perf-health-value { font-size: 13px; color: #0f172a; font-weight: 700; }
+.perf-health-track { height: 10px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
+.perf-health-fill { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #22c55e, #f59e0b, #ef4444); }
 
 .insight-grid { display: grid; grid-template-columns: repeat(2, minmax(160px, 1fr)); gap: 10px; margin-top: 10px; }
 .insight-item { border: 1px solid var(--border); border-radius: 10px; padding: 10px; background: #fff; min-width: 0; }
@@ -505,6 +515,8 @@ textarea { resize: vertical; min-height: 120px; }
 
 @media (max-width: 640px) {
   .content { padding: 16px; }
+  .dashboard-trend-controls { justify-content: flex-start; }
+  .dashboard-trend-controls select { min-width: 0; width: 100%; }
   .monitor-actions { justify-content: flex-start; }
   .live-status-chip { width: 100%; justify-content: center; }
   .utility-bar { padding: 0 10px; }

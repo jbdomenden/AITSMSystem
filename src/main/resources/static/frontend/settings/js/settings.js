@@ -5,31 +5,6 @@ async function fetchJsonOrThrow(url, options = {}) {
   return data;
 }
 
-async function loadProfileSettings() {
-  const user = await fetchJsonOrThrow('/api/users/me');
-  document.getElementById('settingsFullName').value = user.fullName || '';
-  document.getElementById('settingsEmail').value = user.email || '';
-  document.getElementById('settingsCompany').value = user.company || '';
-  document.getElementById('settingsDepartment').value = user.department || '';
-}
-
-async function saveProfileSettings() {
-  const body = {
-    fullName: (document.getElementById('settingsFullName')?.value || '').trim(),
-    company: (document.getElementById('settingsCompany')?.value || '').trim(),
-    department: (document.getElementById('settingsDepartment')?.value || '').trim()
-  };
-
-  const res = await fetch('/api/users/me', {
-    method: 'PUT',
-    headers: authHeaders(),
-    body: JSON.stringify(body)
-  });
-  const data = await res.json();
-  if (!res.ok) return alert(data.error || 'Unable to save profile');
-  alert('Profile updated successfully.');
-}
-
 async function loadSlaPolicies() {
   const rows = document.getElementById('slaRows');
   if (!rows) return;
@@ -241,29 +216,10 @@ function wireAiSettingsEvents() {
 
 document.addEventListener('DOMContentLoaded', async () => {
   try {
-    await Promise.all([loadProfileSettings(), loadSlaPolicies(), loadAssetDetectionPrefixes()]);
+    await Promise.all([loadSlaPolicies(), loadAssetDetectionPrefixes()]);
     wireAiSettingsEvents();
     await loadAiConfig();
   } catch (error) {
     alert(error.message || 'Unable to load settings data');
   }
 });
-
-async function changeMyPassword() {
-  const body = {
-    currentPassword: document.getElementById('currentPassword')?.value || '',
-    newPassword: document.getElementById('newPassword')?.value || '',
-    confirmPassword: document.getElementById('confirmNewPassword')?.value || ''
-  };
-  const res = await fetch('/api/users/me/password', {
-    method: 'PUT',
-    headers: authHeaders(),
-    body: JSON.stringify(body)
-  });
-  const data = await res.json();
-  if (!res.ok) return alert(data.error || 'Unable to change password');
-  alert(data.message || 'Password changed successfully');
-  document.getElementById('currentPassword').value = '';
-  document.getElementById('newPassword').value = '';
-  document.getElementById('confirmNewPassword').value = '';
-}

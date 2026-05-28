@@ -9,19 +9,57 @@
     <div class='topbar'>
       <div>
         <h1 class='page-title'>Ticket Management</h1>
-        <p class='page-subtitle'>Manage all tickets and update workflow statuses.</p>
+        <p class='page-subtitle'>Monitor incoming requests, prioritize work, and update ticket states.</p>
       </div>
     </div>
     <section class='card'>
       <div class='card-head'>
         <div>
-          <h3 class='section-title'>All Tickets <span class='help-tip' data-help='Admins can move tickets to In Progress or Resolved. End-users can close resolved tickets or request follow-up.'>?</span></h3>
-          <p class='section-subtitle'>Connected to live backend `/api/tickets` status APIs.</p>
+          <h3 class='section-title'>Ticket Queue <span class='help-tip' data-help='Search and sort tickets, then update status from the actions menu.'>?</span></h3>
+          <p class='section-subtitle'>Focused view of active ticket operations.</p>
+        </div>
+        <div id='adminTicketCount' class='small'></div>
+      </div>
+      <div class='form-grid' style='margin-bottom:12px'>
+        <div class='form-group'>
+          <label for='adminTicketSearch'>Search</label>
+          <input id='adminTicketSearch' type='search' placeholder='Ticket ID, title, requester, or category'>
+        </div>
+        <div class='form-group'>
+          <label for='adminTicketStatusFilter'>Status</label>
+          <select id='adminTicketStatusFilter'>
+            <option value='all'>All statuses</option>
+            <option value='open'>Open</option>
+            <option value='in progress'>In Progress</option>
+            <option value='resolved'>Resolved</option>
+            <option value='closed'>Closed</option>
+          </select>
+        </div>
+        <div class='form-group'>
+          <label for='adminTicketPriorityFilter'>Priority</label>
+          <select id='adminTicketPriorityFilter'>
+            <option value='all'>All priorities</option>
+            <option value='Critical'>Critical</option>
+            <option value='High'>High</option>
+            <option value='Medium'>Medium</option>
+            <option value='Low'>Low</option>
+          </select>
+        </div>
+        <div class='form-group'>
+          <label for='adminTicketSort'>Sort</label>
+          <select id='adminTicketSort'>
+            <option value='updated-desc'>Updated (latest)</option>
+            <option value='updated-asc'>Updated (oldest)</option>
+            <option value='priority-desc'>Priority (highest)</option>
+            <option value='priority-asc'>Priority (lowest)</option>
+            <option value='id-desc'>Ticket ID (latest)</option>
+            <option value='id-asc'>Ticket ID (oldest)</option>
+          </select>
         </div>
       </div>
       <div class='table-wrap'>
         <table>
-          <thead><tr><th>ID</th><th>User</th><th>Title</th><th>Priority</th><th>Status</th><th>Updated</th><th>Action</th></tr></thead>
+          <thead><tr><th>ID</th><th>Requester</th><th>Title</th><th>Category</th><th>Priority</th><th>Status</th><th>Updated</th><th>Action</th></tr></thead>
           <tbody id='adminTicketRows'></tbody>
         </table>
       </div>

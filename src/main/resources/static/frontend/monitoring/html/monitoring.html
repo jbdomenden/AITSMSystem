@@ -51,12 +51,40 @@
       <div class='card-head'>
         <div>
           <h3 class='section-title'>Device Inventory</h3>
-          <p class='section-subtitle'>Structured list for quick operational scanning.</p>
+          <p class='section-subtitle'>Structured list with filtering and sorting for fast LAN triage.</p>
         </div>
+        <div id='monitorTableCount' class='small'></div>
       </div>
-      <div class='inline-actions' style='justify-content:flex-start;margin-bottom:10px'>
-        <button class='btn btn-ghost'>All Departments</button>
-        <button class='btn btn-ghost'>All Statuses</button>
+      <div class='form-grid' style='margin-bottom:12px'>
+        <div class='form-group'>
+          <label for='monitorSearchInput'>Search</label>
+          <input id='monitorSearchInput' type='search' placeholder='Device name, IP, or source'>
+        </div>
+        <div class='form-group'>
+          <label for='monitorReachabilityFilter'>Reachability</label>
+          <select id='monitorReachabilityFilter'>
+            <option value='all'>All</option>
+            <option value='online'>Online</option>
+            <option value='offline'>Offline</option>
+          </select>
+        </div>
+        <div class='form-group'>
+          <label for='monitorTelemetryFilter'>Telemetry</label>
+          <select id='monitorTelemetryFilter'>
+            <option value='all'>All</option>
+            <option value='available'>Available</option>
+            <option value='unavailable'>Unavailable</option>
+          </select>
+        </div>
+        <div class='form-group'>
+          <label for='monitorSortSelect'>Sort</label>
+          <select id='monitorSortSelect'>
+            <option value='cpu-desc'>CPU usage (high to low)</option>
+            <option value='memory-desc'>Memory usage (high to low)</option>
+            <option value='hostname-asc'>Device name (A-Z)</option>
+            <option value='last-seen-desc'>Last seen (latest)</option>
+          </select>
+        </div>
       </div>
       <div class='table-wrap'>
         <table>

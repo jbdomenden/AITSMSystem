@@ -5,6 +5,13 @@ let monitoringRefreshInFlight = false;
 let monitoringLastUpdatedAt = null;
 let editingDeviceId = null;
 let deviceRegistry = [];
+let monitoringDevicesCache = [];
+const monitoringFilters = {
+  search: '',
+  reachability: 'all',
+  telemetry: 'all',
+  sort: 'cpu-desc'
+};
 
 function statusBadge(status) {
   const s = String(status || '').toLowerCase();
@@ -35,6 +42,59 @@ function formatRelativeTime(value) {
   if (seconds < 60) return `Updated ${seconds}s ago`;
   const minutes = Math.round(seconds / 60);
   return `Updated ${minutes}m ago`;
+}
+
+function normalizedMonitorText(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function monitorSortValue(device, sortKey) {
+  if (sortKey === 'memory-desc') return Number(device.memoryUsagePercent ?? -1);
+  if (sortKey === 'hostname-asc') return normalizedMonitorText(device.hostname || device.ipAddress);
+  if (sortKey === 'last-seen-desc') return parseDateValue(device.lastSeen);
+  return Number(device.cpuUsagePercent ?? -1);
+}
+
+function parseDateValue(value) {
+  const parsed = new Date(value || '');
+  return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+}
+
+function applyMonitoringFilters(devices) {
+  const safe = Array.isArray(devices) ? devices : [];
+  const search = normalizedMonitorText(monitoringFilters.search);
+
+  const filtered = safe.filter((device) => {
+    const matchesSearch = !search || [
+      device.hostname,
+      device.ipAddress,
+      device.telemetrySourceType
+    ].map(normalizedMonitorText).some((token) => token.includes(search));
+
+    const matchesReachability = monitoringFilters.reachability === 'all'
+      || (monitoringFilters.reachability === 'online' && device.reachable)
+      || (monitoringFilters.reachability === 'offline' && !device.reachable);
+
+    const matchesTelemetry = monitoringFilters.telemetry === 'all'
+      || (monitoringFilters.telemetry === 'available' && device.telemetryAvailable)
+      || (monitoringFilters.telemetry === 'unavailable' && !device.telemetryAvailable);
+
+    return matchesSearch && matchesReachability && matchesTelemetry;
+  });
+
+  return filtered.sort((a, b) => {
+    const sortKey = monitoringFilters.sort;
+    if (sortKey === 'hostname-asc') {
+      return monitorSortValue(a, sortKey).localeCompare(monitorSortValue(b, sortKey));
+    }
+    return monitorSortValue(b, sortKey) - monitorSortValue(a, sortKey);
+  });
+}
+
+function renderMonitorTableCount(visibleCount, totalCount) {
+  const el = document.getElementById('monitorTableCount');
+  if (!el) return;
+  el.textContent = `${visibleCount} shown / ${totalCount} discovered`;
 }
 
 function updateMonitoringLiveStatus(state = 'idle', message) {
@@ -111,7 +171,15 @@ function renderMonitorCards(devices) {
     return;
   }
 
-  wrap.innerHTML = devices.map(d => `
+  const highlight = [...devices]
+    .sort((a, b) => {
+      const aScore = Number(a.cpuUsagePercent ?? 0) + Number(a.memoryUsagePercent ?? 0);
+      const bScore = Number(b.cpuUsagePercent ?? 0) + Number(b.memoryUsagePercent ?? 0);
+      return bScore - aScore;
+    })
+    .slice(0, 6);
+
+  wrap.innerHTML = highlight.map(d => `
     <article class='card monitor-device-card'>
       <div class='card-head monitor-device-head'>
         <h3 class='section-title monitor-device-title' title='${d.hostname || d.ipAddress}'>${d.hostname || d.ipAddress}</h3>
@@ -127,18 +195,25 @@ function renderMonitorCards(devices) {
         <div class='insight-item'><div class='insight-label'>Memory</div><div class='insight-value'>${d.memoryUsagePercent != null ? `${Number(d.memoryUsagePercent).toFixed(1)}%` : 'N/A'}</div></div>
       </div>
     </article>`).join('');
+
+  if (devices.length > highlight.length) {
+    wrap.innerHTML += `<div class='small'>Showing top ${highlight.length} devices by utilization out of ${devices.length} discovered devices.</div>`;
+  }
 }
 
 function renderMonitorTable(devices) {
   const rows = document.getElementById('monitorTableRows');
   if (!rows) return;
 
-  if (!devices.length) {
-    renderTableEmptyState(rows, 7, 'No LAN devices discovered yet.');
+  const visible = applyMonitoringFilters(devices);
+  renderMonitorTableCount(visible.length, devices.length);
+
+  if (!visible.length) {
+    renderTableEmptyState(rows, 7, devices.length ? 'No devices matched the current filters.' : 'No LAN devices discovered yet.');
     return;
   }
 
-  rows.innerHTML = devices.map(d => `<tr>
+  rows.innerHTML = visible.map(d => `<tr>
     <td>${d.hostname || '-'}</td>
     <td>${d.ipAddress}</td>
     <td>${d.telemetrySourceType || '-'}</td>
@@ -209,17 +284,20 @@ async function loadMonitoring({ force = false, source = 'manual' } = {}) {
     const peerIps = await peerIpsRes.json();
     const safeDevices = Array.isArray(devices) ? devices : [];
     const safePeerIps = Array.isArray(peerIps) ? peerIps : [];
+    monitoringDevicesCache = safeDevices;
 
     renderMonitorSummary(summaryRes.ok ? summary : null);
-    renderMonitoringHealthPanel(summaryRes.ok ? summary : null, safeDevices);
-    renderMonitorCards(safeDevices);
+    renderMonitoringHealthPanel(summaryRes.ok ? summary : null, monitoringDevicesCache);
+    renderMonitorCards(monitoringDevicesCache);
     if (monitorRows) clearTableSkeleton(monitorRows);
-    renderMonitorTable(safeDevices);
+    renderMonitorTable(monitoringDevicesCache);
     renderLanIpSuggestions(safePeerIps);
 
     monitoringLastUpdatedAt = new Date();
     updateMonitoringLiveStatus('live', source === 'discovery' ? 'Discovery refreshed just now' : undefined);
   } catch {
+    monitoringDevicesCache = [];
+    renderMonitorTableCount(0, 0);
     if (monitorRows) renderTableErrorState(monitorRows, 7, 'Unable to load monitoring table data.');
     updateMonitoringLiveStatus('error');
   } finally {
@@ -417,6 +495,44 @@ async function loadDevices() {
   </tr>`).join('');
 }
 
+function wireMonitoringTableFilters() {
+  const search = document.getElementById('monitorSearchInput');
+  const reachability = document.getElementById('monitorReachabilityFilter');
+  const telemetry = document.getElementById('monitorTelemetryFilter');
+  const sort = document.getElementById('monitorSortSelect');
+
+  if (search) {
+    search.addEventListener('input', () => {
+      monitoringFilters.search = search.value || '';
+      renderMonitorTable(monitoringDevicesCache);
+    });
+  }
+
+  if (reachability) {
+    reachability.value = monitoringFilters.reachability;
+    reachability.addEventListener('change', () => {
+      monitoringFilters.reachability = reachability.value || 'all';
+      renderMonitorTable(monitoringDevicesCache);
+    });
+  }
+
+  if (telemetry) {
+    telemetry.value = monitoringFilters.telemetry;
+    telemetry.addEventListener('change', () => {
+      monitoringFilters.telemetry = telemetry.value || 'all';
+      renderMonitorTable(monitoringDevicesCache);
+    });
+  }
+
+  if (sort) {
+    sort.value = monitoringFilters.sort;
+    sort.addEventListener('change', () => {
+      monitoringFilters.sort = sort.value || 'cpu-desc';
+      renderMonitorTable(monitoringDevicesCache);
+    });
+  }
+}
+
 function stopMonitoringAutoRefresh() {
   if (!monitoringAutoRefreshTimer) return;
   window.clearInterval(monitoringAutoRefreshTimer);
@@ -429,6 +545,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
+  wireMonitoringTableFilters();
   loadMonitoring({ source: 'initial' });
   loadDevices();
   bindAssetAutoFill();

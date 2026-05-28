@@ -21,7 +21,41 @@
       <div class='card-head'>
         <div>
           <h3 class='section-title'>Users</h3>
-          <p class='section-subtitle'>All actions are connected to backend user lifecycle APIs. End-users can login once email is verified via code or approved by an admin.</p>
+          <p class='section-subtitle'>Search, filter, and sort user records before applying administrative actions.</p>
+        </div>
+        <div id='userMgmtCount' class='small'></div>
+      </div>
+      <div class='form-grid' style='margin-bottom:12px'>
+        <div class='form-group'>
+          <label for='userMgmtSearch'>Search</label>
+          <input id='userMgmtSearch' type='search' placeholder='Name or email'>
+        </div>
+        <div class='form-group'>
+          <label for='userMgmtRoleFilter'>Role</label>
+          <select id='userMgmtRoleFilter'>
+            <option value='all'>All roles</option>
+            <option value='superadmin'>Super Admin</option>
+            <option value='admin'>Admin</option>
+            <option value='end-user'>End User</option>
+          </select>
+        </div>
+        <div class='form-group'>
+          <label for='userMgmtVerificationFilter'>Verification</label>
+          <select id='userMgmtVerificationFilter'>
+            <option value='all'>All</option>
+            <option value='verified'>Verified</option>
+            <option value='pending'>Pending</option>
+          </select>
+        </div>
+        <div class='form-group'>
+          <label for='userMgmtSort'>Sort</label>
+          <select id='userMgmtSort'>
+            <option value='name-asc'>Name (A-Z)</option>
+            <option value='name-desc'>Name (Z-A)</option>
+            <option value='email-asc'>Email (A-Z)</option>
+            <option value='email-desc'>Email (Z-A)</option>
+            <option value='role-asc'>Role (A-Z)</option>
+          </select>
         </div>
       </div>
       <div class='table-wrap'>
@@ -55,7 +89,17 @@
           </div>
           <div class='form-group'>
             <label for='internalDepartment'>Department</label>
-            <input id='internalDepartment' type='text' required>
+            <select id='internalDepartment' required>
+              <option value=''>Select department</option>
+              <option value='Finance'>Finance</option>
+              <option value='HR'>HR</option>
+              <option value='IT'>IT</option>
+              <option value='Operations'>Operations</option>
+              <option value='Sales'>Sales</option>
+              <option value='Support'>Support</option>
+              <option value='Security'>Security</option>
+              <option value='Management'>Management</option>
+            </select>
           </div>
           <div class='form-group'>
             <label for='internalPassword'>Temporary password</label>

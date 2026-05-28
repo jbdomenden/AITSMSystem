@@ -17,20 +17,31 @@ class TicketService(
     private val users: UserRepository
 ) {
     private val followUpThresholdHours = 24L
+    private val allowedPriorities = setOf("Critical", "High", "Medium", "Low")
+    private val allowedCategories = setOf("Hardware", "Software", "Network", "Database", "Security", "Other")
 
-    fun create(userId: Int, req: TicketRequest): Ticket = repository.create(userId, req).also {
-        audit.log(userId, "Created ticket #${it.id}", "tickets")
-        notifyAdminsOncePerTicket(
-            eventType = "ticket_created",
-            ticketId = it.id,
-            title = "New Ticket Created",
-            message = "Ticket #${it.id} created by user #$userId"
-        )
+    fun create(userId: Int, req: TicketRequest): Ticket {
+        val normalized = normalizeTicketRequest(req)
+        validateTicketRequest(normalized)
+        return repository.create(userId, normalized).also {
+            audit.log(userId, "Created ticket #${it.id}", "tickets")
+            notifyAdminsOncePerTicket(
+                eventType = "ticket_created",
+                ticketId = it.id,
+                title = "New Ticket Created",
+                message = "Ticket #${it.id} created by user #$userId"
+            )
+        }
     }
+
     fun list(userId: Int?, admin: Boolean, limit: Int, offset: Long) = repository.list(userId, admin, limit, offset)
     fun get(id: Int): Ticket? = repository.get(id)
 
-    fun update(id: Int, req: TicketRequest, userId: Int?) = repository.update(id, req).also { audit.log(userId, "Updated ticket #$id", "tickets") }
+    fun update(id: Int, req: TicketRequest, userId: Int?): Ticket? {
+        val normalized = normalizeTicketRequest(req)
+        validateTicketRequest(normalized)
+        return repository.update(id, normalized).also { audit.log(userId, "Updated ticket #$id", "tickets") }
+    }
 
     fun updateStatus(id: Int, statusValue: String, actor: String, userId: Int?, role: UserRole): Ticket? {
         val existing = repository.get(id) ?: return null
@@ -93,6 +104,22 @@ class TicketService(
             "closed", "cancelled", "canceled" -> TicketStatus.CLOSED
             else -> throw IllegalArgumentException("Unsupported ticket status: $raw")
         }
+    }
+
+    private fun normalizeTicketRequest(req: TicketRequest): TicketRequest = req.copy(
+        title = req.title.trim(),
+        description = req.description.trim(),
+        priority = req.priority.trim(),
+        category = req.category.trim()
+    )
+
+    private fun validateTicketRequest(req: TicketRequest) {
+        require(req.title.isNotBlank()) { "Ticket title is required" }
+        require(req.title.length in 5..200) { "Ticket title must be between 5 and 200 characters" }
+        require(req.description.isNotBlank()) { "Ticket description is required" }
+        require(req.description.length >= 10) { "Ticket description must be at least 10 characters" }
+        require(req.priority in allowedPriorities) { "Invalid ticket priority" }
+        require(req.category in allowedCategories) { "Invalid ticket category" }
     }
 
     private fun notifyAdminsOncePerTicket(

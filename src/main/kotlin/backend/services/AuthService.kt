@@ -27,8 +27,14 @@ class AuthService(
     private data class SensitiveVerification(val userId: Int, val expiresAt: LocalDateTime)
     private val sensitiveVerifications = ConcurrentHashMap<String, SensitiveVerification>()
     private val exposeDevVerificationCode = ((Env.get("AUTH_EXPOSE_DEV_VERIFICATION_CODE") ?: "false").lowercase() == "true")
+    private val emailPattern = Regex("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")
 
     fun register(request: RegisterRequest): RegistrationResponse {
+        require(request.fullName.trim().isNotBlank()) { "Full name is required." }
+        require(request.company.trim().isNotBlank()) { "Company is required." }
+        require(request.department.trim().isNotBlank()) { "Department is required." }
+        requireValidEmail(request.email)
+        require(request.password.length >= 8) { "Password must be at least 8 characters." }
         require(request.password == request.confirmPassword) { "Passwords do not match." }
         require(request.eulaAccepted) { "EULA acceptance is required." }
 
@@ -52,6 +58,7 @@ class AuthService(
     }
 
     fun verifyEmail(email: String, code: String): AuthResponse {
+        requireValidEmail(email)
         val user = userRepository.verifyEmail(email.trim(), code.trim()) ?: error("Invalid or expired verification code")
         auditRepository.log(user.id, "Email verified", "users")
         return AuthResponse(token = tokenFor(user.id, user.role), user = user)
@@ -59,6 +66,7 @@ class AuthService(
 
     fun resendVerification(email: String): RegistrationResponse {
         val normalizedEmail = email.trim()
+        requireValidEmail(normalizedEmail)
         val code = generateVerificationCode()
         val updated = userRepository.regenerateVerificationCode(normalizedEmail, code, LocalDateTime.now().plusMinutes(15))
         require(updated) { "Unable to resend verification code. Email may already be verified or missing." }
@@ -72,6 +80,8 @@ class AuthService(
 
     fun login(request: LoginRequest): AuthResponse {
         val normalizedEmail = request.email.trim()
+        requireValidEmail(normalizedEmail)
+        require(request.password.isNotBlank()) { "Password is required" }
         val (user, hash) = userRepository.findByEmail(normalizedEmail) ?: error("Invalid credentials")
         require(PasswordHasher.verify(request.password, hash)) { "Invalid credentials" }
 
@@ -147,6 +157,7 @@ class AuthService(
         require(request.email.isNotBlank()) { "Email is required" }
         require(request.company.isNotBlank()) { "Company is required" }
         require(request.department.isNotBlank()) { "Department is required" }
+        requireValidEmail(request.email)
         require(request.password == request.confirmPassword) { "Passwords do not match" }
         require(request.password.length >= 8) { "Password must be at least 8 characters" }
         require(request.role in setOf(UserRole.END_USER, UserRole.ADMIN)) { "Unsupported role" }
@@ -209,4 +220,10 @@ class AuthService(
 
     private fun generateVerificationCode(): String = (100000..999999).random().toString()
     private fun tokenFor(userId: Int, role: UserRole): String = Base64.getEncoder().encodeToString("$userId:${role.name}".toByteArray())
+
+    private fun requireValidEmail(email: String) {
+        val normalized = email.trim()
+        require(normalized.isNotBlank()) { "Email is required" }
+        require(emailPattern.matches(normalized)) { "Invalid email format" }
+    }
 }

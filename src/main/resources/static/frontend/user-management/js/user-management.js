@@ -1,3 +1,12 @@
+const userMgmtState = {
+  users: [],
+  filters: {
+    search: '',
+    role: 'all',
+    verification: 'all',
+    sort: 'name-asc'
+  }
+};
 
 function ensureActionMenuBackdrop() {
   if (document.getElementById('actionMenuBackdrop')) return;
@@ -6,10 +15,19 @@ function ensureActionMenuBackdrop() {
   backdrop.className = 'action-menu-backdrop hidden';
   backdrop.addEventListener('click', () => {
     document.querySelectorAll('.row-action-menu').forEach((el) => el.classList.add('hidden'));
-  document.getElementById('actionMenuBackdrop')?.classList.add('hidden');
+    document.getElementById('actionMenuBackdrop')?.classList.add('hidden');
     backdrop.classList.add('hidden');
   });
   document.body.appendChild(backdrop);
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
 
 function closeUserMgmtMenus() {
@@ -51,7 +69,6 @@ async function changeRoleFromUserManagement(userId, role) {
   if (!res.ok) return alert(data.error || 'Unable to update role');
   await loadUserManagement();
 }
-
 
 async function resetUserPasswordFromUserManagement(userId, email) {
   const newPassword = prompt(`Set a temporary password for ${email}:`);
@@ -121,42 +138,92 @@ async function openAddAdminFromUserManagement(targetEmail) {
   await loadUserManagement();
 }
 
+function userSortComparator(sortKey) {
+  if (sortKey === 'name-desc') return (a, b) => String(b.fullName || '').localeCompare(String(a.fullName || ''));
+  if (sortKey === 'email-asc') return (a, b) => String(a.email || '').localeCompare(String(b.email || ''));
+  if (sortKey === 'email-desc') return (a, b) => String(b.email || '').localeCompare(String(a.email || ''));
+  if (sortKey === 'role-asc') return (a, b) => String(a.role || '').localeCompare(String(b.role || ''));
+  return (a, b) => String(a.fullName || '').localeCompare(String(b.fullName || ''));
+}
+
+function applyUserManagementFilters() {
+  const query = userMgmtState.filters.search.trim().toLowerCase();
+  const role = userMgmtState.filters.role;
+  const verification = userMgmtState.filters.verification;
+
+  const filtered = userMgmtState.users.filter((user) => {
+    const userRole = String(user.role || '').toLowerCase();
+    const isVerified = Boolean(user.emailVerified);
+
+    const roleMatch = role === 'all' || userRole === role;
+    const verificationMatch = verification === 'all'
+      || (verification === 'verified' && isVerified)
+      || (verification === 'pending' && !isVerified);
+
+    if (!query) return roleMatch && verificationMatch;
+
+    const tokens = [user.fullName, user.email, user.role].map((value) => String(value || '').toLowerCase());
+    return roleMatch && verificationMatch && tokens.some((token) => token.includes(query));
+  });
+
+  return [...filtered].sort(userSortComparator(userMgmtState.filters.sort));
+}
+
+function renderUserManagementCount(visible, total) {
+  const el = document.getElementById('userMgmtCount');
+  if (!el) return;
+  el.textContent = `${visible} shown / ${total} total`;
+}
+
+function renderUserManagementRows() {
+  const rows = document.getElementById('userMgmtRows');
+  if (!rows) return;
+
+  const users = applyUserManagementFilters();
+  renderUserManagementCount(users.length, userMgmtState.users.length);
+
+  if (!users.length) {
+    renderTableEmptyState(rows, 5, 'No users matched the selected filters.');
+    return;
+  }
+
+  rows.innerHTML = users.map((u) => {
+    const currentUserId = Number(localStorage.getItem('userId') || 0);
+    const canChange = u.role !== 'superadmin' && u.id !== currentUserId;
+    const encodedEmail = encodeURIComponent(u.email || '');
+    const menuItems = [
+      u.role === 'admin'
+        ? `<button type='button' ${canChange ? '' : 'disabled'} onclick='changeRoleFromUserManagement(${u.id}, "end-user")'>Set as end-user</button>`
+        : `<button type='button' ${canChange ? '' : 'disabled'} onclick='openAddAdminFromUserManagement(decodeURIComponent("${encodedEmail}"))'>Grant admin role</button>`,
+      `<button type='button' ${canChange ? '' : 'disabled'} onclick='setUserEmailApprovalFromUserManagement(${u.id}, ${u.emailVerified ? 'false' : 'true'})'>${u.emailVerified ? 'Mark email as pending' : 'Approve email for login'}</button>`,
+      `<button type='button' ${canChange ? '' : 'disabled'} onclick='resetUserPasswordFromUserManagement(${u.id}, decodeURIComponent("${encodedEmail}"))'>Reset password</button>`,
+      `<button type='button' ${canChange ? '' : 'disabled'} onclick='deleteUserFromUserManagement(${u.id}, decodeURIComponent("${encodedEmail}"))'>Delete account</button>`
+    ].join('');
+
+    const actionMenu = `<div class='row-action-wrap'>
+      <button class='btn btn-ghost icon-btn' onclick='toggleUserMgmtMenu(event, ${u.id})' title='Actions' aria-label='Actions'>...</button>
+      <div id='userMgmtMenu-${u.id}' class='row-action-menu hidden'>${menuItems}</div>
+    </div>`;
+
+    return `<tr>
+      <td>${escapeHtml(u.fullName)}</td>
+      <td>${escapeHtml(u.email)}</td>
+      <td><span class='badge ${u.role === 'admin' || u.role === 'superadmin' ? 'in-progress' : 'resolved'}'>${escapeHtml(u.role)}</span></td>
+      <td>${u.emailVerified ? '<span class="badge resolved">Verified</span>' : '<span class="badge warning">Pending</span>'}</td>
+      <td>${actionMenu}</td>
+    </tr>`;
+  }).join('');
+}
+
 async function loadUserManagement() {
   const rows = document.getElementById('userMgmtRows');
   if (!rows) return;
   showTableSkeleton(rows, { rowCount: 6, columnCount: 5, hasActions: true });
 
   try {
-    const users = await fetchJsonOrThrow('/api/users');
+    userMgmtState.users = await fetchJsonOrThrow('/api/users');
     clearTableSkeleton(rows);
-    if (!users.length) {
-      renderTableEmptyState(rows, 5, 'No users found.');
-      return;
-    }
-    rows.innerHTML = users.map(u => {
-      const currentUserId = Number(localStorage.getItem('userId') || 0);
-      const canChange = u.role !== 'superadmin' && u.id !== currentUserId;
-      const menuItems = [
-        u.role === 'admin'
-          ? `<button type='button' ${canChange ? '' : 'disabled'} onclick='changeRoleFromUserManagement(${u.id}, "end-user")'>Set as end-user</button>`
-          : `<button type='button' ${canChange ? '' : 'disabled'} onclick='openAddAdminFromUserManagement("${u.email}")'>Grant admin role</button>`,
-        `<button type='button' ${canChange ? '' : 'disabled'} onclick='setUserEmailApprovalFromUserManagement(${u.id}, ${u.emailVerified ? 'false' : 'true'})'>${u.emailVerified ? 'Mark email as pending' : 'Approve email for login'}</button>`,
-        `<button type='button' ${canChange ? '' : 'disabled'} onclick='resetUserPasswordFromUserManagement(${u.id}, "${u.email}")'>Reset password</button>`,
-        `<button type='button' ${canChange ? '' : 'disabled'} onclick='deleteUserFromUserManagement(${u.id}, "${u.email}")'>Delete account</button>`
-      ].join('');
-      const actionMenu = `<div class='row-action-wrap'>
-        <button class='btn btn-ghost icon-btn' onclick='toggleUserMgmtMenu(event, ${u.id})' title='Actions' aria-label='Actions'>⋯</button>
-        <div id='userMgmtMenu-${u.id}' class='row-action-menu hidden'>${menuItems}</div>
-      </div>`;
-
-      return `<tr>
-        <td>${u.fullName}</td>
-        <td>${u.email}</td>
-        <td><span class='badge ${u.role === 'admin' || u.role === 'superadmin' ? 'in-progress' : 'resolved'}'>${u.role}</span></td>
-        <td>${u.emailVerified ? '<span class="badge resolved">Verified</span>' : '<span class="badge warning">Pending</span>'}</td>
-        <td>${actionMenu}</td>
-      </tr>`;
-    }).join('');
+    renderUserManagementRows();
   } catch (error) {
     renderTableErrorState(rows, 5, error.message);
   } finally {
@@ -164,17 +231,28 @@ async function loadUserManagement() {
   }
 }
 
-document.addEventListener('click', () => closeUserMgmtMenus());
+function wireUserManagementFilters() {
+  const search = document.getElementById('userMgmtSearch');
+  if (search) {
+    search.addEventListener('input', () => {
+      userMgmtState.filters.search = search.value || '';
+      renderUserManagementRows();
+    });
+  }
 
-document.addEventListener('DOMContentLoaded', () => {
-  loadUserManagement();
-  document.getElementById('openCreateUserBtn')?.addEventListener('click', openCreateUserModal);
-  document.getElementById('createUserForm')?.addEventListener('submit', submitCreateUser);
-  document.getElementById('createUserModal')?.addEventListener('click', (e) => {
-    if (e.target.id === 'createUserModal') closeCreateUserModal();
-  });
-});
+  const bindSelect = (id, key) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('change', () => {
+      userMgmtState.filters[key] = el.value || 'all';
+      renderUserManagementRows();
+    });
+  };
 
+  bindSelect('userMgmtRoleFilter', 'role');
+  bindSelect('userMgmtVerificationFilter', 'verification');
+  bindSelect('userMgmtSort', 'sort');
+}
 
 function setCreateUserMessage(message, tone = 'info') {
   const el = document.getElementById('createUserMessage');
@@ -205,6 +283,16 @@ function closeCreateUserModal() {
   setCreateUserMessage('');
 }
 
+function validateCreateUserPayload(payload) {
+  if (!payload.fullName) return 'Full name is required.';
+  if (!payload.email) return 'Email is required.';
+  if (!payload.company) return 'Company is required.';
+  if (!payload.department) return 'Department is required.';
+  if (payload.password.length < 8) return 'Temporary password must be at least 8 characters.';
+  if (payload.password !== payload.confirmPassword) return 'Password and confirmation do not match.';
+  return null;
+}
+
 async function submitCreateUser(event) {
   event.preventDefault();
   const payload = {
@@ -217,6 +305,12 @@ async function submitCreateUser(event) {
     role: document.getElementById('internalRole')?.value || 'end-user',
     emailVerified: Boolean(document.getElementById('internalEmailVerified')?.checked)
   };
+
+  const validationError = validateCreateUserPayload(payload);
+  if (validationError) {
+    setCreateUserMessage(validationError, 'danger');
+    return;
+  }
 
   setCreateUserMessage('Creating account...');
   const res = await fetch('/api/users', {
@@ -234,3 +328,15 @@ async function submitCreateUser(event) {
   await loadUserManagement();
   setTimeout(() => closeCreateUserModal(), 900);
 }
+
+document.addEventListener('click', () => closeUserMgmtMenus());
+
+document.addEventListener('DOMContentLoaded', () => {
+  wireUserManagementFilters();
+  loadUserManagement();
+  document.getElementById('openCreateUserBtn')?.addEventListener('click', openCreateUserModal);
+  document.getElementById('createUserForm')?.addEventListener('submit', submitCreateUser);
+  document.getElementById('createUserModal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'createUserModal') closeCreateUserModal();
+  });
+});

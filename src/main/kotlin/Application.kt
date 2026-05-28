@@ -147,6 +147,7 @@ fun Application.module() {
         get("/knowledge.html") { call.respondRedirect("/knowledge/html/knowledge.html") }
         get("/knowledge-library.html") { call.respondRedirect("/knowledge-library/html/knowledge-library.html") }
         get("/settings.html") { call.respondRedirect("/settings/html/settings.html") }
+        get("/profile.html") { call.respondRedirect("/profile/html/profile.html") }
         get("/user-management.html") { call.respondRedirect("/user-management/html/user-management.html") }
         get("/ai-assistant.html") { call.respondRedirect("/ai-assistant/html/ai-assistant.html") }
         get("/api/health") {
