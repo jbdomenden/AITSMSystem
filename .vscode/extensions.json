@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "redhat.java",
+    "vscjava.vscode-java-pack",
+    "vscjava.vscode-gradle",
+    "fwcd.kotlin",
+    "cweijan.vscode-postgresql-client2",
+    "cweijan.dbclient-jdbc"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "AITSM: Run Ktor Server",
+      "type": "java",
+      "request": "launch",
+      "mainClass": "io.ktor.server.netty.EngineMain",
+      "projectName": "ktor-aitsm",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "args": [],
+      "console": "integratedTerminal",
+      "preLaunchTask": "AITSM: Test"
+    }
+  ]
+}
