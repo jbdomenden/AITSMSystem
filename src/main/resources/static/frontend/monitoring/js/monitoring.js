@@ -468,6 +468,12 @@ async function loadDevices() {
       ? data.data
       : [];
   deviceRegistry = safe;
+  const requestedEditId = Number(new URLSearchParams(window.location.search).get('editDevice'));
+  if (Number.isInteger(requestedEditId) && requestedEditId > 0) {
+    window.history.replaceState({}, '', window.location.pathname);
+    const requestedDevice = deviceRegistry.find((device) => Number(device.id) === requestedEditId);
+    if (requestedDevice) startEditDevice(requestedDevice);
+  }
   clearTableSkeleton(rows);
   if (!safe.length) {
     renderTableEmptyState(rows, 9, 'No devices registered yet.');

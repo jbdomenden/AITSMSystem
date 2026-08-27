@@ -124,6 +124,19 @@ class AIChatService(
         val cfg = configService.snapshot()
         val baseUrl = baseUrlOverride?.trim()?.takeIf { it.isNotBlank() }?.let { configService.normalizeAndValidateBaseUrl(it) } ?: cfg.baseUrl
         val model = modelOverride?.trim()?.takeIf { it.isNotBlank() } ?: cfg.model
+        val discoveryTimeout = minOf(cfg.timeoutMillis, 8_000L)
+        val modelList = provider.listModels(baseUrl, discoveryTimeout)
+        if (!modelList.ok) return modelList
+
+        val models = runCatching {
+            json.decodeFromString(ListSerializer(serializer<String>()), modelList.content)
+        }.getOrElse {
+            logger.warn("Unable to parse Ollama model list during connection test")
+            return AIProviderResult(ok = false, content = "", errorMessage = "Ollama returned an unexpected model list")
+        }
+        if (model !in models) {
+            return AIProviderResult(ok = false, content = "", errorMessage = "Selected model \"$model\" is not available in Ollama")
+        }
         return provider.testConnection(baseUrl, model, cfg.timeoutMillis)
     }
 

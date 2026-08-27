@@ -16,6 +16,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 
 class OllamaProvider : AIProvider {
     private val json = Json { ignoreUnknownKeys = true }
@@ -25,6 +26,10 @@ class OllamaProvider : AIProvider {
         val payload = buildJsonObject {
             put("model", model)
             put("stream", false)
+            // qwen3 enables its internal reasoning mode by default. Disabling it keeps
+            // support-chat responses concise and avoids spending the request budget on
+            // hidden reasoning tokens before a visible answer is produced.
+            put("think", false)
             putJsonArray("messages") {
                 messages.forEach { msg ->
                     add(buildJsonObject {
@@ -79,6 +84,10 @@ class OllamaProvider : AIProvider {
                     buildJsonObject {
                         put("model", model)
                         put("stream", false)
+                        put("think", false)
+                        putJsonObject("options") {
+                            put("num_predict", 8)
+                        }
                         putJsonArray("messages") {
                             add(buildJsonObject {
                                 put("role", "user")
@@ -100,7 +109,11 @@ class OllamaProvider : AIProvider {
         return try {
             val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
             if (response.statusCode() !in 200..299) {
-                AIProviderResult(ok = false, content = "", errorMessage = "Provider request failed (${response.statusCode()})")
+                val error = when (response.statusCode()) {
+                    404 -> "Selected Ollama model was not found"
+                    else -> "Ollama request failed (${response.statusCode()})"
+                }
+                AIProviderResult(ok = false, content = "", errorMessage = error)
             } else {
                 val content = runCatching { extractor(response.body()) }.getOrNull()?.trim().orEmpty()
                 if (content.isBlank()) {
@@ -112,7 +125,7 @@ class OllamaProvider : AIProvider {
         } catch (_: ConnectException) {
             AIProviderResult(ok = false, content = "", errorMessage = "Unable to connect to Ollama")
         } catch (_: java.net.http.HttpTimeoutException) {
-            AIProviderResult(ok = false, content = "", errorMessage = "Ollama request timed out")
+            AIProviderResult(ok = false, content = "", errorMessage = "Ollama inference timed out before it completed")
         } catch (ex: Exception) {
             AIProviderResult(ok = false, content = "", errorMessage = ex.message ?: "Unknown provider error")
         }

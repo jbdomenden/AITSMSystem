@@ -164,10 +164,17 @@ async function testAiConnection() {
   setAiMessage('Testing Ollama connection...');
 
   try {
+    // Persist the validated form before testing so user chat and this diagnostic
+    // always exercise the exact same server-side provider configuration.
+    await fetchJsonOrThrow('/api/ai/config', {
+      method: 'POST',
+      body: JSON.stringify({ baseUrl, model })
+    });
+
     const response = await fetch('/api/ai/test', {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ baseUrl, model })
+      body: JSON.stringify({})
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || 'Connection failed');

@@ -6,6 +6,9 @@ import backend.models.ai.AIConnectionTestRequest
 import backend.models.ai.AIConnectionTestResponse
 import backend.models.ai.AIModelsResponse
 import backend.models.ai.AITicketDraftRequest
+import backend.models.UserRole
+import backend.security.requireAuthenticated
+import backend.security.requireRole
 import backend.services.ai.AIChatService
 import backend.services.ai.AIConfigService
 import io.ktor.http.HttpStatusCode
@@ -26,6 +29,7 @@ private val aiRateBucket = ConcurrentHashMap<String, MutableList<Long>>()
 
 fun Route.aiRoutes(chatService: AIChatService, configService: AIConfigService) {
     post("/api/ai/chat") {
+        if (!call.requireAuthenticated()) return@post
         val rateKey = buildRateLimitKey(
             call.request.headers["X-User-Id"].orEmpty(),
             call.request.headers["X-Forwarded-For"].orEmpty()
@@ -50,6 +54,7 @@ fun Route.aiRoutes(chatService: AIChatService, configService: AIConfigService) {
     }
 
     post("/api/ai-assistant/chat") {
+        if (!call.requireAuthenticated()) return@post
         val request = call.receive<AIChatRequest>()
         val message = request.message.trim()
         if (message.isBlank()) {
@@ -60,31 +65,37 @@ fun Route.aiRoutes(chatService: AIChatService, configService: AIConfigService) {
     }
 
     post("/api/ai/clear") {
+        if (!call.requireAuthenticated()) return@post
         chatService.clearConversation(call.resolveSessionId())
         call.respond(HttpStatusCode.OK, mapOf("cleared" to true))
     }
 
     post("/api/ai/create-ticket-draft") {
+        if (!call.requireAuthenticated()) return@post
         val request = call.receive<AITicketDraftRequest>()
         call.respond(chatService.createTicketDraft(request))
     }
 
     get("/api/ai/config") {
+        if (!call.requireRole(UserRole.ADMIN)) return@get
         call.respond(configService.snapshot())
     }
 
     post("/api/ai/config") {
+        if (!call.requireRole(UserRole.ADMIN)) return@post
         val request = call.receive<AIConfigUpdateRequest>()
         call.respond(configService.update(request))
     }
 
     get("/api/ai/models") {
+        if (!call.requireRole(UserRole.ADMIN)) return@get
         val cfg = configService.snapshot()
         val models = chatService.getModels()
         call.respond(AIModelsResponse(models = models, currentModel = cfg.model, baseUrl = cfg.baseUrl))
     }
 
     post("/api/ai/test") {
+        if (!call.requireRole(UserRole.ADMIN)) return@post
         val request = call.receive<AIConnectionTestRequest>()
         val result = chatService.testConnection(request.baseUrl, request.model)
         val response = if (result.ok) {

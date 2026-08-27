@@ -30,7 +30,6 @@ function adminNavItems() {
     ]},
     { section: 'System', items: [
       { page: 'settings.html', href: '/settings.html', icon: 'settings', label: 'Settings' },
-      { page: 'profile.html', href: '/profile.html', icon: 'profile', label: 'Profile' },
       { page: 'assets.html', href: '/assets.html', icon: 'assets', label: 'Asset Management' },
       { page: 'user-management.html', href: '/user-management.html', icon: 'users', label: 'User Management' }
     ]}
@@ -115,6 +114,7 @@ function renderUtilityHeader() {
       <div id='adminNotifMenu' class='admin-header-menu hidden'><div id='adminNotifList' class='small'>Loading...</div></div>
       <button id='adminMenuTrigger' class='btn btn-ghost icon-btn header-icon-btn' type='button' onclick='toggleAdminHeaderMenu()' aria-label='Open account menu' title='Account menu'>${adminIcon('more')}</button>
       <div id='adminHeaderMenu' class='admin-header-menu hidden'>
+        <a class='menu-action-btn' href='/profile.html'>${adminIcon('profile')}<span>Profile</span></a>
         <button type='button' class='menu-action-btn' onclick='openAdminHelp()'>${adminIcon('help')}<span>Help</span></button>
         <button type='button' class='menu-action-btn' onclick='openPasswordModal()'>${adminIcon('password')}<span>Change password</span></button>
         <button type='button' class='menu-action-btn danger' onclick='logout()'>${adminIcon('logout')}<span>Logout</span></button>

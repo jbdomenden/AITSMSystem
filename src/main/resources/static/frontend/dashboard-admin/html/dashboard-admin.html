@@ -7,9 +7,9 @@
   <main class='content'>
     <section id='utilityHeader' class='utility-bar card'></section>
     <section id='summaryCards' class='grid stats summary-balanced-grid'></section>
+    <section id='operationalReportStats' class='grid stats compact-grid' style='margin-top:16px'></section>
 
-    <section class='grid admin-panels'>
-      <article class='card'>
+    <section class='card' style='margin-top:16px'>
         <div class='card-head'>
           <div>
             <h3 class='section-title'>Ticket Trend</h3>
@@ -37,22 +37,9 @@
         </div>
         <div id='ticketTrendChart' class='chart-placeholder admin-chart'></div>
         <div id='ticketTrendDetails' class='small' style='margin-top:12px'></div>
-      </article>
-      <article class='card'>
-        <div class='card-head'>
-          <div>
-            <h3 class='section-title'>Priority Distribution</h3>
-            <p class='section-subtitle'>Tickets by priority level.</p>
-          </div>
-        </div>
-        <div id='priorityDistributionChart' class='chart-placeholder admin-chart'></div>
-      </article>
     </section>
 
-    <section id='operationalReportStats' class='grid stats compact-grid' style='margin-top:16px'></section>
-
-    <section class='grid admin-panels' style='margin-top:16px'>
-      <article class='card'>
+    <section class='card' style='margin-top:16px'>
         <div class='card-head'>
           <div>
             <h3 class='section-title'>Recent High Priority Tickets</h3>
@@ -65,7 +52,9 @@
             <tbody id='recentAdminTicketRows'></tbody>
           </table>
         </div>
-      </article>
+    </section>
+
+    <section class='grid admin-panels' style='margin-top:16px'>
       <article class='card'>
         <div class='card-head'>
           <div>
@@ -74,6 +63,15 @@
           </div>
         </div>
         <div id='adminOpsFeed' class='notification-list'></div>
+      </article>
+      <article class='card'>
+        <div class='card-head'>
+          <div>
+            <h3 class='section-title'>Priority Distribution</h3>
+            <p class='section-subtitle'>Tickets by priority level.</p>
+          </div>
+        </div>
+        <div id='priorityDistributionChart' class='chart-placeholder admin-chart'></div>
       </article>
     </section>
 
