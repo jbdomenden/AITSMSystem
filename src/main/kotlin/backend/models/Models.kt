@@ -48,10 +48,29 @@ data class User(
     val email: String,
     val company: String,
     val department: String,
+    val profilePhotoUrl: String? = null,
     val role: UserRole,
     val emailVerified: Boolean = false,
     val createdAt: String
 )
+
+@Serializable
+enum class ProfilePhotoStatus { PENDING, APPROVED, REJECTED }
+
+@Serializable
+data class ProfilePhotoRequest(
+    val id: Int,
+    val userId: Int,
+    val userName: String? = null,
+    val userEmail: String? = null,
+    val photoUrl: String,
+    val status: ProfilePhotoStatus,
+    val submittedAt: String,
+    val reviewedAt: String? = null,
+    val reviewedBy: Int? = null
+)
+
+@Serializable data class ProfilePhotoReviewRequest(val approved: Boolean)
 
 @Serializable
 data class RegisterRequest(

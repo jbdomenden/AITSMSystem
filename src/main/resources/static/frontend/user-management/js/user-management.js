@@ -231,6 +231,35 @@ async function loadUserManagement() {
   }
 }
 
+async function loadProfilePhotoApprovals() {
+  const rows = document.getElementById('profilePhotoApprovalRows');
+  if (!rows) return;
+  showTableSkeleton(rows, { rowCount: 3, columnCount: 4, hasActions: true });
+  try {
+    const requests = await fetchJsonOrThrow('/api/profile-photo-requests/pending');
+    clearTableSkeleton(rows);
+    if (!requests.length) return renderTableEmptyState(rows, 4, 'No profile photos are waiting for approval.');
+    rows.innerHTML = requests.map((request) => `<tr>
+      <td>${escapeHtml(request.userName || 'Unknown')}<br><span class='small'>${escapeHtml(request.userEmail || '')}</span></td>
+      <td><img class='approval-photo-preview' src='${encodeURI(request.photoUrl)}' alt='Submitted profile photo for ${escapeHtml(request.userName || 'user')}'></td>
+      <td>${escapeHtml(new Date(request.submittedAt).toLocaleString())}</td>
+      <td><div class='inline-actions'><button class='btn btn-primary' type='button' onclick='reviewProfilePhoto(${request.id}, true)'>Approve</button><button class='btn btn-ghost' type='button' onclick='reviewProfilePhoto(${request.id}, false)'>Reject</button></div></td>
+    </tr>`).join('');
+  } catch (error) {
+    renderTableErrorState(rows, 4, error.message || 'Unable to load profile photo requests.');
+  } finally { clearTableSkeleton(rows); }
+}
+
+async function reviewProfilePhoto(id, approved) {
+  const action = approved ? 'approve' : 'reject';
+  if (!confirm(`Are you sure you want to ${action} this profile photo?`)) return;
+  try {
+    await fetchJsonOrThrow(`/api/profile-photo-requests/${id}/review`, { method: 'POST', body: JSON.stringify({ approved }) });
+    alert(`Profile photo ${approved ? 'approved' : 'rejected'}.`);
+    await loadProfilePhotoApprovals();
+  } catch (error) { alert(error.message || `Unable to ${action} profile photo.`); }
+}
+
 function wireUserManagementFilters() {
   const search = document.getElementById('userMgmtSearch');
   if (search) {
@@ -334,6 +363,7 @@ document.addEventListener('click', () => closeUserMgmtMenus());
 document.addEventListener('DOMContentLoaded', () => {
   wireUserManagementFilters();
   loadUserManagement();
+  loadProfilePhotoApprovals();
   document.getElementById('openCreateUserBtn')?.addEventListener('click', openCreateUserModal);
   document.getElementById('createUserForm')?.addEventListener('submit', submitCreateUser);
   document.getElementById('createUserModal')?.addEventListener('click', (e) => {

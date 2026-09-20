@@ -11,6 +11,7 @@ import backend.routes.authRoutes
 import backend.routes.deviceRoutes
 import backend.routes.knowledgeRoutes
 import backend.routes.monitoringRoutes
+import backend.routes.profilePhotoRoutes
 import backend.routes.notificationRoutes
 import backend.routes.inventoryRoutes
 import backend.routes.settingsRoutes
@@ -32,6 +33,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import java.net.URI
+import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
@@ -159,8 +161,10 @@ fun Application.module() {
         get("/docs") {
             call.respond(mapOf("message" to "OpenAPI publishing is tracked for a follow-up release."))
         }
+        staticFiles("/uploads/profile-photos", File(Env.get("PROFILE_UPLOAD_DIR") ?: "uploads/profile-photos"))
         staticResources("/", "static/frontend")
         authRoutes(container.authService)
+        profilePhotoRoutes(container.profilePhotoService)
         ticketRoutes(container.ticketService)
         monitoringRoutes(container.monitoringService, container.deviceRepo, container.assetDetectionService, container.inventoryService)
         analyticsRoutes(container.ticketService, container.monitoringService, container.aiService)

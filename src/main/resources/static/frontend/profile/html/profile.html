@@ -1,0 +1,32 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Profile | AITSM</title><link rel="stylesheet" href="/shared/css/styles.css"></head>
+<body><div class="app-layout"><aside id="profileSidebar" class="sidebar"></aside><main class="content">
+  <section id="utilityHeader" class="utility-bar card"></section>
+  <section class="profile-page" aria-labelledby="profileTitle">
+    <article class="profile-hero card">
+      <div class="profile-cover" aria-hidden="true"></div>
+      <div class="profile-hero-content">
+        <div class="profile-photo-wrap">
+          <img id="profilePhoto" class="profile-photo" src="/profile/assets/default-avatar.png" alt="Your profile photo">
+          <button id="changeProfilePhoto" class="profile-photo-camera" type="button" aria-label="Change profile photo" title="Change profile photo">📷</button>
+          <input id="profilePhotoInput" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+        </div>
+        <div class="profile-identity"><h1 id="profileTitle" class="profile-name">Loading...</h1><p id="profileEmail" class="profile-email"></p></div>
+      </div>
+    </article>
+    <div id="profilePhotoStatus" class="small profile-photo-status" aria-live="polite"></div>
+    <section class="profile-details-grid">
+      <article class="card profile-info-card"><div class="card-head"><div><h2 class="section-title">Profile information</h2><p class="section-subtitle">Your account details in AITSM.</p></div></div>
+        <dl class="profile-facts"><div><dt>Full name</dt><dd id="profileNameDetail">—</dd></div><div><dt>Email</dt><dd id="profileEmailDetail">—</dd></div><div><dt>Department</dt><dd id="profileDepartment">—</dd></div></dl>
+      </article>
+      <article class="card profile-account-card"><h2 class="section-title">Photo approval</h2><p class="small">New profile photos are reviewed by an administrator before they become visible.</p><p class="small"><strong>Accepted formats:</strong> JPG, PNG, WEBP</p><p class="small"><strong>Maximum size:</strong> 5 MB</p></article>
+    </section>
+  </section>
+  <div id="profilePhotoSuccessModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="profilePhotoSuccessTitle">
+    <div class="modal-card"><div class="card-head"><h3 id="profilePhotoSuccessTitle" class="section-title">Submitted and waiting for approval</h3></div><p class="small">Please give us 24-48 hours to review your photo.</p><div class="inline-actions" style="justify-content:flex-end"><button id="closeProfilePhotoSuccess" class="btn btn-primary" type="button">OK</button></div></div>
+  </div>
+</main></div><script src="/modules/common/js/app.js"></script><script>
+  const profileIsAdmin = ['admin', 'superadmin'].includes(String(localStorage.getItem('role') || '').toLowerCase());
+  document.getElementById('profileSidebar').id = profileIsAdmin ? 'adminSidebar' : 'userSidebar';
+  document.write(`<script src="/modules/sidebar/js/${profileIsAdmin ? 'admin-shell' : 'user-shell'}.js"><\/script>`);
+</script><script src="/profile/js/profile.js"></script></body></html>

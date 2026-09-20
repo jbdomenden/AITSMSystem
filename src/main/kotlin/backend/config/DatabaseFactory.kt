@@ -15,12 +15,24 @@ object UsersTable : Table("users") {
     val email = varchar("email", 200).uniqueIndex()
     val company = varchar("company", 150)
     val department = varchar("department", 120)
+    val profilePhotoUrl = varchar("profile_photo_url", 500).nullable()
     val passwordHash = varchar("password_hash", 255)
     val role = varchar("role", 20).index()
     val emailVerified = bool("email_verified").default(false)
     val verificationCode = varchar("verification_code", 12).nullable()
     val verificationExpiresAt = datetime("verification_expires_at").nullable()
     val createdAt = datetime("created_at").index()
+    override val primaryKey = PrimaryKey(id)
+}
+
+object ProfilePhotoRequestsTable : Table("profile_photo_requests") {
+    val id = integer("id").autoIncrement()
+    val userId = integer("user_id").references(UsersTable.id, onDelete = ReferenceOption.CASCADE).index()
+    val photoUrl = varchar("photo_url", 500)
+    val status = varchar("status", 20).index()
+    val submittedAt = datetime("submitted_at").index()
+    val reviewedAt = datetime("reviewed_at").nullable()
+    val reviewedBy = integer("reviewed_by").references(UsersTable.id).nullable().index()
     override val primaryKey = PrimaryKey(id)
 }
 
@@ -198,6 +210,7 @@ object DatabaseFactory {
 
             SchemaUtils.createMissingTablesAndColumns(
                 UsersTable,
+                ProfilePhotoRequestsTable,
                 EulaAcceptanceTable,
                 DevicesTable,
                 TicketsTable,
@@ -211,6 +224,7 @@ object DatabaseFactory {
                 InventoryAssetsTable,
                 InventoryAssetSnapshotsTable
             )
+            exec("CREATE UNIQUE INDEX IF NOT EXISTS profile_photo_requests_one_pending_per_user ON profile_photo_requests(user_id) WHERE status = 'PENDING'")
         }
     }
 }

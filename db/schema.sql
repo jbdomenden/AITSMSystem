@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(200) UNIQUE NOT NULL,
   company VARCHAR(150) NOT NULL,
   department VARCHAR(120) NOT NULL,
+  profile_photo_url VARCHAR(500),
   password_hash VARCHAR(255) NOT NULL,
   role VARCHAR(20) NOT NULL DEFAULT 'end-user',
   email_verified BOOLEAN NOT NULL DEFAULT FALSE,
@@ -14,6 +15,21 @@ CREATE TABLE IF NOT EXISTS users (
   verification_expires_at TIMESTAMP,
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+-- Safe to run for existing deployments as well.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_photo_url VARCHAR(500);
+
+CREATE TABLE IF NOT EXISTS profile_photo_requests (
+  id SERIAL PRIMARY KEY,
+  user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  photo_url VARCHAR(500) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+  submitted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  reviewed_at TIMESTAMP,
+  reviewed_by INT REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS profile_photo_requests_user_status_idx ON profile_photo_requests(user_id, status);
+CREATE UNIQUE INDEX IF NOT EXISTS profile_photo_requests_one_pending_per_user ON profile_photo_requests(user_id) WHERE status = 'PENDING';
 
 CREATE TABLE IF NOT EXISTS eula_acceptance (
   id SERIAL PRIMARY KEY,

@@ -14,6 +14,7 @@ import backend.services.AuthService
 import backend.services.InventoryService
 import backend.services.KnowledgeService
 import backend.services.MonitoringService
+import backend.services.ProfilePhotoService
 import backend.services.NotificationService
 import backend.services.SLAService
 import backend.services.TicketService
@@ -35,6 +36,7 @@ class ServiceContainer(application: Application) {
 
     val authService = AuthService(userRepo, auditRepo)
     val notificationService = NotificationService()
+    val profilePhotoService = ProfilePhotoService(userRepo, auditRepo)
     val ticketService = TicketService(ticketRepo, auditRepo, notificationService, userRepo)
     val monitoringService = MonitoringService(deviceRepo, assetDetectionService)
     val aiService = AIService()

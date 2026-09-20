@@ -3,10 +3,15 @@ package backend.repository
 import backend.config.AuditLogsTable
 import backend.config.EulaAcceptanceTable
 import backend.config.UsersTable
+import backend.config.ProfilePhotoRequestsTable
 import backend.models.RegisterRequest
 import backend.models.User
 import backend.models.UserRole
+import backend.models.ProfilePhotoRequest
+import backend.models.ProfilePhotoStatus
 import org.jetbrains.exposed.sql.ResultRow
+import org.jetbrains.exposed.sql.Op
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
@@ -227,14 +232,77 @@ class UserRepository {
         UsersTable.selectAll().where { UsersTable.id eq id }.singleOrNull()?.let(::toUser)
     }
 
+    fun hasPendingProfilePhoto(userId: Int): Boolean = transaction {
+        ProfilePhotoRequestsTable.selectAll().where(Op.build {
+            (ProfilePhotoRequestsTable.userId eq userId) and
+                (ProfilePhotoRequestsTable.status eq ProfilePhotoStatus.PENDING.name)
+        }).any()
+    }
+
+    fun createProfilePhotoRequest(userId: Int, photoUrl: String): ProfilePhotoRequest = transaction {
+        val id = ProfilePhotoRequestsTable.insert {
+            it[ProfilePhotoRequestsTable.userId] = userId
+            it[ProfilePhotoRequestsTable.photoUrl] = photoUrl
+            it[status] = ProfilePhotoStatus.PENDING.name
+            it[submittedAt] = LocalDateTime.now()
+            it[reviewedAt] = null
+            it[reviewedBy] = null
+        }[ProfilePhotoRequestsTable.id]
+        toProfilePhotoRequest(ProfilePhotoRequestsTable.selectAll().where { ProfilePhotoRequestsTable.id eq id }.single())
+    }
+
+    fun pendingProfilePhotoRequests(): List<ProfilePhotoRequest> = transaction {
+        ProfilePhotoRequestsTable.selectAll()
+            .where { ProfilePhotoRequestsTable.status eq ProfilePhotoStatus.PENDING.name }
+            .orderBy(ProfilePhotoRequestsTable.submittedAt)
+            .map(::toProfilePhotoRequest)
+    }
+
+    fun pendingProfilePhotoRequest(userId: Int): ProfilePhotoRequest? = transaction {
+        ProfilePhotoRequestsTable.selectAll().where(Op.build {
+            (ProfilePhotoRequestsTable.userId eq userId) and
+                (ProfilePhotoRequestsTable.status eq ProfilePhotoStatus.PENDING.name)
+        }).singleOrNull()?.let(::toProfilePhotoRequest)
+    }
+
+    fun reviewProfilePhotoRequest(requestId: Int, reviewerId: Int, approved: Boolean): ProfilePhotoRequest? = transaction {
+        val row = ProfilePhotoRequestsTable.selectAll().where { ProfilePhotoRequestsTable.id eq requestId }.singleOrNull()
+            ?: return@transaction null
+        if (row[ProfilePhotoRequestsTable.status] != ProfilePhotoStatus.PENDING.name) return@transaction null
+        val status = if (approved) ProfilePhotoStatus.APPROVED else ProfilePhotoStatus.REJECTED
+        ProfilePhotoRequestsTable.update({ ProfilePhotoRequestsTable.id eq requestId }) {
+            it[ProfilePhotoRequestsTable.status] = status.name
+            it[reviewedAt] = LocalDateTime.now()
+            it[reviewedBy] = reviewerId
+        }
+        if (approved) {
+            UsersTable.update({ UsersTable.id eq row[ProfilePhotoRequestsTable.userId] }) {
+                it[profilePhotoUrl] = row[ProfilePhotoRequestsTable.photoUrl]
+            }
+        }
+        toProfilePhotoRequest(ProfilePhotoRequestsTable.selectAll().where { ProfilePhotoRequestsTable.id eq requestId }.single())
+    }
+
     private fun toUser(row: ResultRow) = User(
         id = row[UsersTable.id],
         fullName = row[UsersTable.fullName],
         email = row[UsersTable.email],
         company = row[UsersTable.company],
         department = row[UsersTable.department],
+        profilePhotoUrl = row[UsersTable.profilePhotoUrl],
         role = UserRole.from(row[UsersTable.role]),
         emailVerified = row[UsersTable.emailVerified],
         createdAt = row[UsersTable.createdAt].toString()
     )
+
+    private fun toProfilePhotoRequest(row: ResultRow): ProfilePhotoRequest {
+        val user = UsersTable.selectAll().where { UsersTable.id eq row[ProfilePhotoRequestsTable.userId] }.singleOrNull()
+        return ProfilePhotoRequest(
+            id = row[ProfilePhotoRequestsTable.id], userId = row[ProfilePhotoRequestsTable.userId],
+            userName = user?.get(UsersTable.fullName), userEmail = user?.get(UsersTable.email),
+            photoUrl = row[ProfilePhotoRequestsTable.photoUrl], status = ProfilePhotoStatus.valueOf(row[ProfilePhotoRequestsTable.status]),
+            submittedAt = row[ProfilePhotoRequestsTable.submittedAt].toString(),
+            reviewedAt = row[ProfilePhotoRequestsTable.reviewedAt]?.toString(), reviewedBy = row[ProfilePhotoRequestsTable.reviewedBy]
+        )
+    }
 }
