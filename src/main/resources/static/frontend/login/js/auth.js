@@ -85,6 +85,46 @@ async function login() {
   location.href = ['admin', 'superadmin'].includes(role) ? '/dashboard-admin.html' : '/dashboard-user.html';
 }
 
+function signInWithGoogle() {
+  window.location.assign('/api/auth/oauth/google');
+}
+
+function showMicrosoftSignInMessage() {
+  const message = document.getElementById('oauthLoginMessage');
+  if (message) message.textContent = 'Microsoft sign-in will be available once its Entra application is configured.';
+}
+
+async function completeGoogleLoginFromCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const message = document.getElementById('oauthLoginMessage');
+  const error = params.get('oauth_error');
+  if (error) {
+    if (message) message.textContent = 'Google sign-in was cancelled or could not be completed. Please try again.';
+    history.replaceState({}, document.title, '/login.html');
+    return;
+  }
+  const ticket = params.get('oauth_ticket');
+  if (!ticket) return;
+  if (message) message.textContent = 'Completing Google sign-in...';
+  try {
+    const res = await fetch(`/api/auth/oauth/result?ticket=${encodeURIComponent(ticket)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Google sign-in could not be completed.');
+    if (data.status === 'PENDING') {
+      if (message) message.textContent = data.message;
+      history.replaceState({}, document.title, '/login.html');
+      return;
+    }
+    const auth = data.auth || (data.user ? { token: data.token, user: data.user } : null);
+    if (!auth?.user) throw new Error(data.message || 'Google sign-in could not be completed.');
+    saveSession(auth);
+    redirectForRole(auth.user.role);
+  } catch (error) {
+    if (message) message.textContent = error.message || 'Google sign-in could not be completed.';
+    history.replaceState({}, document.title, '/login.html');
+  }
+}
+
 
 function openEulaModal() {
   const modal = document.getElementById('eulaModal');
@@ -139,4 +179,5 @@ function setPasswordVisibility(inputId, toggleId) {
 
 document.addEventListener('DOMContentLoaded', () => {
   setPasswordVisibility('password', 'loginPasswordToggle');
+  completeGoogleLoginFromCallback();
 });

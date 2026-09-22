@@ -4,6 +4,7 @@ import backend.config.Env
 import backend.models.AdminEligibilityResponse
 import backend.models.AdminGrantResponse
 import backend.models.AuthResponse
+import backend.models.OAuthLoginResult
 import backend.models.LoginRequest
 import backend.models.InternalUserCreateRequest
 import backend.models.ProfileUpdateRequest
@@ -22,7 +23,8 @@ import java.util.concurrent.ConcurrentHashMap
 
 class AuthService(
     private val userRepository: UserRepository,
-    private val auditRepository: AuditRepository
+    private val auditRepository: AuditRepository,
+    private val notificationService: NotificationService? = null
 ) {
     private data class SensitiveVerification(val userId: Int, val expiresAt: LocalDateTime)
     private val sensitiveVerifications = ConcurrentHashMap<String, SensitiveVerification>()
@@ -87,6 +89,43 @@ class AuthService(
 
         auditRepository.log(user.id, "User login", "auth")
         return AuthResponse(token = tokenFor(user.id, user.role), user = user)
+    }
+
+    fun loginWithExternalProvider(email: String, provider: String): AuthResponse {
+        requireValidEmail(email)
+        val user = userRepository.findByEmailOnly(email.trim())
+            ?: error("No AITSM account is associated with this $provider email address.")
+        require(user.emailVerified) { "Your AITSM account email must be approved before you can sign in with $provider." }
+        auditRepository.log(user.id, "User login with $provider", "auth")
+        return AuthResponse(token = tokenFor(user.id, user.role), user = user)
+    }
+
+    fun completeExternalLogin(email: String, fullName: String, provider: String): OAuthLoginResult {
+        requireValidEmail(email)
+        val user = userRepository.findByEmailOnly(email.trim()) ?: userRepository.createExternalUser(
+            fullName = fullName.trim().ifBlank { email.substringBefore('@') }, email = email.trim(), provider = provider,
+            passwordHash = PasswordHasher.hash(UUID.randomUUID().toString())
+        ).also {
+            auditRepository.log(it.id, "Created pending $provider account", "users")
+            notificationService?.let { notifications ->
+                userRepository.listUsers().filter { admin -> admin.role in setOf(UserRole.ADMIN, UserRole.SUPERADMIN) }
+                    .forEach { admin -> notifications.push(admin.id, "Account approval required", "${it.fullName} signed in with $provider and is awaiting access approval.", "account_approval") }
+            }
+        }
+        if (!user.emailVerified) {
+            return OAuthLoginResult("PENDING", "Login successful. Your profile was created and is awaiting administrator verification.")
+        }
+        auditRepository.log(user.id, "User login with $provider", "auth")
+        return OAuthLoginResult("APPROVED", "Login successful", AuthResponse(tokenFor(user.id, user.role), user))
+    }
+
+    fun approveExternalAccount(userId: Int, department: String, role: UserRole, actorUserId: Int?): User {
+        require(department.isNotBlank()) { "Department is required" }
+        require(role in setOf(UserRole.END_USER, UserRole.ADMIN)) { "Unsupported access role" }
+        val updated = userRepository.approveExternalAccount(userId, department.trim(), role)
+            ?: error("User not found or cannot be approved")
+        auditRepository.log(actorUserId, "Approved external account ${updated.email} as ${role.name} in ${updated.department}", "users")
+        return updated
     }
 
     fun listUsers(): List<User> = userRepository.listUsers()

@@ -3,6 +3,7 @@ package backend.config
 import backend.repository.AIConversationRepository
 import backend.repository.AuditRepository
 import backend.repository.DeviceRepository
+import backend.repository.ColleagueRepository
 import backend.repository.KnowledgeRepository
 import backend.repository.TicketRepository
 import backend.repository.UserRepository
@@ -12,6 +13,8 @@ import backend.services.AIService
 import backend.services.AssetDetectionService
 import backend.services.AuthService
 import backend.services.InventoryService
+import backend.services.GoogleOAuthService
+import backend.services.ColleagueService
 import backend.services.KnowledgeService
 import backend.services.MonitoringService
 import backend.services.ProfilePhotoService
@@ -26,6 +29,7 @@ import io.ktor.server.application.Application
 class ServiceContainer(application: Application) {
     val auditRepo = AuditRepository()
     val userRepo = UserRepository()
+    val colleagueRepo = ColleagueRepository()
     val ticketRepo = TicketRepository()
     val systemSettingsQueries = SystemSettingsQueries()
     val inventoryQueries = InventoryQueries()
@@ -34,8 +38,10 @@ class ServiceContainer(application: Application) {
     val knowledgeRepo = KnowledgeRepository()
     val aiConversationRepository = AIConversationRepository()
 
-    val authService = AuthService(userRepo, auditRepo)
     val notificationService = NotificationService()
+    val colleagueService = ColleagueService(colleagueRepo, auditRepo, notificationService)
+    val authService = AuthService(userRepo, auditRepo, notificationService)
+    val googleOAuthService = GoogleOAuthService(authService)
     val profilePhotoService = ProfilePhotoService(userRepo, auditRepo)
     val ticketService = TicketService(ticketRepo, auditRepo, notificationService, userRepo)
     val monitoringService = MonitoringService(deviceRepo, assetDetectionService)

@@ -36,6 +36,26 @@ object ProfilePhotoRequestsTable : Table("profile_photo_requests") {
     override val primaryKey = PrimaryKey(id)
 }
 
+object ColleagueRequestsTable : Table("colleague_requests") {
+    val id = integer("id").autoIncrement()
+    val senderId = integer("sender_id").references(UsersTable.id, onDelete = ReferenceOption.CASCADE).index()
+    val recipientId = integer("recipient_id").references(UsersTable.id, onDelete = ReferenceOption.CASCADE).index()
+    val status = varchar("status", 20).index()
+    val createdAt = datetime("created_at").index()
+    val respondedAt = datetime("responded_at").nullable()
+    override val primaryKey = PrimaryKey(id)
+}
+
+object DirectMessagesTable : Table("direct_messages") {
+    val id = integer("id").autoIncrement()
+    val senderId = integer("sender_id").references(UsersTable.id, onDelete = ReferenceOption.CASCADE).index()
+    val recipientId = integer("recipient_id").references(UsersTable.id, onDelete = ReferenceOption.CASCADE).index()
+    val body = varchar("body", 2000)
+    val sentAt = datetime("sent_at").index()
+    val readAt = datetime("read_at").nullable().index()
+    override val primaryKey = PrimaryKey(id)
+}
+
 object EulaAcceptanceTable : Table("eula_acceptance") {
     val id = integer("id").autoIncrement()
     val userId = integer("user_id").references(UsersTable.id, onDelete = ReferenceOption.CASCADE).index()
@@ -211,6 +231,8 @@ object DatabaseFactory {
             SchemaUtils.createMissingTablesAndColumns(
                 UsersTable,
                 ProfilePhotoRequestsTable,
+                ColleagueRequestsTable,
+                DirectMessagesTable,
                 EulaAcceptanceTable,
                 DevicesTable,
                 TicketsTable,
@@ -225,6 +247,7 @@ object DatabaseFactory {
                 InventoryAssetSnapshotsTable
             )
             exec("CREATE UNIQUE INDEX IF NOT EXISTS profile_photo_requests_one_pending_per_user ON profile_photo_requests(user_id) WHERE status = 'PENDING'")
+            exec("CREATE UNIQUE INDEX IF NOT EXISTS colleague_requests_pair_idx ON colleague_requests (LEAST(sender_id, recipient_id), GREATEST(sender_id, recipient_id))")
         }
     }
 }

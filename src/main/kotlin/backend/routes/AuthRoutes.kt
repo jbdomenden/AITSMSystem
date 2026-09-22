@@ -4,6 +4,7 @@ import backend.models.AdminEligibilityRequest
 import backend.models.AdminGrantRequest
 import backend.models.AdminSensitiveVerifyRequest
 import backend.models.EmailApprovalRequest
+import backend.models.ExternalAccountApprovalRequest
 import backend.models.ChangeOwnPasswordRequest
 import backend.models.LoginRequest
 import backend.models.InternalUserCreateRequest
@@ -18,13 +19,14 @@ import backend.models.UserActionResponse
 import backend.security.requireRole
 import backend.security.userId
 import backend.services.AuthService
+import backend.services.GoogleOAuthService
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
-fun Route.authRoutes(authService: AuthService) {
+fun Route.authRoutes(authService: AuthService, googleOAuthService: GoogleOAuthService) {
     route("/api/auth") {
         post("/register") {
             val req = call.receive<RegisterRequest>()
@@ -41,6 +43,29 @@ fun Route.authRoutes(authService: AuthService) {
         post("/login") {
             val req = call.receive<LoginRequest>()
             call.respond(authService.login(req))
+        }
+        get("/oauth/google") {
+            val (url, state) = googleOAuthService.start()
+            call.response.cookies.append(
+                name = "google_oauth_state", value = state, path = "/api/auth/oauth/callback/google",
+                httpOnly = true, secure = googleOAuthService.usesSecureCookies, extensions = mapOf("SameSite" to "Lax")
+            )
+            call.respondRedirect(url)
+        }
+        get("/oauth/callback/google") {
+            val providerError = call.request.queryParameters["error"]
+            if (providerError != null) return@get call.respondRedirect("/login/html/login.html?oauth_error=${providerError.encodeURLParameter()}")
+            val state = call.request.queryParameters["state"] ?: return@get call.respondRedirect("/login/html/login.html?oauth_error=missing_state")
+            val code = call.request.queryParameters["code"] ?: return@get call.respondRedirect("/login/html/login.html?oauth_error=missing_code")
+            if (call.request.cookies["google_oauth_state"] != state) {
+                return@get call.respondRedirect("/login/html/login.html?oauth_error=invalid_state")
+            }
+            val ticket = googleOAuthService.complete(code, state)
+            call.respondRedirect("/login/html/login.html?oauth_ticket=${ticket.encodeURLParameter()}")
+        }
+        get("/oauth/result") {
+            val ticket = call.request.queryParameters["ticket"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            call.respond(googleOAuthService.consumeTicket(ticket))
         }
         post("/logout") {
             call.respond(HttpStatusCode.OK, mapOf("message" to "Logged out"))
@@ -88,6 +113,13 @@ fun Route.authRoutes(authService: AuthService) {
             val req = call.receive<EmailApprovalRequest>()
             val updated = authService.updateUserEmailApproval(id, req.approved, call.userId())
             call.respond(UserActionResponse(if (req.approved) "User approved for login" else "User marked as pending", updated))
+        }
+        put("/{id}/access-approval") {
+            if (!call.requireRole(UserRole.ADMIN)) return@put
+            val id = call.parameters["id"]?.toIntOrNull() ?: return@put call.respond(HttpStatusCode.BadRequest)
+            val req = call.receive<ExternalAccountApprovalRequest>()
+            val updated = authService.approveExternalAccount(id, req.department, req.role, call.userId())
+            call.respond(UserActionResponse("Account access granted", updated))
         }
         delete("/{id}") {
             if (!call.requireRole(UserRole.ADMIN)) return@delete

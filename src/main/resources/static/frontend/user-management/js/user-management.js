@@ -7,6 +7,28 @@ const userMgmtState = {
     sort: 'name-asc'
   }
 };
+let accessApprovalUserId = null;
+
+function openAccessApprovalModal(userId, email) {
+  accessApprovalUserId = userId;
+  document.getElementById('accessApprovalTarget').textContent = email;
+  document.getElementById('accessApprovalModal').classList.replace('hidden', 'show');
+}
+function closeAccessApprovalModal() {
+  document.getElementById('accessApprovalModal').classList.replace('show', 'hidden');
+  accessApprovalUserId = null;
+}
+async function submitAccessApproval() {
+  const department = document.getElementById('accessApprovalDepartment').value;
+  const role = document.getElementById('accessApprovalRole').value;
+  if (!department) return alert('Select a department before granting access.');
+  try {
+    await fetchJsonOrThrow(`/api/users/${accessApprovalUserId}/access-approval`, { method: 'PUT', body: JSON.stringify({ department, role }) });
+    closeAccessApprovalModal();
+    alert('Account access granted.');
+    await loadUserManagement();
+  } catch (error) { alert(error.message || 'Unable to grant account access.'); }
+}
 
 function ensureActionMenuBackdrop() {
   if (document.getElementById('actionMenuBackdrop')) return;
@@ -191,7 +213,9 @@ function renderUserManagementRows() {
     const currentUserId = Number(localStorage.getItem('userId') || 0);
     const canChange = u.role !== 'superadmin' && u.id !== currentUserId;
     const encodedEmail = encodeURIComponent(u.email || '');
+    const needsAccessProvisioning = !u.emailVerified || String(u.department || '').trim().toLowerCase() === 'pending approval';
     const menuItems = [
+      needsAccessProvisioning ? `<button type='button' ${canChange ? '' : 'disabled'} onclick='openAccessApprovalModal(${u.id}, decodeURIComponent("${encodedEmail}"))'>Grant access</button>` : '',
       u.role === 'admin'
         ? `<button type='button' ${canChange ? '' : 'disabled'} onclick='changeRoleFromUserManagement(${u.id}, "end-user")'>Set as end-user</button>`
         : `<button type='button' ${canChange ? '' : 'disabled'} onclick='openAddAdminFromUserManagement(decodeURIComponent("${encodedEmail}"))'>Grant admin role</button>`,
@@ -239,12 +263,18 @@ async function loadProfilePhotoApprovals() {
     const requests = await fetchJsonOrThrow('/api/profile-photo-requests/pending');
     clearTableSkeleton(rows);
     if (!requests.length) return renderTableEmptyState(rows, 4, 'No profile photos are waiting for approval.');
-    rows.innerHTML = requests.map((request) => `<tr>
+    const reviewerId = Number(localStorage.getItem('userId') || 0);
+    const reviewerRole = String(localStorage.getItem('role') || '').toLowerCase();
+    rows.innerHTML = requests.map((request) => {
+      const ownerRole = String(request.userRole || '').toLowerCase();
+      const blocked = request.userId === reviewerId || (ownerRole === 'superadmin' && reviewerRole !== 'superadmin');
+      const reason = request.userId === reviewerId ? 'You cannot review your own photo.' : (ownerRole === 'superadmin' ? 'Only another superadmin can review this photo.' : '');
+      return `<tr>
       <td>${escapeHtml(request.userName || 'Unknown')}<br><span class='small'>${escapeHtml(request.userEmail || '')}</span></td>
       <td><img class='approval-photo-preview' src='${encodeURI(request.photoUrl)}' alt='Submitted profile photo for ${escapeHtml(request.userName || 'user')}'></td>
       <td>${escapeHtml(new Date(request.submittedAt).toLocaleString())}</td>
-      <td><div class='inline-actions'><button class='btn btn-primary' type='button' onclick='reviewProfilePhoto(${request.id}, true)'>Approve</button><button class='btn btn-ghost' type='button' onclick='reviewProfilePhoto(${request.id}, false)'>Reject</button></div></td>
-    </tr>`).join('');
+      <td><div class='inline-actions'><button class='btn btn-primary' type='button' ${blocked ? 'disabled' : ''} title='${reason}' onclick='reviewProfilePhoto(${request.id}, true)'>Approve</button><button class='btn btn-ghost' type='button' ${blocked ? 'disabled' : ''} title='${reason}' onclick='reviewProfilePhoto(${request.id}, false)'>Reject</button></div>${reason ? `<span class='small text-danger'>${reason}</span>` : ''}</td>
+    </tr>`; }).join('');
   } catch (error) {
     renderTableErrorState(rows, 4, error.message || 'Unable to load profile photo requests.');
   } finally { clearTableSkeleton(rows); }
@@ -368,5 +398,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('createUserForm')?.addEventListener('submit', submitCreateUser);
   document.getElementById('createUserModal')?.addEventListener('click', (e) => {
     if (e.target.id === 'createUserModal') closeCreateUserModal();
+  });
+  document.getElementById('accessApprovalModal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'accessApprovalModal') closeAccessApprovalModal();
   });
 });
