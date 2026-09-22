@@ -83,6 +83,12 @@ function renderNotifications(items) {
   `).join('');
 }
 
+function collectionFromResponse(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  return [];
+}
+
 async function fetchJsonOrThrow(url) {
   const res = await fetch(url, { headers: authHeaders() });
   const data = await res.json();
@@ -102,8 +108,8 @@ async function loadUserDashboard() {
       fetchJsonOrThrow('/api/notifications')
     ]);
 
-    const sortedTickets = [...tickets].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-    const sortedNotifications = [...userNotifications].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const sortedTickets = collectionFromResponse(tickets).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+    const sortedNotifications = collectionFromResponse(userNotifications).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     renderUserSummary(sortedTickets);
     if (rows) clearTableSkeleton(rows);
@@ -111,8 +117,8 @@ async function loadUserDashboard() {
     renderNotifications(sortedNotifications);
   } catch (error) {
     renderUserSummary([]);
-    if (rows) renderTableErrorState(rows, 5, error.message);
-    if (notifications) notifications.innerHTML = `<p class='small text-danger'>${error.message}</p>`;
+    if (rows) renderTableErrorState(rows, 5, 'Unable to load tickets right now. Please try again.');
+    if (notifications) notifications.innerHTML = "<div class='empty-state'><h3>Notifications unavailable</h3><p>Please try again shortly.</p></div>";
   } finally {
     if (rows) clearTableSkeleton(rows);
   }

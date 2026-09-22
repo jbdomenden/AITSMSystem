@@ -132,6 +132,7 @@
         <p id='createUserMessage' class='small' style='margin-top:12px'></p>
       </div>
     </div>
+    <div id='accessApprovalModal' class='modal-overlay hidden'><div class='modal-card'><div class='card-head'><div><h3 class='section-title'>Grant Account Access</h3><p id='accessApprovalTarget' class='section-subtitle'></p></div></div><div class='form-grid single-col'><div class='form-group'><label for='accessApprovalDepartment'>Department</label><select id='accessApprovalDepartment'><option value=''>Select department</option><option>Finance</option><option>HR</option><option>IT</option><option>Operations</option><option>Sales</option><option>Support</option><option>Security</option><option>Management</option></select></div><div class='form-group'><label for='accessApprovalRole'>Access level</label><select id='accessApprovalRole'><option value='end-user'>End-user</option><option value='admin'>Admin</option></select></div></div><div class='inline-actions' style='justify-content:flex-end'><button class='btn btn-ghost' type='button' onclick='closeAccessApprovalModal()'>Cancel</button><button class='btn btn-primary' type='button' onclick='submitAccessApproval()'>Grant access</button></div></div></div>
   </main>
 </div>
 <script src='/modules/sidebar/js/admin-shell.js'></script><script src='/modules/common/js/app.js'></script><script src='/modules/common/js/table-skeleton.js'></script><script src='/user-management/js/user-management.js'></script>

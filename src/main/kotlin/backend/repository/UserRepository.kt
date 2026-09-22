@@ -193,6 +193,17 @@ class UserRepository {
         UsersTable.selectAll().where { UsersTable.id eq userId }.singleOrNull()?.let(::toUser)
     }
 
+    fun approveExternalAccount(userId: Int, department: String, role: UserRole): User? = transaction {
+        val row = UsersTable.selectAll().where { UsersTable.id eq userId }.singleOrNull() ?: return@transaction null
+        if (row[UsersTable.role] == UserRole.SUPERADMIN.name) return@transaction null
+        UsersTable.update({ UsersTable.id eq userId }) {
+            it[UsersTable.department] = department
+            it[UsersTable.role] = role.name
+            it[UsersTable.emailVerified] = true
+        }
+        UsersTable.selectAll().where { UsersTable.id eq userId }.singleOrNull()?.let(::toUser)
+    }
+
     fun updateProfile(userId: Int, fullName: String, company: String, department: String): User? = transaction {
         val row = UsersTable.selectAll().where { UsersTable.id eq userId }.singleOrNull() ?: return@transaction null
         UsersTable.update({ UsersTable.id eq userId }) {
@@ -230,6 +241,23 @@ class UserRepository {
 
     fun findById(id: Int): User? = transaction {
         UsersTable.selectAll().where { UsersTable.id eq id }.singleOrNull()?.let(::toUser)
+    }
+
+    fun createExternalUser(fullName: String, email: String, provider: String, passwordHash: String): User = transaction {
+        val now = LocalDateTime.now()
+        val id = UsersTable.insert {
+            it[UsersTable.fullName] = fullName
+            it[UsersTable.email] = email.lowercase()
+            it[UsersTable.company] = "$provider account"
+            it[UsersTable.department] = "Pending approval"
+            it[UsersTable.passwordHash] = passwordHash
+            it[UsersTable.role] = UserRole.END_USER.name
+            it[UsersTable.emailVerified] = false
+            it[UsersTable.verificationCode] = null
+            it[UsersTable.verificationExpiresAt] = null
+            it[UsersTable.createdAt] = now
+        }[UsersTable.id]
+        UsersTable.selectAll().where { UsersTable.id eq id }.single().let(::toUser)
     }
 
     fun hasPendingProfilePhoto(userId: Int): Boolean = transaction {
@@ -299,7 +327,7 @@ class UserRepository {
         val user = UsersTable.selectAll().where { UsersTable.id eq row[ProfilePhotoRequestsTable.userId] }.singleOrNull()
         return ProfilePhotoRequest(
             id = row[ProfilePhotoRequestsTable.id], userId = row[ProfilePhotoRequestsTable.userId],
-            userName = user?.get(UsersTable.fullName), userEmail = user?.get(UsersTable.email),
+            userName = user?.get(UsersTable.fullName), userEmail = user?.get(UsersTable.email), userRole = user?.let { UserRole.from(it[UsersTable.role]) },
             photoUrl = row[ProfilePhotoRequestsTable.photoUrl], status = ProfilePhotoStatus.valueOf(row[ProfilePhotoRequestsTable.status]),
             submittedAt = row[ProfilePhotoRequestsTable.submittedAt].toString(),
             reviewedAt = row[ProfilePhotoRequestsTable.reviewedAt]?.toString(), reviewedBy = row[ProfilePhotoRequestsTable.reviewedBy]

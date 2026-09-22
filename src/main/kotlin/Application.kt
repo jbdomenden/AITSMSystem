@@ -9,6 +9,7 @@ import backend.routes.aiRoutes
 import backend.routes.analyticsRoutes
 import backend.routes.authRoutes
 import backend.routes.deviceRoutes
+import backend.routes.colleagueRoutes
 import backend.routes.knowledgeRoutes
 import backend.routes.monitoringRoutes
 import backend.routes.profilePhotoRoutes
@@ -152,6 +153,7 @@ fun Application.module() {
         get("/profile.html") { call.respondRedirect("/profile/html/profile.html") }
         get("/user-management.html") { call.respondRedirect("/user-management/html/user-management.html") }
         get("/ai-assistant.html") { call.respondRedirect("/ai-assistant/html/ai-assistant.html") }
+        get("/colleagues.html") { call.respondRedirect("/colleagues/html/colleagues.html") }
         get("/api/health") {
             call.respond(mapOf("status" to "ok", "environment" to appEnv))
         }
@@ -163,13 +165,14 @@ fun Application.module() {
         }
         staticFiles("/uploads/profile-photos", File(Env.get("PROFILE_UPLOAD_DIR") ?: "uploads/profile-photos"))
         staticResources("/", "static/frontend")
-        authRoutes(container.authService)
+        authRoutes(container.authService, container.googleOAuthService)
         profilePhotoRoutes(container.profilePhotoService)
         ticketRoutes(container.ticketService)
         monitoringRoutes(container.monitoringService, container.deviceRepo, container.assetDetectionService, container.inventoryService)
         analyticsRoutes(container.ticketService, container.monitoringService, container.aiService)
         deviceRoutes(container.deviceRepo, container.userRepo, container.monitoringService, container.assetDetectionService, container.inventoryService)
         notificationRoutes(container.notificationService)
+        colleagueRoutes(container.colleagueService)
         knowledgeRoutes(container.knowledgeService)
         inventoryRoutes(container.inventoryService)
         slaRoutes(container.slaService)
