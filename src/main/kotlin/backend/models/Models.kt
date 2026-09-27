@@ -63,6 +63,7 @@ data class ProfilePhotoRequest(
     val userId: Int,
     val userName: String? = null,
     val userEmail: String? = null,
+    val userRole: UserRole? = null,
     val photoUrl: String,
     val status: ProfilePhotoStatus,
     val submittedAt: String,
@@ -86,6 +87,16 @@ data class RegisterRequest(
 
 @Serializable data class LoginRequest(val email: String, val password: String)
 @Serializable data class AuthResponse(val token: String, val user: User)
+@Serializable
+data class OAuthLoginResult(
+    val status: String,
+    val message: String,
+    val auth: AuthResponse? = null,
+    // Kept at the top level as well so the OAuth result is compatible with
+    // the regular login response and browser-cached login pages.
+    val token: String? = auth?.token,
+    val user: User? = auth?.user
+)
 @Serializable data class RegistrationResponse(val message: String, val email: String, val devVerificationCode: String? = null)
 @Serializable data class VerifyEmailRequest(val email: String, val code: String)
 @Serializable data class ResendVerificationRequest(val email: String)
@@ -97,6 +108,7 @@ data class RegisterRequest(
 @Serializable data class AssetIpPrefixesRequest(val prefixes: List<String>)
 @Serializable data class AssetIpPrefixesResponse(val prefixes: List<String>, val message: String? = null)
 @Serializable data class EmailApprovalRequest(val approved: Boolean)
+@Serializable data class ExternalAccountApprovalRequest(val department: String, val role: UserRole)
 @Serializable data class EmailVerificationUpdateRequest(val approved: Boolean)
 @Serializable data class InternalUserCreateRequest(
     val fullName: String,
@@ -115,6 +127,12 @@ data class RegisterRequest(
 @Serializable data class AdminGrantRequest(val targetEmail: String, val verificationToken: String)
 @Serializable data class AdminGrantResponse(val success: Boolean, val user: User? = null, val message: String)
 @Serializable data class UserActionResponse(val message: String, val user: User)
+@Serializable enum class ColleagueRequestStatus { PENDING, ACCEPTED, DECLINED, CANCELLED }
+@Serializable data class ColleagueRequest(val id: Int, val senderId: Int, val recipientId: Int, val status: ColleagueRequestStatus, val createdAt: String, val respondedAt: String? = null)
+@Serializable data class Colleague(val id: Int, val fullName: String, val email: String, val department: String, val role: UserRole, val profilePhotoUrl: String? = null)
+@Serializable data class DirectMessage(val id: Int, val senderId: Int, val recipientId: Int, val body: String, val sentAt: String, val readAt: String? = null)
+@Serializable data class ConversationSummary(val colleague: Colleague, val lastMessage: DirectMessage? = null, val unreadCount: Long = 0)
+@Serializable data class SendMessageRequest(val body: String)
 
 
 @Serializable

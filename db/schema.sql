@@ -31,6 +31,27 @@ CREATE TABLE IF NOT EXISTS profile_photo_requests (
 CREATE INDEX IF NOT EXISTS profile_photo_requests_user_status_idx ON profile_photo_requests(user_id, status);
 CREATE UNIQUE INDEX IF NOT EXISTS profile_photo_requests_one_pending_per_user ON profile_photo_requests(user_id) WHERE status = 'PENDING';
 
+CREATE TABLE IF NOT EXISTS colleague_requests (
+  id SERIAL PRIMARY KEY,
+  sender_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  recipient_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  responded_at TIMESTAMP,
+  CHECK (sender_id <> recipient_id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS colleague_requests_pair_idx ON colleague_requests (LEAST(sender_id, recipient_id), GREATEST(sender_id, recipient_id));
+
+CREATE TABLE IF NOT EXISTS direct_messages (
+  id SERIAL PRIMARY KEY,
+  sender_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  recipient_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  body VARCHAR(2000) NOT NULL,
+  sent_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  read_at TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS direct_messages_pair_idx ON direct_messages(sender_id, recipient_id, sent_at);
+
 CREATE TABLE IF NOT EXISTS eula_acceptance (
   id SERIAL PRIMARY KEY,
   user_id INT REFERENCES users(id),

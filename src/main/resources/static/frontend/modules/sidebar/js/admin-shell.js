@@ -31,7 +31,8 @@ function adminNavItems() {
     { section: 'System', items: [
       { page: 'settings.html', href: '/settings.html', icon: 'settings', label: 'Settings' },
       { page: 'assets.html', href: '/assets.html', icon: 'assets', label: 'Asset Management' },
-      { page: 'user-management.html', href: '/user-management.html', icon: 'users', label: 'User Management' }
+      { page: 'user-management.html', href: '/user-management.html', icon: 'users', label: 'User Management' },
+      { page: 'colleagues.html', href: '/colleagues.html', icon: 'users', label: 'Colleagues & Chat' }
     ]}
   ];
 }

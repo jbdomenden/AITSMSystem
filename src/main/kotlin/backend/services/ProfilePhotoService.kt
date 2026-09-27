@@ -2,6 +2,7 @@ package backend.services
 
 import backend.config.Env
 import backend.models.ProfilePhotoRequest
+import backend.models.UserRole
 import backend.repository.AuditRepository
 import backend.repository.UserRepository
 import io.ktor.http.ContentType
@@ -46,6 +47,16 @@ class ProfilePhotoService(
     fun pendingFor(userId: Int): ProfilePhotoRequest? = userRepository.pendingProfilePhotoRequest(userId)
 
     fun review(requestId: Int, reviewerId: Int, approved: Boolean): ProfilePhotoRequest {
+        val request = pending().firstOrNull { it.id == requestId } ?: error("Profile photo request was not found or was already reviewed.")
+        val owner = userRepository.findById(request.userId) ?: error("Profile photo owner was not found.")
+        val reviewer = userRepository.findById(reviewerId) ?: throw SecurityException("Reviewer account was not found.")
+        require(owner.id != reviewer.id) { "You cannot review your own profile photo." }
+        val allowed = when (owner.role) {
+            UserRole.END_USER -> reviewer.role in setOf(UserRole.ADMIN, UserRole.SUPERADMIN)
+            UserRole.ADMIN -> reviewer.role in setOf(UserRole.ADMIN, UserRole.SUPERADMIN)
+            UserRole.SUPERADMIN -> reviewer.role == UserRole.SUPERADMIN
+        }
+        if (!allowed) throw SecurityException("You are not allowed to review this profile photo request.")
         val reviewed = userRepository.reviewProfilePhotoRequest(requestId, reviewerId, approved)
             ?: error("Profile photo request was not found or was already reviewed.")
         auditRepository.log(reviewerId, "${if (approved) "Approved" else "Rejected"} profile photo request ${reviewed.id}", "profile_photo_requests")

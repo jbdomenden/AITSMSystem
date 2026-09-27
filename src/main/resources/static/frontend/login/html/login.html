@@ -31,9 +31,15 @@
       <span>Remember me</span>
     </label>
     <button class='btn btn-primary auth-login-btn' onclick='login()'>Login</button>
+    <div class='auth-divider' aria-hidden='true'><span>or continue with</span></div>
+    <div class='auth-social-actions'>
+      <button class='btn auth-provider-btn' type='button' onclick='signInWithGoogle()' aria-label='Sign in with Google'><span class='provider-mark provider-google'>G</span>Sign in with Google</button>
+      <button class='btn auth-provider-btn' type='button' onclick='showMicrosoftSignInMessage()' aria-label='Sign in with Microsoft'><span class='provider-mark provider-microsoft'>⊞</span>Sign in with Microsoft</button>
+    </div>
+    <p id='oauthLoginMessage' class='small auth-oauth-message' role='status' aria-live='polite'></p>
     <p class='small auth-links'>Need an account? <a href='/signup.html' class='text-primary'>sign up</a>.</p>
   </section>
-  <script src='/modules/common/js/app.js'></script>
-  <script src='/login/js/auth.js'></script>
+  <script src='/modules/common/js/app.js?v=oauth-session-v2'></script>
+  <script src='/login/js/auth.js?v=oauth-session-v2'></script>
 </body>
 </html>

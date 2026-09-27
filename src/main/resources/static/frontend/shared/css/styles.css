@@ -440,6 +440,16 @@ textarea { resize: vertical; min-height: 120px; }
 .auth-login-btn { width: 100%; margin-top: 8px; background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%); border-radius: 14px; }
 .remember-row { display: flex; align-items: center; gap: 8px; margin: 10px 0 2px; color: #c8d5f7; font-size: 14px; }
 .auth-links { margin-top: 12px; text-align: left; }
+.auth-divider { display: flex; align-items: center; gap: 10px; margin: 18px 0 12px; color: #b8c6e8; font-size: 12px; }
+.auth-divider::before, .auth-divider::after { content: ''; height: 1px; background: rgba(184, 198, 232, .28); flex: 1; }
+.auth-divider span { white-space: nowrap; }
+.auth-social-actions { display: grid; gap: 10px; }
+.auth-provider-btn { width: 100%; justify-content: center; border-color: rgba(191, 219, 254, .48); background: rgba(255, 255, 255, .96); color: #0f172a; }
+.auth-provider-btn:hover, .auth-provider-btn:focus-visible { background: #fff; border-color: #60a5fa; }
+.provider-mark { width: 20px; height: 20px; display: inline-grid; place-items: center; margin-right: 8px; border-radius: 4px; font-weight: 800; }
+.provider-google { color: #4285f4; }
+.provider-microsoft { color: #0078d4; font-size: 22px; line-height: 1; }
+.auth-oauth-message { min-height: 18px; margin: 10px 0 0; color: #bfdbfe; }
 .auth-dark .text-primary { color: #8ec7ff; }
 .auth-panel-wide { width: min(700px, 100%); }
 .signup-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
@@ -832,6 +842,11 @@ body.sidebar-hidden .sidebar {
 .profile-facts dt { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
 .profile-facts dd { margin: 6px 0 0; color: var(--text); font-weight: 700; overflow-wrap: anywhere; }
 .approval-photo-preview { width: 56px; height: 56px; object-fit: cover; border-radius: 50%; border: 1px solid var(--border); }
+.colleague-layout { display:grid; grid-template-columns:minmax(220px,.8fr) minmax(220px,.8fr) minmax(320px,1.5fr); gap:16px; align-items:start; }
+.colleague-list { display:grid; gap:8px; margin:12px 0 20px; max-height:360px; overflow:auto; }
+.colleague-row,.conversation-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px; border:1px solid var(--border); border-radius:10px; background:#fff; text-align:left; }
+.conversation-row { width:100%; cursor:pointer; display:grid; justify-items:start; position:relative; }
+.chat-card { min-height:540px; display:flex; flex-direction:column; }.message-list { flex:1; display:grid; align-content:start; gap:8px; overflow:auto; padding:10px 0; }.message { max-width:80%; padding:9px 11px; border-radius:12px; background:#f1f5f9; overflow-wrap:anywhere; }.message.mine { justify-self:end; background:#dbeafe; }.message span { display:block; font-size:10px; opacity:.65; margin-top:3px; }.chat-form { display:flex; gap:8px; }.chat-form textarea { min-height:48px; flex:1; }@media(max-width:980px){.colleague-layout{grid-template-columns:1fr 1fr}.chat-card{grid-column:1/-1}}@media(max-width:640px){.colleague-layout{grid-template-columns:1fr}.chat-card{grid-column:auto}.chat-form{flex-direction:column}}
 @media (max-width: 980px) {
   /* A hidden fixed sidebar must not leave content in a zero-width grid column. */
   body.sidebar-hidden .app-layout { grid-template-columns: minmax(0, 1fr); }
