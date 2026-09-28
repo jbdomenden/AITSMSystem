@@ -95,6 +95,10 @@ async function loadKnowledgeLibrary() {
     knowledgeLibraryArticles = await fetchKnowledgeLibrary();
     if (host) clearTableSkeleton(host);
     renderKnowledgeLibrary(filterKnowledgeLibrary(knowledgeLibraryArticles));
+    const requestedId = Number(new URLSearchParams(location.search).get('articleId'));
+    if (requestedId > 0 && knowledgeLibraryArticles.some((article) => article.id === requestedId)) {
+      openKnowledgeLibraryModal(requestedId);
+    }
   } catch (error) {
     if (host) renderTableErrorState(host, 4, error.message);
   } finally {

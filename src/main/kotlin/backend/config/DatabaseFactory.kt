@@ -108,6 +108,7 @@ object NotificationsTable : Table("notifications") {
     val message = text("message")
     val type = varchar("type", 40)
     val relatedTicketId = integer("related_ticket_id").nullable().index()
+    val relatedUserId = integer("related_user_id").references(UsersTable.id, onDelete = ReferenceOption.SET_NULL).nullable().index()
     val isRead = bool("is_read").default(false).index()
     val createdAt = datetime("created_at").index()
     val readAt = datetime("read_at").nullable().index()
@@ -209,9 +210,16 @@ object InventoryAssetSnapshotsTable : Table("inventory_asset_snapshots") {
 
 object DatabaseFactory {
     fun init() {
-        val dbUrl = Env.get("DB_URL") ?: error("DB_URL is required")
-        val dbUser = Env.get("DB_USER") ?: error("DB_USER is required")
-        val dbPassword = Env.get("DB_PASSWORD") ?: error("DB_PASSWORD is required")
+        val production = Env.get("APP_ENV")?.equals("production", ignoreCase = true) == true
+        fun databaseSetting(name: String, developmentDefault: String): String = Env.get(name)
+            ?: if (!production) developmentDefault
+            else error("$name is required in production. Set the PostgreSQL connection values before starting AITSM.")
+
+        // Preserve the original local setup for existing developer installations. Production
+        // still requires explicit environment settings and never falls back to credentials.
+        val dbUrl = databaseSetting("DB_URL", "jdbc:postgresql://localhost:5432/aitsm_db")
+        val dbUser = databaseSetting("DB_USER", "postgres")
+        val dbPassword = databaseSetting("DB_PASSWORD", "root")
 
         val config = HikariConfig().apply {
             jdbcUrl = dbUrl

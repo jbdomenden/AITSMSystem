@@ -30,7 +30,15 @@ This guide explains how to use the system as an end-user or admin.
    - If AI provider is unavailable/malformed: fallback troubleshooting panel appears.
 4. Click **Create Ticket from Last Reply** to prefill ticket form from visible final output.
 
-### 2.4 Notifications
+### 2.4 AI-Assisted Ticket Creation
+1. Enter a ticket description with at least 10 characters.
+2. Click **Analyze with AI**.
+3. Review and edit the suggested title, description, category, and priority in the preview.
+4. Review any knowledge recommendations or possible duplicate tickets.
+5. Click **Apply reviewed suggestions** only when the proposed fields are accurate.
+6. Continue editing as needed, then create the ticket normally.
+
+### 2.5 Notifications
 - Open notification areas in dashboard/shell to review updates.
 
 ### 2.5 Profile and Password
@@ -62,6 +70,12 @@ This guide explains how to use the system as an end-user or admin.
 ### 3.6 SLA
 - View configured SLA policies.
 
+### 3.7 AI Ticket Assistance
+1. Open **Ticket Management** and select a ticket ID or title.
+2. In **AI Ticket Assistance**, click **Generate assistance**.
+3. Review the summary and checklist.
+4. Edit the resolution draft before copying or using it. Generation never posts an update or changes ticket status automatically.
+
 ---
 
 ## 4. Practical Workflow (Recommended)
@@ -80,7 +94,7 @@ This guide explains how to use the system as an end-user or admin.
 - Reset password if needed.
 
 ### AI assistant shows fallback panel
-- AI backend (Ollama) may be unavailable or timed out.
+- The hosted Gemini AI service may be temporarily unavailable, rate limited, or timed out.
 - You can still create a ticket draft from fallback guidance.
 
 ### No monitoring data

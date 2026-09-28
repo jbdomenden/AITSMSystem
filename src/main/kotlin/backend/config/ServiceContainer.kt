@@ -23,7 +23,8 @@ import backend.services.SLAService
 import backend.services.TicketService
 import backend.services.ai.AIChatService
 import backend.services.ai.AIConfigService
-import backend.services.ai.OllamaProvider
+import backend.services.ai.GeminiProvider
+import backend.services.ai.TicketAiAdvisor
 import io.ktor.server.application.Application
 
 class ServiceContainer(application: Application) {
@@ -47,7 +48,9 @@ class ServiceContainer(application: Application) {
     val monitoringService = MonitoringService(deviceRepo, assetDetectionService)
     val aiService = AIService()
     val aiConfigService = AIConfigService(application.environment.config)
-    val aiChatService = AIChatService(OllamaProvider(), aiConfigService, aiConversationRepository)
+    private val aiProvider = GeminiProvider()
+    val aiChatService = AIChatService(aiProvider, aiConfigService, aiConversationRepository)
+    val ticketAiAdvisor = TicketAiAdvisor(ticketService, knowledgeRepo, aiProvider, aiConfigService)
     val slaService = SLAService()
     val knowledgeService = KnowledgeService(knowledgeRepo, auditRepo)
     val inventoryService = InventoryService(inventoryQueries, assetDetectionService)

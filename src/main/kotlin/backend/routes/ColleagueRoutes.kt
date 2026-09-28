@@ -16,6 +16,7 @@ import io.ktor.server.routing.route
 fun Route.colleagueRoutes(service: ColleagueService) {
     route("/api/colleagues") {
         get("/search") { if (!call.requireAuthenticated()) return@get; call.respond(service.search(call.userId()!!, call.request.queryParameters["q"] ?: "")) }
+        get("/{id}/profile") { if (!call.requireAuthenticated()) return@get; val id = call.parameters["id"]?.toIntOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest); call.respond(service.profile(call.userId()!!, id)) }
         get { if (!call.requireAuthenticated()) return@get; call.respond(service.colleagues(call.userId()!!)) }
         get("/requests") { if (!call.requireAuthenticated()) return@get; call.respond(service.requests(call.userId()!!)) }
         post("/{id}/request") { if (!call.requireAuthenticated()) return@post; val id = call.parameters["id"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest); call.respond(HttpStatusCode.Created, service.sendRequest(call.userId()!!, id)) }

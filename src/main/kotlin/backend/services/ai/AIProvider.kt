@@ -9,7 +9,6 @@ data class AIProviderResult(
 )
 
 interface AIProvider {
-    fun chat(baseUrl: String, model: String, timeoutMillis: Long, messages: List<AIMessage>): AIProviderResult
-    fun listModels(baseUrl: String, timeoutMillis: Long): AIProviderResult
-    fun testConnection(baseUrl: String, model: String, timeoutMillis: Long): AIProviderResult
+    fun chat(model: String, timeoutMillis: Long, messages: List<AIMessage>): AIProviderResult
+    fun testConnection(model: String, timeoutMillis: Long): AIProviderResult
 }

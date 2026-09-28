@@ -140,9 +140,9 @@ function applyAiResponse(payload, userMessage) {
   }
 
   const source = payload.source;
-  if (source === 'ollama' && typeof payload.reply === 'string' && payload.reply.trim()) {
+  if (source === 'gemini' && typeof payload.reply === 'string' && payload.reply.trim()) {
     addAssistantReply(payload.reply.trim());
-    aiState.lastVisible = { type: 'ollama', reply: payload.reply.trim() };
+    aiState.lastVisible = { type: 'gemini', reply: payload.reply.trim() };
     saveState();
     renderMessages();
     renderFallbackPanel();
@@ -168,14 +168,14 @@ function applyAiResponse(payload, userMessage) {
 
 function localFallback(reason, userMessage) {
   return {
-    message: 'I’m currently unable to process a full diagnosis. Please verify local Ollama connectivity and retry.',
+    message: 'I’m currently unable to process a full diagnosis because the hosted AI service is unavailable. Please retry shortly.',
     issueSummary: userMessage || 'Unable to process request',
-    likelyCauses: [reason || 'Backend-to-Ollama connectivity issue'],
-    troubleshootingSteps: ['Verify Ollama is running locally', 'Check configured model in Settings', 'Retry request'],
+    likelyCauses: [reason || 'Hosted AI service temporarily unavailable'],
+    troubleshootingSteps: ['Retry after a short wait', 'Contact an administrator if the issue continues'],
     escalationCriteria: ['Escalate if service remains unavailable for critical support cases'],
     suggestedPriority: 'Medium',
     ticketTitle: 'AI assistant unavailable',
-    ticketDescription: 'AI assistant request failed because backend could not reach Ollama.'
+    ticketDescription: 'AI assistant request failed because the hosted AI service was unavailable.'
   };
 }
 
@@ -242,7 +242,7 @@ function draftFromVisible() {
   const lastUser = aiState.messages.filter((m) => m.role === 'user').slice(-1)[0]?.content || '';
   if (!visible) return null;
 
-  if (visible.type === 'ollama' && visible.reply) {
+  if (visible.type === 'gemini' && visible.reply) {
     return {
       title: 'AI-assisted IT support request',
       description: visible.reply,

@@ -62,27 +62,6 @@ function renderRecentTickets(tickets) {
   `).join('');
 }
 
-function renderNotifications(items) {
-  const el = document.getElementById('userNotifications');
-  if (!el) return;
-
-  const safe = Array.isArray(items) ? items : [];
-  if (!safe.length) {
-    el.innerHTML = "<div class='empty-state'><h3>No notifications</h3><p>Updates from support team will appear here.</p></div>";
-    return;
-  }
-
-  el.innerHTML = safe.slice(0, 6).map(n => `
-    <article class='notification-item'>
-      <div class='notification-line'>
-        <span class='badge ${n.type === 'error' ? 'open' : (n.type === 'success' ? 'resolved' : 'in-progress')}'>${n.type || 'info'}</span>
-        <span class='small'>${formatDateTime(n.createdAt)}</span>
-      </div>
-      <p>${n.message || 'Notification received.'}</p>
-    </article>
-  `).join('');
-}
-
 function collectionFromResponse(payload) {
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload?.data)) return payload.data;
@@ -98,27 +77,19 @@ async function fetchJsonOrThrow(url) {
 
 async function loadUserDashboard() {
   const rows = document.getElementById('recentTicketRows');
-  const notifications = document.getElementById('userNotifications');
   if (rows) showTableSkeleton(rows, { rowCount: 5, columnCount: 5 });
-  if (notifications) notifications.innerHTML = "<p class='small'>Loading notifications...</p>";
 
   try {
-    const [tickets, userNotifications] = await Promise.all([
-      fetchJsonOrThrow('/api/tickets'),
-      fetchJsonOrThrow('/api/notifications')
-    ]);
+    const tickets = await fetchJsonOrThrow('/api/tickets');
 
     const sortedTickets = collectionFromResponse(tickets).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-    const sortedNotifications = collectionFromResponse(userNotifications).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     renderUserSummary(sortedTickets);
     if (rows) clearTableSkeleton(rows);
     renderRecentTickets(sortedTickets);
-    renderNotifications(sortedNotifications);
   } catch (error) {
     renderUserSummary([]);
     if (rows) renderTableErrorState(rows, 5, 'Unable to load tickets right now. Please try again.');
-    if (notifications) notifications.innerHTML = "<div class='empty-state'><h3>Notifications unavailable</h3><p>Please try again shortly.</p></div>";
   } finally {
     if (rows) clearTableSkeleton(rows);
   }

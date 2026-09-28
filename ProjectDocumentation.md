@@ -104,17 +104,17 @@ Features include:
 ## 7. AI Assistant Flow
 
 ### 7.1 Provider interaction
-`AIChatService` calls Ollama via provider abstraction with timeout protection.
+`AIChatService` calls the hosted Gemini API through a provider abstraction with timeout protection.
 
 ### 7.2 Strict source-based rendering contract
 AI responses are normalized into one DTO shape:
-- `source: "ollama" | "fallback"`
+- `source: "gemini" | "fallback"`
 - `reachable: boolean`
 - `reply: string?`
 - `fallback: object?`
 
 Rules:
-- Ollama success => `source=ollama`, `reply` only, `fallback=null`
+- Gemini success => `source=gemini`, `reply` only, `fallback=null`
 - Provider fail/timeout/malformed/blank => `source=fallback`, `reply=null`, fallback object populated
 - Never mixed content in one response
 
@@ -123,6 +123,14 @@ Per-session messages are persisted and reloaded from `ai_conversation_messages`.
 
 ### 7.4 Ticket drafting
 Frontend can submit visible final AI output to `/api/ai/create-ticket-draft` and prefill the Create Ticket page.
+
+### 7.5 Advisory ticket intelligence
+- End users can request a Gemini-generated ticket preview and explicitly apply the reviewed fields.
+- Knowledge recommendations are limited to existing published articles and link back to the read-only library.
+- Possible duplicate tickets use local, explainable matching and never merge or close records automatically.
+- Admins and superadmins can generate a summary, troubleshooting checklist, and editable resolution draft for a selected ticket.
+- AI output never changes priority, assignment, status, approval, access, or ticket data automatically.
+- Provider failure or malformed structured output falls back to safe local guidance.
 
 ---
 
@@ -142,7 +150,7 @@ Use `.env` (from `.env.example`) for runtime values.
 Key variables:
 - DB: `DB_URL`, `DB_USER`, `DB_PASSWORD`
 - Production superadmin: `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD`
-- AI: `AI_PROVIDER`, `AI_OLLAMA_BASE_URL`, `AI_OLLAMA_MODEL`, `AI_TIMEOUT_MILLIS`
+- AI: `AI_PROVIDER=gemini`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `AI_TIMEOUT_MILLIS`. Keep the API key in deployment secrets or ignored `.env`, never source control.
 
 ---
 

@@ -116,6 +116,144 @@ async function createTicket() {
   location.href = '/tickets.html';
 }
 
+async function analyzeTicketWithAi() {
+  const button = document.getElementById('analyzeTicketBtn');
+  const host = document.getElementById('ticketAiInsights');
+  const titleInput = document.getElementById('title');
+  const descriptionInput = document.getElementById('description');
+  const body = { title: titleInput.value.trim(), description: descriptionInput.value.trim() };
+  if (body.description.length < 10) return setCreateTicketMessage('Add at least 10 description characters before AI analysis.', 'danger');
+  button.disabled = true;
+  host.classList.remove('hidden', 'text-danger');
+  host.textContent = 'Gemini is analyzing the ticket and matching published knowledge articles…';
+  try {
+    const response = await fetch('/api/ai/ticket-insights', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || data.message || 'AI analysis unavailable');
+    renderTicketAiPreview(data);
+  } catch (error) {
+    host.textContent = error.message;
+    host.classList.add('text-danger');
+  }
+  finally { button.disabled = false; }
+}
+
+function labeledPreviewField(label, control) {
+  const group = document.createElement('label');
+  group.className = 'form-group';
+  const text = document.createElement('span');
+  text.textContent = label;
+  group.append(text, control);
+  return group;
+}
+
+function previewSelect(id, value, choices) {
+  const select = document.createElement('select');
+  select.id = id;
+  choices.forEach((choice) => {
+    const option = document.createElement('option');
+    option.value = choice;
+    option.textContent = choice;
+    option.selected = choice === value;
+    select.appendChild(option);
+  });
+  return select;
+}
+
+function renderTicketAiPreview(data) {
+  const host = document.getElementById('ticketAiInsights');
+  const suggestion = data.suggestion || {};
+  host.replaceChildren();
+
+  const heading = document.createElement('div');
+  heading.className = 'ai-advisory-heading';
+  const headingText = document.createElement('div');
+  const titleText = document.createElement('strong');
+  titleText.textContent = 'Review AI suggestions';
+  const subtitle = document.createElement('p');
+  subtitle.className = 'small';
+  subtitle.textContent = suggestion.advisory || 'Review and edit every suggestion before applying it.';
+  headingText.append(titleText, subtitle);
+  const source = document.createElement('span');
+  source.className = `badge ${data.source === 'gemini' ? 'resolved' : 'in-progress'}`;
+  source.textContent = data.source === 'gemini' ? 'Gemini' : 'Fallback';
+  heading.append(headingText, source);
+
+  const fields = document.createElement('div');
+  fields.className = 'ai-preview-grid';
+  const suggestedTitle = document.createElement('input');
+  suggestedTitle.id = 'aiSuggestedTitle';
+  suggestedTitle.maxLength = 200;
+  suggestedTitle.value = suggestion.title || '';
+  const suggestedDescription = document.createElement('textarea');
+  suggestedDescription.id = 'aiSuggestedDescription';
+  suggestedDescription.value = suggestion.description || '';
+  fields.append(
+    labeledPreviewField('Suggested title', suggestedTitle),
+    labeledPreviewField('Suggested description', suggestedDescription),
+    labeledPreviewField('Priority', previewSelect('aiSuggestedPriority', suggestion.priority || 'Medium', ['Critical', 'High', 'Medium', 'Low'])),
+    labeledPreviewField('Category', previewSelect('aiSuggestedCategory', suggestion.category || 'Other', ['Hardware', 'Software', 'Network', 'Database', 'Security', 'Other']))
+  );
+
+  const service = document.createElement('p');
+  service.className = 'small';
+  service.textContent = `Affected service or area: ${suggestion.affectedService || 'Not identified'}`;
+
+  const recommendations = document.createElement('div');
+  recommendations.className = 'ai-recommendation-grid';
+  const articles = Array.isArray(data.knowledgeArticles) ? data.knowledgeArticles : [];
+  const knowledgeBlock = document.createElement('section');
+  const knowledgeTitle = document.createElement('strong');
+  knowledgeTitle.textContent = 'Recommended knowledge articles';
+  knowledgeBlock.appendChild(knowledgeTitle);
+  if (!articles.length) {
+    const empty = document.createElement('p'); empty.className = 'small'; empty.textContent = 'No relevant published article was found.'; knowledgeBlock.appendChild(empty);
+  } else {
+    articles.forEach((article) => {
+      const item = document.createElement('a');
+      item.className = 'ai-recommendation-item';
+      item.href = article.articleUrl;
+      const itemTitle = document.createElement('strong'); itemTitle.textContent = article.title;
+      const meta = document.createElement('span'); meta.textContent = `${article.category} — ${article.relevance}`;
+      item.append(itemTitle, meta); knowledgeBlock.appendChild(item);
+    });
+  }
+
+  const duplicatesBlock = document.createElement('section');
+  const duplicatesTitle = document.createElement('strong'); duplicatesTitle.textContent = 'Possible duplicates'; duplicatesBlock.appendChild(duplicatesTitle);
+  const duplicates = Array.isArray(data.duplicates) ? data.duplicates : [];
+  if (!duplicates.length) {
+    const empty = document.createElement('p'); empty.className = 'small'; empty.textContent = 'No similar open tickets were found.'; duplicatesBlock.appendChild(empty);
+  } else {
+    duplicates.forEach((ticket) => {
+      const item = document.createElement('a'); item.className = 'ai-recommendation-item'; item.href = `/tickets.html?ticketId=${encodeURIComponent(ticket.id)}`;
+      const itemTitle = document.createElement('strong'); itemTitle.textContent = `#${ticket.id} ${ticket.title}`;
+      const meta = document.createElement('span'); meta.textContent = `${ticket.status} • ${ticket.priority} — ${ticket.reason}`;
+      item.append(itemTitle, meta); duplicatesBlock.appendChild(item);
+    });
+  }
+  recommendations.append(knowledgeBlock, duplicatesBlock);
+
+  const actions = document.createElement('div');
+  actions.className = 'inline-actions';
+  const apply = document.createElement('button');
+  apply.type = 'button'; apply.className = 'btn btn-primary'; apply.textContent = 'Apply reviewed suggestions';
+  apply.addEventListener('click', applyTicketAiSuggestions);
+  const dismiss = document.createElement('button');
+  dismiss.type = 'button'; dismiss.className = 'btn btn-ghost'; dismiss.textContent = 'Dismiss';
+  dismiss.addEventListener('click', () => { host.replaceChildren(); host.classList.add('hidden'); });
+  actions.append(apply, dismiss);
+  host.append(heading, fields, service, recommendations, actions);
+}
+
+function applyTicketAiSuggestions() {
+  document.getElementById('title').value = document.getElementById('aiSuggestedTitle')?.value.trim() || document.getElementById('title').value;
+  document.getElementById('description').value = document.getElementById('aiSuggestedDescription')?.value.trim() || document.getElementById('description').value;
+  document.getElementById('priority').value = document.getElementById('aiSuggestedPriority')?.value || document.getElementById('priority').value;
+  document.getElementById('category').value = document.getElementById('aiSuggestedCategory')?.value || document.getElementById('category').value;
+  setCreateTicketMessage('Reviewed AI suggestions were applied. You can continue editing before creating the ticket.', 'success');
+}
+
 async function updateMyTicketStatus(id, status){
   closeAllRowMenus();
   const res = await fetch(`/api/tickets/${id}/status`, {
@@ -148,4 +286,4 @@ async function loadTickets() {
 }
 
 document.addEventListener('click', () => closeAllRowMenus());
-document.addEventListener('DOMContentLoaded', loadTickets);
+document.addEventListener('DOMContentLoaded', () => { loadTickets(); document.getElementById('analyzeTicketBtn')?.addEventListener('click', analyzeTicketWithAi); });

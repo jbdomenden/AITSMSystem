@@ -12,12 +12,10 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.serializer
 import org.slf4j.LoggerFactory
 
 class AIChatService(
@@ -38,11 +36,10 @@ class AIChatService(
         val config = configService.snapshot()
         logger.info("AI provider configured: {}", config.provider)
         logger.info("AI model configured: {}", config.model)
-        logger.info("AI base URL configured: {}", config.baseUrl)
     }
 
     fun chat(sessionId: String, message: String): AIChatResponse {
-        val cleanInput = sanitize(message).trim().take(2_000)
+        val cleanInput = AIContentSanitizer.redact(message).trim().take(2_000)
         require(cleanInput.isNotBlank()) { "Message is required" }
 
         cleanupStaleSessions()
@@ -62,7 +59,7 @@ class AIChatService(
         }
 
         val providerReply = runCatching {
-            CompletableFuture.supplyAsync({ provider.chat(cfg.baseUrl, cfg.model, cfg.timeoutMillis, promptMessages) }, aiExecutor)
+            CompletableFuture.supplyAsync({ provider.chat(cfg.model, cfg.timeoutMillis, promptMessages) }, aiExecutor)
                 .orTimeout(cfg.timeoutMillis + 2_000, TimeUnit.MILLISECONDS)
                 .join()
         }.getOrElse {
@@ -71,13 +68,13 @@ class AIChatService(
         }
 
         if (!providerReply.ok) {
-            logger.error("Ollama chat failed: {}", providerReply.errorMessage)
+            logger.warn("Hosted AI chat failed: {}", providerReply.errorMessage)
             return fallbackResponse(cleanInput, cfg.provider, cfg.model, synchronized(history) { history.size }, "AI backend unavailable")
         }
 
-        val plainReply = normalizeOllamaReply(providerReply.content)
+        val plainReply = normalizeProviderReply(providerReply.content)
         if (plainReply.isNullOrBlank()) {
-            logger.error("Ollama returned empty/malformed payload")
+            logger.warn("Hosted AI returned empty or malformed content")
             return fallbackResponse(cleanInput, cfg.provider, cfg.model, synchronized(history) { history.size }, "Malformed AI payload")
         }
 
@@ -89,7 +86,7 @@ class AIChatService(
         }
 
         return AIChatResponse(
-            source = "ollama",
+            source = "gemini",
             reachable = true,
             reply = plainReply,
             fallback = null,
@@ -103,41 +100,12 @@ class AIChatService(
     fun clearConversation(sessionId: String) {
         conversationStore.remove(sessionId)
         sessionLastSeen.remove(sessionId)
+        conversationRepository.clearSession(sessionId)
     }
 
-    fun getModels(): List<String> {
+    fun testConnection(): AIProviderResult {
         val cfg = configService.snapshot()
-        val result = provider.listModels(cfg.baseUrl, cfg.timeoutMillis)
-        if (!result.ok) {
-            logger.error("Failed to fetch Ollama models: {}", result.errorMessage)
-            return emptyList()
-        }
-        return runCatching {
-            json.decodeFromString(ListSerializer(serializer<String>()), result.content)
-        }.getOrElse {
-            logger.error("Malformed model list payload from provider")
-            emptyList()
-        }
-    }
-
-    fun testConnection(baseUrlOverride: String?, modelOverride: String?): AIProviderResult {
-        val cfg = configService.snapshot()
-        val baseUrl = baseUrlOverride?.trim()?.takeIf { it.isNotBlank() }?.let { configService.normalizeAndValidateBaseUrl(it) } ?: cfg.baseUrl
-        val model = modelOverride?.trim()?.takeIf { it.isNotBlank() } ?: cfg.model
-        val discoveryTimeout = minOf(cfg.timeoutMillis, 8_000L)
-        val modelList = provider.listModels(baseUrl, discoveryTimeout)
-        if (!modelList.ok) return modelList
-
-        val models = runCatching {
-            json.decodeFromString(ListSerializer(serializer<String>()), modelList.content)
-        }.getOrElse {
-            logger.warn("Unable to parse Ollama model list during connection test")
-            return AIProviderResult(ok = false, content = "", errorMessage = "Ollama returned an unexpected model list")
-        }
-        if (model !in models) {
-            return AIProviderResult(ok = false, content = "", errorMessage = "Selected model \"$model\" is not available in Ollama")
-        }
-        return provider.testConnection(baseUrl, model, cfg.timeoutMillis)
+        return provider.testConnection(cfg.model, cfg.timeoutMillis)
     }
 
     fun createTicketDraft(input: AITicketDraftRequest): AITicketDraftResponse {
@@ -169,22 +137,21 @@ class AIChatService(
     private fun buildFallback(userInput: String): AIFallbackContent {
         val summary = userInput.trim().take(180).ifBlank { "Unable to analyze issue due to provider connectivity." }
         return AIFallbackContent(
-            message = "I’m currently unable to process a full diagnosis. Please verify local Ollama connectivity and retry.",
+            message = "I’m currently unable to process a full diagnosis because the hosted AI service is unavailable. Please retry shortly.",
             issueSummary = summary,
             likelyCauses = listOf("AI backend connection is unavailable"),
             troubleshootingSteps = listOf(
-                "Confirm Ollama is running locally (e.g., `ollama list` and service status)",
-                "Validate the configured model exists on the machine",
-                "Retry once connectivity to local Ollama is restored"
+                "Retry after a short wait",
+                "If this persists, contact the AITSM administrator to check the hosted AI service"
             ),
             escalationCriteria = listOf("Escalate if outage impacts production support workflows for more than 15 minutes"),
             suggestedPriority = "Medium",
             ticketTitle = "AI backend unavailable for troubleshooting",
-            ticketDescription = "The AI troubleshooting backend could not be reached. Confirm local Ollama service health and retry."
+            ticketDescription = "The hosted AI service could not be reached. Retry later or continue by creating a support ticket manually."
         )
     }
 
-    private fun normalizeOllamaReply(raw: String): String? {
+    private fun normalizeProviderReply(raw: String): String? {
         val trimmed = raw.trim()
         if (trimmed.isBlank()) return null
 
@@ -207,12 +174,6 @@ class AIChatService(
             "critical" -> "Critical"
             else -> "Medium"
         }
-    }
-
-    private fun sanitize(input: String): String {
-        return input
-            .replace(Regex("(?i)(api[_-]?key|token|password|secret)\\s*[:=]\\s*[^\\s,;]+"), "$1: [redacted]")
-            .replace(Regex("(?i)bearer\\s+[a-z0-9._-]+"), "Bearer [redacted]")
     }
 
     private fun trimConversation(history: MutableList<AIMessage>) {

@@ -386,22 +386,29 @@ This file lists backend endpoints, what they do, and POST payload examples for q
 }
 ```
 
+### POST `/api/ai/ticket-insights`
+- Authenticated, rate-limited advisory endpoint used by **Analyze with AI** on ticket creation.
+- Returns an editable Gemini suggestion, published knowledge recommendations, and deterministic possible-duplicate matches.
+- Does not create or modify a ticket.
+- Example input:
+```json
+{ "title": "Wi-Fi disconnects", "description": "My laptop disconnects every ten minutes." }
+```
+
+### POST `/api/ai/tickets/{id}/assist`
+- Admin/superadmin-only, rate-limited endpoint.
+- Returns a ticket summary, editable resolution draft, and troubleshooting checklist.
+- Does not post an update, resolve the ticket, or change its status.
+
 ### GET `/api/ai/config`
 - Returns AI config snapshot.
 
 ### POST `/api/ai/config`
-- Updates AI config values.
+- Updates the Gemini model. The API key is configured only on the server.
 - Example input:
 ```json
-{ "baseUrl": "http://localhost:11434", "model": "llama3.1:8b" }
+{ "model": "gemini-3.8-flash" }
 ```
-
-### GET `/api/ai/models`
-- Returns model list from provider.
 
 ### POST `/api/ai/test`
-- Tests provider connectivity.
-- Example input:
-```json
-{ "baseUrl": "http://localhost:11434", "model": "llama3.1:8b" }
-```
+- Tests the server-side Gemini connection. No request body or API key is accepted.

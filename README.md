@@ -62,9 +62,9 @@ Optional:
 - `SUPERADMIN_COMPANY`
 - `SUPERADMIN_DEPARTMENT`
 - `CORS_ALLOWED_ORIGINS`
-- `AI_PROVIDER`
-- `AI_OLLAMA_BASE_URL`
-- `AI_OLLAMA_MODEL`
+- `AI_PROVIDER` (set to `gemini`)
+- `GEMINI_API_KEY` (store only in a deployment secret manager or ignored `.env` file)
+- `GEMINI_MODEL`
 - `AI_TIMEOUT_MILLIS`
 
 

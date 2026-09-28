@@ -24,23 +24,69 @@ class ColleagueRepository {
     fun searchableUsers(actorId: Int, query: String): List<Colleague> = transaction {
         UsersTable.selectAll().where(Op.build { (UsersTable.id neq actorId) and (UsersTable.emailVerified eq true) })
             .map(::toColleague).filter { user ->
-                query.isBlank() || listOf(user.fullName, user.email, user.department).any { it.contains(query, true) }
+                query.isBlank() || listOf(user.fullName, user.email, user.department, user.role.name).any { it.contains(query, true) }
             }.take(30)
     }
 
     fun request(senderId: Int, recipientId: Int): ColleagueRequest = transaction {
-        val id = ColleagueRequestsTable.insert {
-            it[ColleagueRequestsTable.senderId] = senderId; it[ColleagueRequestsTable.recipientId] = recipientId
-            it[status] = ColleagueRequestStatus.PENDING.name; it[createdAt] = LocalDateTime.now(); it[respondedAt] = null
-        }[ColleagueRequestsTable.id]
-        ColleagueRequestsTable.selectAll().where { ColleagueRequestsTable.id eq id }.single().let(::toRequest)
+        insertRequest(senderId, recipientId, ColleagueRequestStatus.PENDING)
+    }
+
+    fun createOrReopenRequest(senderId: Int, recipientId: Int): ColleagueRequest = transaction {
+        val existing = findRequestBetween(senderId, recipientId)
+        if (existing == null) return@transaction insertRequest(senderId, recipientId, ColleagueRequestStatus.PENDING)
+        val status = ColleagueRequestStatus.valueOf(existing[ColleagueRequestsTable.status])
+        require(status != ColleagueRequestStatus.ACCEPTED) { "You are already connected." }
+        require(status != ColleagueRequestStatus.PENDING) { "A colleague request is already pending." }
+        ColleagueRequestsTable.update({ ColleagueRequestsTable.id eq existing[ColleagueRequestsTable.id] }) {
+            it[ColleagueRequestsTable.senderId] = senderId
+            it[ColleagueRequestsTable.recipientId] = recipientId
+            it[ColleagueRequestsTable.status] = ColleagueRequestStatus.PENDING.name
+            it[createdAt] = LocalDateTime.now()
+            it[respondedAt] = null
+        }
+        ColleagueRequestsTable.selectAll().where { ColleagueRequestsTable.id eq existing[ColleagueRequestsTable.id] }.single().let(::toRequest)
+    }
+
+    fun connect(actorId: Int, otherId: Int): ColleagueRequest = transaction {
+        val existing = findRequestBetween(actorId, otherId)
+        if (existing == null) return@transaction insertRequest(actorId, otherId, ColleagueRequestStatus.ACCEPTED)
+        val status = ColleagueRequestStatus.valueOf(existing[ColleagueRequestsTable.status])
+        require(status != ColleagueRequestStatus.ACCEPTED) { "You are already connected." }
+        ColleagueRequestsTable.update({ ColleagueRequestsTable.id eq existing[ColleagueRequestsTable.id] }) {
+            it[ColleagueRequestsTable.status] = ColleagueRequestStatus.ACCEPTED.name
+            it[respondedAt] = LocalDateTime.now()
+        }
+        ColleagueRequestsTable.selectAll().where { ColleagueRequestsTable.id eq existing[ColleagueRequestsTable.id] }.single().let(::toRequest)
     }
 
     fun requestBetween(firstId: Int, secondId: Int): ColleagueRequest? = transaction {
+        findRequestBetween(firstId, secondId)?.let(::toRequest)
+    }
+
+    fun visibleUser(actorId: Int, userId: Int): Colleague? = transaction {
+        if (actorId == userId) return@transaction null
+        UsersTable.selectAll().where { (UsersTable.id eq userId) and (UsersTable.emailVerified eq true) }.singleOrNull()?.let(::toColleague)
+    }
+
+    private fun org.jetbrains.exposed.sql.Transaction.findRequestBetween(firstId: Int, secondId: Int): ResultRow? =
         ColleagueRequestsTable.selectAll().where(Op.build {
             ((ColleagueRequestsTable.senderId eq firstId) and (ColleagueRequestsTable.recipientId eq secondId)) or
                 ((ColleagueRequestsTable.senderId eq secondId) and (ColleagueRequestsTable.recipientId eq firstId))
-        }).singleOrNull()?.let(::toRequest)
+        }).singleOrNull()
+
+    private fun org.jetbrains.exposed.sql.Transaction.insertRequest(
+        senderId: Int,
+        recipientId: Int,
+        status: ColleagueRequestStatus
+    ): ColleagueRequest {
+        val id = ColleagueRequestsTable.insert {
+            it[ColleagueRequestsTable.senderId] = senderId; it[ColleagueRequestsTable.recipientId] = recipientId
+            it[ColleagueRequestsTable.status] = status.name
+            it[createdAt] = LocalDateTime.now()
+            it[respondedAt] = if (status == ColleagueRequestStatus.ACCEPTED) LocalDateTime.now() else null
+        }[ColleagueRequestsTable.id]
+        return ColleagueRequestsTable.selectAll().where { ColleagueRequestsTable.id eq id }.single().let(::toRequest)
     }
 
     fun respond(id: Int, recipientId: Int, status: ColleagueRequestStatus): ColleagueRequest? = transaction {

@@ -4,6 +4,7 @@ import backend.config.SLAPoliciesTable
 import backend.config.TicketHistoryTable
 import backend.config.TicketsTable
 import backend.models.Ticket
+import backend.models.TicketHistoryEvent
 import backend.models.TicketRequest
 import backend.models.TicketStatus
 import org.jetbrains.exposed.sql.ResultRow
@@ -47,6 +48,21 @@ class TicketRepository {
     }
 
     fun get(id: Int): Ticket? = transaction { TicketsTable.selectAll().where { TicketsTable.id eq id }.singleOrNull()?.let(::toTicket) }
+
+    fun history(id: Int, limit: Int = 20): List<TicketHistoryEvent> = transaction {
+        TicketHistoryTable.selectAll()
+            .where { TicketHistoryTable.ticketId eq id }
+            .orderBy(TicketHistoryTable.timestamp, org.jetbrains.exposed.sql.SortOrder.DESC)
+            .limit(limit)
+            .map {
+                TicketHistoryEvent(
+                    status = it[TicketHistoryTable.status],
+                    updatedBy = it[TicketHistoryTable.updatedBy],
+                    timestamp = it[TicketHistoryTable.timestamp].toString()
+                )
+            }
+            .reversed()
+    }
 
     fun update(id: Int, req: TicketRequest): Ticket? = transaction {
         TicketsTable.update({ TicketsTable.id eq id }) {

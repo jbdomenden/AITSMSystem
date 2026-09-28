@@ -96,6 +96,73 @@ function focusRequestedAdminTicket() {
   row.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
+function renderAdminTicketAiContext() {
+  const panel = document.getElementById('adminTicketAiPanel');
+  const requestedId = Number(getRequestedAdminTicketId());
+  const ticket = adminTicketState.tickets.find((item) => Number(item.id) === requestedId);
+  if (!panel || !ticket) {
+    panel?.classList.add('hidden');
+    return;
+  }
+  panel.classList.remove('hidden');
+  document.getElementById('adminTicketAiTitle').textContent = `AI assistance for ticket #${ticket.id}`;
+  document.getElementById('adminTicketAiMeta').textContent = `${ticket.title} • ${statusLabel(ticket.status)} • ${ticket.priority}`;
+  document.getElementById('adminTicketAiResults').classList.add('hidden');
+  document.getElementById('adminTicketAiStatus').textContent = 'Generate a reviewable Gemini summary and resolution draft. Nothing will be posted automatically.';
+}
+
+async function generateAdminTicketAssistance() {
+  const ticketId = Number(getRequestedAdminTicketId());
+  const button = document.getElementById('generateTicketAiBtn');
+  const status = document.getElementById('adminTicketAiStatus');
+  const results = document.getElementById('adminTicketAiResults');
+  if (!(ticketId > 0) || !button || !status || !results) return;
+  button.disabled = true;
+  status.classList.remove('text-danger', 'text-success');
+  status.textContent = 'Gemini is summarizing the ticket and preparing a reviewable draft…';
+  results.classList.add('hidden');
+  try {
+    const response = await fetch(`/api/ai/tickets/${ticketId}/assist`, { method: 'POST', headers: authHeaders() });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || data.message || 'Unable to generate ticket assistance');
+    document.getElementById('adminTicketAiSummary').textContent = data.summary || 'No summary was generated.';
+    document.getElementById('adminTicketAiDraft').value = data.resolutionDraft || '';
+    document.getElementById('adminTicketAiAdvisory').textContent = data.advisory || 'Review this draft before use.';
+    const checklist = document.getElementById('adminTicketAiChecklist');
+    checklist.replaceChildren();
+    (data.troubleshootingChecklist || []).forEach((step) => {
+      const item = document.createElement('li');
+      item.textContent = step;
+      checklist.appendChild(item);
+    });
+    results.classList.remove('hidden');
+    status.classList.add(data.source === 'gemini' ? 'text-success' : 'text-danger');
+    status.textContent = data.source === 'gemini'
+      ? 'Gemini assistance generated. Review and edit it before use.'
+      : `Fallback guidance shown: ${data.fallbackReason || 'Gemini was unavailable.'}`;
+  } catch (error) {
+    status.classList.add('text-danger');
+    status.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function copyAdminTicketDraft() {
+  const draft = document.getElementById('adminTicketAiDraft')?.value.trim();
+  const status = document.getElementById('adminTicketAiStatus');
+  if (!draft || !status) return;
+  try {
+    await navigator.clipboard.writeText(draft);
+    status.classList.remove('text-danger');
+    status.classList.add('text-success');
+    status.textContent = 'The reviewed draft was copied. No ticket data was changed.';
+  } catch {
+    status.classList.add('text-danger');
+    status.textContent = 'Copy failed. Select the draft text and copy it manually.';
+  }
+}
+
 function toggleAdminRowMenu(event, id) {
   event.stopPropagation();
   const menu = document.getElementById(`adminTicketRowMenu-${id}`);
@@ -255,6 +322,7 @@ async function loadAdminTicketManagement() {
 
     clearTableSkeleton(rows);
     renderAdminTicketRows();
+    renderAdminTicketAiContext();
   } catch {
     renderTableErrorState(rows, 8, 'Unable to load tickets');
   } finally {
@@ -288,5 +356,7 @@ function wireAdminTicketFilters() {
 document.addEventListener('click', () => closeAdminRowMenus());
 document.addEventListener('DOMContentLoaded', () => {
   wireAdminTicketFilters();
+  document.getElementById('generateTicketAiBtn')?.addEventListener('click', generateAdminTicketAssistance);
+  document.getElementById('copyTicketAiDraftBtn')?.addEventListener('click', copyAdminTicketDraft);
   loadAdminTicketManagement();
 });

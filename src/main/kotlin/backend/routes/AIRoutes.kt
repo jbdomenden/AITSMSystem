@@ -1,16 +1,16 @@
 package backend.routes
 
 import backend.models.ai.AIChatRequest
+import backend.models.ai.TicketAiAnalysisRequest
 import backend.models.ai.AIConfigUpdateRequest
-import backend.models.ai.AIConnectionTestRequest
 import backend.models.ai.AIConnectionTestResponse
-import backend.models.ai.AIModelsResponse
 import backend.models.ai.AITicketDraftRequest
 import backend.models.UserRole
 import backend.security.requireAuthenticated
 import backend.security.requireRole
 import backend.services.ai.AIChatService
 import backend.services.ai.AIConfigService
+import backend.services.ai.TicketAiAdvisor
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
@@ -27,7 +27,7 @@ private val aiRateLimitWindowMs = 60_000L
 private val aiRateLimitMaxRequests = 20
 private val aiRateBucket = ConcurrentHashMap<String, MutableList<Long>>()
 
-fun Route.aiRoutes(chatService: AIChatService, configService: AIConfigService) {
+fun Route.aiRoutes(chatService: AIChatService, configService: AIConfigService, ticketAiAdvisor: TicketAiAdvisor) {
     post("/api/ai/chat") {
         if (!call.requireAuthenticated()) return@post
         val rateKey = buildRateLimitKey(
@@ -76,6 +76,38 @@ fun Route.aiRoutes(chatService: AIChatService, configService: AIConfigService) {
         call.respond(chatService.createTicketDraft(request))
     }
 
+    post("/api/ai/ticket-insights") {
+        if (!call.requireAuthenticated()) return@post
+        val rateKey = buildRateLimitKey(
+            call.request.headers["X-User-Id"].orEmpty(),
+            call.request.headers["X-Forwarded-For"].orEmpty()
+        )
+        if (isRateLimited(rateKey)) {
+            call.respond(HttpStatusCode.TooManyRequests, mapOf("error" to "Rate limit exceeded. Please try again shortly."))
+            return@post
+        }
+        val request = call.receive<TicketAiAnalysisRequest>()
+        require(request.description.trim().length >= 10) { "Describe the issue in at least 10 characters." }
+        call.respond(ticketAiAdvisor.analyze(request))
+    }
+
+    post("/api/ai/tickets/{id}/assist") {
+        if (!call.requireRole(UserRole.ADMIN)) return@post
+        val rateKey = buildRateLimitKey(
+            call.request.headers["X-User-Id"].orEmpty(),
+            call.request.headers["X-Forwarded-For"].orEmpty()
+        )
+        if (isRateLimited(rateKey)) {
+            call.respond(HttpStatusCode.TooManyRequests, mapOf("error" to "Rate limit exceeded. Please try again shortly."))
+            return@post
+        }
+        val ticketId = call.parameters["id"]?.toIntOrNull()
+            ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid ticket id"))
+        val assistance = ticketAiAdvisor.assist(ticketId)
+            ?: return@post call.respond(HttpStatusCode.NotFound, mapOf("error" to "Ticket not found"))
+        call.respond(assistance)
+    }
+
     get("/api/ai/config") {
         if (!call.requireRole(UserRole.ADMIN)) return@get
         call.respond(configService.snapshot())
@@ -87,21 +119,13 @@ fun Route.aiRoutes(chatService: AIChatService, configService: AIConfigService) {
         call.respond(configService.update(request))
     }
 
-    get("/api/ai/models") {
-        if (!call.requireRole(UserRole.ADMIN)) return@get
-        val cfg = configService.snapshot()
-        val models = chatService.getModels()
-        call.respond(AIModelsResponse(models = models, currentModel = cfg.model, baseUrl = cfg.baseUrl))
-    }
-
     post("/api/ai/test") {
         if (!call.requireRole(UserRole.ADMIN)) return@post
-        val request = call.receive<AIConnectionTestRequest>()
-        val result = chatService.testConnection(request.baseUrl, request.model)
+        val result = chatService.testConnection()
         val response = if (result.ok) {
-            AIConnectionTestResponse(success = true, message = "Connected to Ollama successfully")
+            AIConnectionTestResponse(success = true, message = "Connected to Gemini successfully")
         } else {
-            AIConnectionTestResponse(success = false, message = result.errorMessage ?: "Failed to connect to Ollama")
+            AIConnectionTestResponse(success = false, message = result.errorMessage ?: "Failed to connect to Gemini")
         }
         if (result.ok) {
             call.respond(HttpStatusCode.OK, response)

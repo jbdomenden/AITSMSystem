@@ -130,6 +130,7 @@ data class OAuthLoginResult(
 @Serializable enum class ColleagueRequestStatus { PENDING, ACCEPTED, DECLINED, CANCELLED }
 @Serializable data class ColleagueRequest(val id: Int, val senderId: Int, val recipientId: Int, val status: ColleagueRequestStatus, val createdAt: String, val respondedAt: String? = null)
 @Serializable data class Colleague(val id: Int, val fullName: String, val email: String, val department: String, val role: UserRole, val profilePhotoUrl: String? = null)
+@Serializable data class ColleagueSearchResult(val colleague: Colleague, val relationship: ColleagueRequestStatus? = null, val requestedByCurrentUser: Boolean = false)
 @Serializable data class DirectMessage(val id: Int, val senderId: Int, val recipientId: Int, val body: String, val sentAt: String, val readAt: String? = null)
 @Serializable data class ConversationSummary(val colleague: Colleague, val lastMessage: DirectMessage? = null, val unreadCount: Long = 0)
 @Serializable data class SendMessageRequest(val body: String)
@@ -154,6 +155,7 @@ data class Ticket(
 
 @Serializable data class TicketRequest(val title: String, val description: String, val priority: String, val category: String, val deviceId: Int? = null)
 @Serializable data class TicketStatusUpdate(val status: String)
+@Serializable data class TicketHistoryEvent(val status: String, val updatedBy: String, val timestamp: String)
 
 @Serializable
 data class Device(
@@ -212,6 +214,7 @@ data class Notification(
     val message: String,
     val type: String,
     val relatedTicketId: Int? = null,
+    val relatedUserId: Int? = null,
     val isRead: Boolean = false,
     val createdAt: String,
     val readAt: String? = null

@@ -23,6 +23,7 @@ class NotificationService {
                     message = it[NotificationsTable.message],
                     type = it[NotificationsTable.type],
                     relatedTicketId = it[NotificationsTable.relatedTicketId],
+                    relatedUserId = it[NotificationsTable.relatedUserId],
                     isRead = it[NotificationsTable.isRead],
                     createdAt = it[NotificationsTable.createdAt].toString(),
                     readAt = it[NotificationsTable.readAt]?.toString()
@@ -57,12 +58,25 @@ class NotificationService {
         }
     }
 
+    fun markDirectMessagesFromAsRead(userId: Int, senderId: Int): Int = transaction {
+        NotificationsTable.update({
+            (NotificationsTable.userId eq userId) and
+                (NotificationsTable.type eq "direct_message") and
+                (NotificationsTable.relatedUserId eq senderId) and
+                (NotificationsTable.isRead eq false)
+        }) {
+            it[isRead] = true
+            it[readAt] = LocalDateTime.now()
+        }
+    }
+
     fun push(
         userId: Int,
         title: String,
         message: String,
         type: String = "info",
-        relatedTicketId: Int? = null
+        relatedTicketId: Int? = null,
+        relatedUserId: Int? = null
     ) = transaction {
         NotificationsTable.insert {
             it[NotificationsTable.userId] = userId
@@ -70,6 +84,7 @@ class NotificationService {
             it[NotificationsTable.message] = message
             it[NotificationsTable.type] = type
             it[NotificationsTable.relatedTicketId] = relatedTicketId
+            it[NotificationsTable.relatedUserId] = relatedUserId
             it[NotificationsTable.isRead] = false
             it[NotificationsTable.createdAt] = LocalDateTime.now()
             it[NotificationsTable.readAt] = null
@@ -96,6 +111,7 @@ class NotificationService {
                 it[NotificationsTable.message] = message
                 it[NotificationsTable.type] = eventType
                 it[NotificationsTable.relatedTicketId] = ticketId
+                it[NotificationsTable.relatedUserId] = null
                 it[NotificationsTable.isRead] = false
                 it[NotificationsTable.createdAt] = LocalDateTime.now()
                 it[NotificationsTable.readAt] = null

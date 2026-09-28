@@ -15,6 +15,7 @@ const authHeaders = () => ({
 });
 
 function logout() {
+  sessionStorage.removeItem('aitsm.chat.drawer.v1');
   localStorage.clear();
   location.href = '/login.html';
 }
@@ -62,7 +63,10 @@ function injectGlobalHeader() {
       <h2 class='section-title'>AITSM Portal</h2>
       <p class='small'>${roleLabel}${userEmail ? ` • ${userEmail}` : ''}</p>
     </div>
-    <button class='btn btn-ghost icon-btn' type='button' onclick='logout()' aria-label='Logout' title='Logout'>⎋</button>`;
+    <div class='inline-actions'>
+      <button id='globalChatTrigger' class='btn btn-ghost icon-btn notif-trigger-btn' type='button' onclick='openAitsmChat()' aria-label='Open chat' title='Messages' aria-expanded='false'>💬<span id='globalChatCount' class='notif-count hidden'>0</span></button>
+      <button class='btn btn-ghost icon-btn' type='button' onclick='logout()' aria-label='Logout' title='Logout'>⎋</button>
+    </div>`;
 
   content.prepend(header);
 }
@@ -161,6 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
   enforcePageAccess();
   injectGlobalHeader();
   markActiveNav();
+  ensureChatDrawer();
   window.setTimeout(hidePageSplash, 450);
 });
 
@@ -211,3 +216,101 @@ if (!window.__aitsmAlertPatched) {
     showAppAlert(message);
   };
 }
+
+const globalSearchEscape = (value) => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
+
+function closeGlobalSearch() {
+  const modal = document.getElementById('globalSearchModal');
+  modal?.classList.remove('show');
+  modal?.classList.add('hidden');
+  document.body.classList.remove('global-search-open');
+}
+
+function colleagueProfileUrl(id) {
+  return `/profile.html?id=${encodeURIComponent(id)}`;
+}
+
+function colleagueChatUrl(id) {
+  return `/colleagues.html?chat=${encodeURIComponent(id)}`;
+}
+
+function ensureChatDrawer() {
+  if (!currentRole() || window.AITSMChat || document.querySelector('script[data-aitsm-chat]')) return;
+  const script = document.createElement('script');
+  script.src = '/modules/common/js/chat-drawer.js';
+  script.dataset.aitsmChat = 'true';
+  script.addEventListener('load', () => window.AITSMChat?.mount());
+  document.body.appendChild(script);
+}
+
+function openAitsmChat(colleagueId = null) {
+  const id = Number(colleagueId || 0);
+  if (window.AITSMChat) {
+    window.AITSMChat.open(id > 0 ? id : null);
+    return;
+  }
+  if (id > 0) window.__aitsmPendingChatId = id;
+  ensureChatDrawer();
+}
+
+function globalNavigationItems() {
+  const admin = ['admin', 'superadmin'].includes(currentRole());
+  return admin
+    ? [{ label: 'Dashboard', href: '/dashboard-admin.html' }, { label: 'Ticket management', href: '/ticket-management.html' }, { label: 'User management', href: '/user-management.html' }, { label: 'Settings', href: '/settings.html' }, { label: 'Colleagues & Chat', href: '/colleagues.html' }, { label: 'Profile', href: '/profile.html' }]
+    : [{ label: 'Dashboard', href: '/dashboard-user.html' }, { label: 'Create ticket', href: '/create-ticket.html' }, { label: 'My tickets', href: '/tickets.html' }, { label: 'Knowledge base', href: '/knowledge-library.html' }, { label: 'AI assistant', href: '/ai-assistant.html' }, { label: 'Colleagues & Chat', href: '/colleagues.html' }, { label: 'Profile', href: '/profile.html' }];
+}
+
+let globalSearchRequest = 0;
+async function runGlobalSearch(query = '') {
+  const target = document.getElementById('globalSearchResults');
+  if (!target) return;
+  const normalized = query.trim().toLowerCase();
+  const requestId = ++globalSearchRequest;
+  if (!normalized) {
+    target.innerHTML = '<p class="small global-search-hint">Start typing to search pages and colleagues.</p>';
+    return;
+  }
+  const pages = globalNavigationItems().filter(item => item.label.toLowerCase().includes(normalized));
+  target.innerHTML = '<p class="small global-search-hint">Searching…</p>';
+  let people = [];
+  try {
+    const response = await fetch(`/api/colleagues/search?q=${encodeURIComponent(query)}`, { headers: authHeaders() });
+    if (response.ok) people = await response.json();
+  } catch { /* Navigation results still work while people search is unavailable. */ }
+  if (requestId !== globalSearchRequest) return;
+  target.innerHTML = `${pages.length ? `<div class='global-search-section'>Pages</div>${pages.map(item => `<button class='global-search-result' type='button' data-page='${item.href}'><strong>${globalSearchEscape(item.label)}</strong></button>`).join('')}` : ''}${people.length ? `<div class='global-search-section'>Colleagues</div>${people.map(item => `<button class='global-search-result' type='button' data-profile='${item.colleague.id}'><span><strong>${globalSearchEscape(item.colleague.fullName)}</strong><br><span class='small'>${globalSearchEscape(item.colleague.department)} · ${globalSearchEscape(item.colleague.role)}</span></span></button>`).join('')}` : ''}` || '<p class="small global-search-hint">No matching pages or approved colleagues.</p>';
+  target.querySelectorAll('[data-page]').forEach(button => button.addEventListener('click', () => { location.href = button.dataset.page; }));
+  target.querySelectorAll('[data-profile]').forEach(button => button.addEventListener('click', () => {
+    closeGlobalSearch();
+    location.href = colleagueProfileUrl(button.dataset.profile);
+  }));
+}
+
+function openGlobalSearch() {
+  if (!currentRole()) return;
+  let modal = document.getElementById('globalSearchModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'globalSearchModal';
+    modal.className = 'modal-overlay hidden';
+    modal.innerHTML = `<div class='modal-card global-search-card' role='dialog' aria-modal='true' aria-label='Search AITSM'><div class='card-head'><h3 class='section-title'>Search AITSM</h3><button class='btn btn-ghost' type='button' data-close-search aria-label='Close search'>×</button></div><input id='globalSearchInput' class='global-search-input' type='search' autocomplete='off' placeholder='Search pages or colleagues'><div id='globalSearchResults' class='global-search-results'></div></div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', event => { if (event.target === modal) closeGlobalSearch(); });
+    modal.querySelector('[data-close-search]').addEventListener('click', closeGlobalSearch);
+    modal.querySelector('#globalSearchInput').addEventListener('input', event => runGlobalSearch(event.target.value));
+  }
+  modal.classList.remove('hidden');
+  modal.classList.add('show');
+  document.body.classList.add('global-search-open');
+  const input = document.getElementById('globalSearchInput');
+  input.value = '';
+  runGlobalSearch();
+  window.setTimeout(() => input.focus(), 0);
+}
+
+document.addEventListener('keydown', event => {
+  const inputFocused = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); openGlobalSearch(); }
+  else if (event.key === 'Escape') { closeGlobalSearch(); }
+  else if (event.key === '/' && !inputFocused) { event.preventDefault(); openGlobalSearch(); }
+});

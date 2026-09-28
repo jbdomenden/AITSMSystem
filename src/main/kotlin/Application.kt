@@ -135,6 +135,11 @@ fun Application.module() {
     }
 
     routing {
+        suspend fun ApplicationCall.redirectKeepingQuery(target: String) {
+            val query = request.queryString().takeIf { it.isNotBlank() }
+            respondRedirect(if (query == null) target else "$target?$query")
+        }
+
         get("/") { call.respondRedirect("/index/html/index.html") }
         get("/index.html") { call.respondRedirect("/index/html/index.html") }
         get("/login.html") { call.respondRedirect("/login/html/login.html") }
@@ -148,12 +153,12 @@ fun Application.module() {
         get("/monitoring.html") { call.respondRedirect("/monitoring/html/monitoring.html") }
         get("/inventory.html") { call.respondRedirect("/inventory/html/inventory.html") }
         get("/knowledge.html") { call.respondRedirect("/knowledge/html/knowledge.html") }
-        get("/knowledge-library.html") { call.respondRedirect("/knowledge-library/html/knowledge-library.html") }
+        get("/knowledge-library.html") { call.redirectKeepingQuery("/knowledge-library/html/knowledge-library.html") }
         get("/settings.html") { call.respondRedirect("/settings/html/settings.html") }
-        get("/profile.html") { call.respondRedirect("/profile/html/profile.html") }
+        get("/profile.html") { call.redirectKeepingQuery("/profile/html/profile.html") }
         get("/user-management.html") { call.respondRedirect("/user-management/html/user-management.html") }
         get("/ai-assistant.html") { call.respondRedirect("/ai-assistant/html/ai-assistant.html") }
-        get("/colleagues.html") { call.respondRedirect("/colleagues/html/colleagues.html") }
+        get("/colleagues.html") { call.redirectKeepingQuery("/colleagues/html/colleagues.html") }
         get("/api/health") {
             call.respond(mapOf("status" to "ok", "environment" to appEnv))
         }
@@ -177,6 +182,6 @@ fun Application.module() {
         inventoryRoutes(container.inventoryService)
         slaRoutes(container.slaService)
         settingsRoutes(container.assetDetectionService)
-        aiRoutes(container.aiChatService, container.aiConfigService)
+        aiRoutes(container.aiChatService, container.aiConfigService, container.ticketAiAdvisor)
     }
 }

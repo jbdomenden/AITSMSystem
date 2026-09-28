@@ -3,11 +3,10 @@ ktor:
     modules:
       - com.aitsm.ApplicationKt.module
   deployment:
-    port: 8070
+    port: ${PORT:8070}
 
 ai:
-  provider: ${AI_PROVIDER:ollama}
-  ollama:
-    baseUrl: ${AI_OLLAMA_BASE_URL:http://localhost:11434}
-    model: ${AI_OLLAMA_MODEL:llama3.1:8b}
+  provider: ${AI_PROVIDER:gemini}
+  gemini:
+    model: ${GEMINI_MODEL:gemini-3.8-flash}
   timeoutMillis: ${AI_TIMEOUT_MILLIS:60000}

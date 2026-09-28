@@ -36,6 +36,8 @@ class TicketService(
 
     fun list(userId: Int?, admin: Boolean, limit: Int, offset: Long) = repository.list(userId, admin, limit, offset)
     fun get(id: Int): Ticket? = repository.get(id)
+    fun history(id: Int) = repository.history(id)
+    fun allForAdvisory() = repository.list(null, true, 500, 0).items
 
     fun update(id: Int, req: TicketRequest, userId: Int?): Ticket? {
         val normalized = normalizeTicketRequest(req)

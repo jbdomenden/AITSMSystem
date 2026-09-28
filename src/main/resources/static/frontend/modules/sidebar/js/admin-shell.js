@@ -11,6 +11,7 @@ function adminIcon(name) {
     profile: "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.42 0-8 1.79-8 4v2h16v-2c0-2.21-3.58-4-8-4z'/></svg>",
     menu: "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 7h16v2H4zm0 8h16v2H4zm0-4h16v2H4z'/></svg>",
     bell: "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-5V11a7 7 0 1 0-14 0v6l-2 2v1h18v-1l-2-2z'/></svg>",
+    chat: "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 3h16a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm1 4v2h14V7H5zm0 4v2h10v-2H5z'/></svg>",
     more: "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M12 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4z' transform='translate(0 -3)'/></svg>",
     help: "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 17.2a1.2 1.2 0 1 1 1.2-1.2 1.2 1.2 0 0 1-1.2 1.2zm1.57-7.44-.7.49A2.14 2.14 0 0 0 12 14h-1.5v-.38a3.3 3.3 0 0 1 1.4-2.7l.97-.72a1.61 1.61 0 1 0-2.57-1.29H8.8a3.11 3.11 0 1 1 4.77 2.85z'/></svg>",
     password: "<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M17 8h-1V6a4 4 0 0 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2zm-6 0V6a2 2 0 1 1 4 0v2zm1 8.73V18h-2v-1.27a2 2 0 1 1 2 0z'/></svg>",
@@ -77,12 +78,14 @@ async function loadHeaderNotifications(){
     const unreadPayload = await unreadRes.json();
     if(!res.ok) throw new Error(data.error || 'Unable to load notifications');
     const items = (Array.isArray(data)?data:[]).slice(0,8);
-    count.textContent = String(Number(unreadPayload?.unreadCount || 0));
+    const unread = Number(unreadPayload?.unreadCount || 0);
+    count.textContent = String(unread);
+    count.classList.toggle('hidden', unread === 0);
     list.innerHTML = `
       <div style='display:flex;justify-content:flex-end;padding:8px;border-bottom:1px solid #1f325f'>
         <button class='btn btn-ghost' style='padding:4px 8px' onclick='markAllNotificationsRead()'>Mark all read</button>
       </div>
-      ${items.map(n=>`<button type='button' class='small' style='display:block;width:100%;text-align:left;padding:8px;border:none;border-bottom:1px solid #1f325f;background:${n.isRead ? 'transparent' : 'rgba(37,99,235,.12)'};color:inherit' onclick='markNotificationRead(${n.id})'>
+      ${items.map(n=>`<button type='button' class='small' style='display:block;width:100%;text-align:left;padding:8px;border:none;border-bottom:1px solid #1f325f;background:${n.isRead ? 'transparent' : 'rgba(37,99,235,.12)'};color:inherit' onclick='openAdminNotification(${n.id}, "${String(n.type || '').replaceAll('"', '')}", ${Number(n.relatedUserId || 0)})'>
         <strong style='display:block'>${n.title || 'Notification'}</strong>
         <span>${n.message || 'Notification'}</span><br>
         <span style='opacity:.7'>${n.createdAt || ''}</span>
@@ -95,6 +98,12 @@ async function loadHeaderNotifications(){
 async function markNotificationRead(notificationId) {
   await fetch(`/api/notifications/${notificationId}/read`, { method: 'PATCH', headers: authHeaders() });
   await loadHeaderNotifications();
+}
+
+async function openAdminNotification(notificationId, type, relatedUserId = 0) {
+  await markNotificationRead(notificationId);
+  document.getElementById('adminNotifMenu')?.classList.add('hidden');
+  if (type === 'direct_message') openAitsmChat(relatedUserId || null);
 }
 
 async function markAllNotificationsRead() {
@@ -111,6 +120,8 @@ function renderUtilityHeader() {
       <a class='utility-brand' href='/dashboard-admin.html' aria-label='Go to dashboard overview'>AITSM Control</a>
     </div>
     <div class='utility-right'>
+      <button class='btn btn-ghost icon-btn header-icon-btn' type='button' onclick='openGlobalSearch()' aria-label='Search AITSM' title='Search AITSM (Ctrl+K)'>⌕</button>
+      <button id='adminChatTrigger' class='btn btn-ghost icon-btn header-icon-btn notif-trigger-btn' type='button' onclick='openAitsmChat()' aria-label='Open chat' title='Messages' aria-expanded='false'>${adminIcon('chat')}<span id='adminChatCount' class='notif-count hidden'>0</span></button>
       <button id='adminNotifTrigger' class='btn btn-ghost icon-btn header-icon-btn notif-trigger-btn' type='button' onclick='toggleAdminNotifMenu()' aria-label='Notifications' title='Notifications'>${adminIcon('bell')}<span id='adminNotifCount' class='notif-count'>0</span></button>
       <div id='adminNotifMenu' class='admin-header-menu hidden'><div id='adminNotifList' class='small'>Loading...</div></div>
       <button id='adminMenuTrigger' class='btn btn-ghost icon-btn header-icon-btn' type='button' onclick='toggleAdminHeaderMenu()' aria-label='Open account menu' title='Account menu'>${adminIcon('more')}</button>
@@ -143,4 +154,5 @@ function renderUtilityHeader() {
 document.addEventListener('DOMContentLoaded', () => {
   renderAdminSidebar();
   renderUtilityHeader();
+  if (window.matchMedia('(max-width: 980px)').matches) toggleAdminSidebar(true);
 });

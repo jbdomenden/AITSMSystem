@@ -64,6 +64,35 @@
         </table>
       </div>
     </section>
+    <section id='adminTicketAiPanel' class='card ai-ticket-assistance hidden' aria-live='polite'>
+      <div class='card-head'>
+        <div>
+          <p class='page-kicker'>Advisory workspace</p>
+          <h3 id='adminTicketAiTitle' class='section-title'>AI Ticket Assistance</h3>
+          <p id='adminTicketAiMeta' class='section-subtitle'>Select a ticket to generate a summary and resolution draft.</p>
+        </div>
+        <button id='generateTicketAiBtn' class='btn btn-primary' type='button'>Generate assistance</button>
+      </div>
+      <p id='adminTicketAiStatus' class='small'></p>
+      <div id='adminTicketAiResults' class='ai-ticket-assistance-results hidden'>
+        <section>
+          <h4>Ticket summary</h4>
+          <div id='adminTicketAiSummary' class='ai-review-copy'></div>
+        </section>
+        <section>
+          <h4>Troubleshooting checklist</h4>
+          <ul id='adminTicketAiChecklist' class='ai-checklist'></ul>
+        </section>
+        <section class='ai-resolution-editor'>
+          <label class='form-group' for='adminTicketAiDraft'>Editable resolution draft</label>
+          <textarea id='adminTicketAiDraft' rows='8'></textarea>
+          <p id='adminTicketAiAdvisory' class='small'></p>
+          <div class='inline-actions'>
+            <button id='copyTicketAiDraftBtn' class='btn btn-ghost' type='button'>Copy reviewed draft</button>
+          </div>
+        </section>
+      </div>
+    </section>
   </main>
 </div>
 <script src='/modules/sidebar/js/admin-shell.js'></script><script src='/modules/common/js/app.js'></script><script src='/modules/common/js/help.js'></script><script src='/modules/common/js/table-skeleton.js'></script><script src='/ticket-management/js/admin-ticket-management.js'></script>

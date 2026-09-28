@@ -1,232 +1,61 @@
 async function fetchJsonOrThrow(url, options = {}) {
-  const res = await fetch(url, { headers: authHeaders(), ...options });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || data.message || `Failed request: ${url}`);
+  const response = await fetch(url, { headers: { ...authHeaders(), ...(options.headers || {}) }, ...options });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || data.message || 'Request failed');
   return data;
 }
 
+function setAiMessage(message, error = false) {
+  const node = document.getElementById('aiConfigMessage');
+  if (node) { node.textContent = message; node.classList.toggle('text-danger', error); }
+}
+function setAiStatus(message, tone = 'neutral') {
+  const node = document.getElementById('aiConnectionStatus');
+  if (node) { node.textContent = message; node.className = `status-pill status-pill-${tone}`; }
+}
+function setAiButtonsDisabled(disabled) { ['aiTestConnectionBtn', 'aiSaveConfigBtn'].forEach(id => { const button = document.getElementById(id); if (button) button.disabled = disabled; }); }
+
 async function loadSlaPolicies() {
-  const rows = document.getElementById('slaRows');
-  if (!rows) return;
-  showTableSkeleton(rows, { rowCount: 4, columnCount: 3 });
-  try {
-    const policies = await fetchJsonOrThrow('/api/sla');
-    clearTableSkeleton(rows);
-    if (!policies.length) {
-      renderTableEmptyState(rows, 3, 'No SLA policies found.');
-      return;
-    }
-    rows.innerHTML = policies.map((p) => `<tr><td>${p.priority}</td><td>${p.responseTime}</td><td>${p.resolutionTime}</td></tr>`).join('');
-  } catch (error) {
-    renderTableErrorState(rows, 3, error.message || 'Unable to load SLA policies');
-  } finally {
-    clearTableSkeleton(rows);
-  }
+  const policies = await fetchJsonOrThrow('/api/sla');
+  document.getElementById('slaRows').innerHTML = policies.map(policy => `<tr><td>${policy.priority}</td><td>${policy.responseTime}</td><td>${policy.resolutionTime}</td></tr>`).join('');
 }
-
 async function loadAssetDetectionPrefixes() {
-  const area = document.getElementById('assetIpPrefixes');
-  if (!area) return;
   const data = await fetchJsonOrThrow('/settings/asset-ip-prefixes');
-  area.value = Array.isArray(data.prefixes) ? data.prefixes.join('\n') : '';
+  document.getElementById('assetIpPrefixes').value = (data.prefixes || []).join('\n');
 }
-
-function parsePrefixTextarea(value) {
-  return (value || '')
-    .split(/\r?\n|,/)
-    .map((v) => v.trim())
-    .filter(Boolean);
-}
-
 async function saveAssetDetectionPrefixes() {
-  const area = document.getElementById('assetIpPrefixes');
-  if (!area) return;
-  const prefixes = parsePrefixTextarea(area.value);
-  if (!prefixes.length) {
-    alert('Please add at least one IP prefix.');
-    return;
-  }
-
-  const data = await fetchJsonOrThrow('/settings/asset-ip-prefixes', {
-    method: 'POST',
-    body: JSON.stringify({ prefixes })
-  });
-  area.value = Array.isArray(data.prefixes) ? data.prefixes.join('\n') : '';
-  alert(data.message || 'Asset detection prefixes saved.');
-}
-
-function setAiMessage(text, isError = false) {
-  const host = document.getElementById('aiConfigMessage');
-  if (!host) return;
-  host.textContent = text || '';
-  host.classList.toggle('text-danger', Boolean(isError));
-}
-
-function setAiStatus(label, variant) {
-  const el = document.getElementById('aiConnectionStatus');
-  if (!el) return;
-  el.textContent = label;
-  el.className = `status-pill status-pill-${variant}`;
-}
-
-function setAiButtonsDisabled(disabled) {
-  ['aiRefreshModelsBtn', 'aiTestConnectionBtn', 'aiSaveConfigBtn'].forEach((id) => {
-    const btn = document.getElementById(id);
-    if (btn) btn.disabled = disabled;
-  });
-}
-
-function validUrl(url) {
-  try {
-    const parsed = new URL(url);
-    return ['http:', 'https:'].includes(parsed.protocol);
-  } catch {
-    return false;
-  }
-}
-
-function currentAiFormState() {
-  return {
-    baseUrl: (document.getElementById('aiBaseUrl')?.value || '').trim(),
-    model: (document.getElementById('aiModelSelect')?.value || '').trim()
-  };
-}
-
-function renderModelOptions(models = [], selectedModel = '') {
-  const select = document.getElementById('aiModelSelect');
-  const hint = document.getElementById('aiModelHint');
-  if (!select) return;
-
-  if (!models.length) {
-    select.innerHTML = "<option value=''>No models found</option>";
-    select.value = '';
-    if (hint) hint.textContent = 'No local models found. Run `ollama pull <model>` first.';
-    return;
-  }
-
-  select.innerHTML = models.map((name) => `<option value='${name}'>${name}</option>`).join('');
-  select.value = models.includes(selectedModel) ? selectedModel : models[0];
-  if (hint) hint.textContent = `${models.length} model(s) detected from local Ollama.`;
+  const prefixes = document.getElementById('assetIpPrefixes').value.split(/\r?\n/).map(value => value.trim()).filter(Boolean);
+  await fetchJsonOrThrow('/settings/asset-ip-prefixes', { method: 'POST', body: JSON.stringify({ prefixes }) });
+  alert('Asset detection prefixes saved.');
 }
 
 async function loadAiConfig() {
   const data = await fetchJsonOrThrow('/api/ai/config');
-  const input = document.getElementById('aiBaseUrl');
-  if (input) input.value = data.baseUrl || 'http://localhost:11434';
-  setAiStatus('Unknown', 'neutral');
-  await refreshModels();
+  document.getElementById('aiModel').value = data.model || 'gemini-3.8-flash';
+  setAiStatus('Not tested', 'neutral');
+  setAiMessage('Gemini credentials are configured securely on the server.');
 }
-
-async function refreshModels() {
-  const { baseUrl } = currentAiFormState();
-  if (!baseUrl || !validUrl(baseUrl)) {
-    setAiMessage('Base URL must be a valid http(s) URL before refreshing models.', true);
-    return;
-  }
-
-  setAiButtonsDisabled(true);
-  setAiMessage('Refreshing model list...');
-  try {
-    const saveRes = await fetch('/api/ai/config', {
-      method: 'POST',
-      headers: authHeaders(),
-      body: JSON.stringify({ baseUrl, model: (document.getElementById('aiModelSelect')?.value || 'llama3.1:8b') })
-    });
-    if (!saveRes.ok) {
-      const err = await saveRes.json();
-      throw new Error(err.error || err.message || 'Unable to apply base URL');
-    }
-
-    const data = await fetchJsonOrThrow('/api/ai/models');
-    renderModelOptions(data.models || [], data.currentModel || '');
-    setAiMessage('Model list refreshed successfully.');
-  } catch (error) {
-    renderModelOptions([], '');
-    setAiMessage(error.message || 'Failed to refresh models.', true);
-    setAiStatus('Failed', 'fail');
-  } finally {
-    setAiButtonsDisabled(false);
-  }
-}
-
-async function testAiConnection() {
-  const { baseUrl, model } = currentAiFormState();
-  if (!baseUrl || !validUrl(baseUrl)) {
-    setAiMessage('Base URL must be a valid http(s) URL.', true);
-    return;
-  }
-  if (!model) {
-    setAiMessage('Please select a model before testing connection.', true);
-    return;
-  }
-
-  setAiButtonsDisabled(true);
-  setAiMessage('Testing Ollama connection...');
-
-  try {
-    // Persist the validated form before testing so user chat and this diagnostic
-    // always exercise the exact same server-side provider configuration.
-    await fetchJsonOrThrow('/api/ai/config', {
-      method: 'POST',
-      body: JSON.stringify({ baseUrl, model })
-    });
-
-    const response = await fetch('/api/ai/test', {
-      method: 'POST',
-      headers: authHeaders(),
-      body: JSON.stringify({})
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message || 'Connection failed');
-    setAiStatus('Connected', 'ok');
-    setAiMessage(data.message || 'Connection successful.');
-  } catch (error) {
-    setAiStatus('Failed', 'fail');
-    setAiMessage(error.message || 'Unable to connect to Ollama.', true);
-  } finally {
-    setAiButtonsDisabled(false);
-  }
-}
-
 async function saveAiConfig() {
-  const { baseUrl, model } = currentAiFormState();
-  if (!baseUrl || !validUrl(baseUrl)) {
-    setAiMessage('Please enter a valid Base URL (http:// or https://).', true);
-    return;
-  }
-  if (!model) {
-    setAiMessage('Please select an Ollama model.', true);
-    return;
-  }
-
-  setAiButtonsDisabled(true);
-  setAiMessage('Saving AI configuration...');
-
-  try {
-    await fetchJsonOrThrow('/api/ai/config', {
-      method: 'POST',
-      body: JSON.stringify({ baseUrl, model })
-    });
-    setAiMessage('Configuration saved successfully.');
-  } catch (error) {
-    setAiMessage(error.message || 'Unable to save configuration.', true);
-  } finally {
-    setAiButtonsDisabled(false);
-  }
+  const model = document.getElementById('aiModel').value.trim();
+  if (!model) return setAiMessage('A Gemini model is required.', true);
+  setAiButtonsDisabled(true); setAiMessage('Saving Gemini configuration...');
+  try { await fetchJsonOrThrow('/api/ai/config', { method: 'POST', body: JSON.stringify({ model }) }); setAiMessage('Gemini model saved.'); }
+  catch (error) { setAiMessage(error.message || 'Unable to save Gemini configuration.', true); }
+  finally { setAiButtonsDisabled(false); }
 }
-
-function wireAiSettingsEvents() {
-  document.getElementById('aiRefreshModelsBtn')?.addEventListener('click', refreshModels);
-  document.getElementById('aiTestConnectionBtn')?.addEventListener('click', testAiConnection);
-  document.getElementById('aiSaveConfigBtn')?.addEventListener('click', saveAiConfig);
+async function testAiConnection() {
+  setAiButtonsDisabled(true); setAiMessage('Testing Gemini connection...');
+  try {
+    await saveAiConfig();
+    const data = await fetchJsonOrThrow('/api/ai/test', { method: 'POST', body: '{}' });
+    setAiStatus('Connected', 'ok'); setAiMessage(data.message || 'Gemini connection successful.');
+  } catch (error) { setAiStatus('Unavailable', 'fail'); setAiMessage(error.message || 'Unable to connect to Gemini.', true); }
+  finally { setAiButtonsDisabled(false); }
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  try {
-    await Promise.all([loadSlaPolicies(), loadAssetDetectionPrefixes()]);
-    wireAiSettingsEvents();
-    await loadAiConfig();
-  } catch (error) {
-    alert(error.message || 'Unable to load settings data');
-  }
+  document.getElementById('aiTestConnectionBtn')?.addEventListener('click', testAiConnection);
+  document.getElementById('aiSaveConfigBtn')?.addEventListener('click', saveAiConfig);
+  try { await Promise.all([loadSlaPolicies(), loadAssetDetectionPrefixes(), loadAiConfig()]); }
+  catch (error) { alert(error.message || 'Unable to load settings data'); }
 });
