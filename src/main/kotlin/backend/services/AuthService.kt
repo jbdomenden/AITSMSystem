@@ -184,8 +184,10 @@ class AuthService(
 
 
     fun changeOwnPassword(userId: Int, currentPassword: String, newPassword: String, confirmPassword: String): User {
+        require(currentPassword.isNotBlank()) { "Current password is required" }
         require(newPassword == confirmPassword) { "Passwords do not match" }
-        require(newPassword.length >= 8) { "Password must be at least 8 characters" }
+        require(newPassword.length >= 12) { "Password must be at least 12 characters" }
+        require(newPassword != currentPassword) { "New password must be different from the current password" }
 
         val currentHash = userRepository.findHashById(userId) ?: error("User not found")
         require(PasswordHasher.verify(currentPassword, currentHash)) { "Current password is incorrect" }

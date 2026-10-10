@@ -304,27 +304,54 @@ function ensurePasswordModal() {
   modal.id = 'passwordModal';
   modal.className = 'modal-overlay hidden';
   modal.innerHTML = `
-    <div class='modal-card'>
-      <div class='card-head'><h3 class='section-title'>Change Password</h3></div>
-      <div class='form-grid single-col'>
-        <div class='form-group'><label>Current Password</label><input id='modalCurrentPassword' type='password'></div>
-        <div class='form-group'><label>New Password</label><input id='modalNewPassword' type='password'></div>
-        <div class='form-group'><label>Confirm New Password</label><input id='modalConfirmPassword' type='password'></div>
-      </div>
-      <div class='inline-actions' style='justify-content:flex-end'>
-        <button type='button' class='btn btn-ghost' onclick='closePasswordModal()'>Cancel</button>
-        <button type='button' class='btn btn-primary' onclick='submitPasswordChange()'>Save</button>
-      </div>
-    </div>`;
+    <section class='modal-card' role='dialog' aria-modal='true' aria-labelledby='passwordModalTitle'>
+      <div class='card-head'><h3 id='passwordModalTitle' class='section-title'>Change Password</h3></div>
+      <form id='passwordChangeForm' class='form-grid single-col'>
+        <div class='form-group'>
+          <label for='modalCurrentPassword'>Current password</label>
+          <input id='modalCurrentPassword' type='password' autocomplete='current-password' required>
+        </div>
+        <div class='form-group'>
+          <label for='modalNewPassword'>New password</label>
+          <input id='modalNewPassword' type='password' autocomplete='new-password' minlength='12' required aria-describedby='passwordRequirements'>
+          <span id='passwordRequirements' class='small'>Use at least 12 characters.</span>
+        </div>
+        <div class='form-group'>
+          <label for='modalConfirmPassword'>Confirm new password</label>
+          <input id='modalConfirmPassword' type='password' autocomplete='new-password' minlength='12' required>
+        </div>
+        <p id='passwordChangeMessage' class='small hidden' role='status' aria-live='polite'></p>
+        <div class='inline-actions' style='justify-content:flex-end'>
+          <button id='passwordChangeCancel' type='button' class='btn btn-ghost'>Cancel</button>
+          <button id='passwordChangeSubmit' type='submit' class='btn btn-primary'>Save password</button>
+        </div>
+      </form>
+    </section>`;
   document.body.appendChild(modal);
 
+  document.getElementById('passwordChangeForm')?.addEventListener('submit', submitPasswordChange);
+  document.getElementById('passwordChangeCancel')?.addEventListener('click', closePasswordModal);
   modal.addEventListener('click', (event) => {
     if (event.target?.id === 'passwordModal') closePasswordModal();
   });
+  modal.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closePasswordModal();
+  });
+}
+
+function setPasswordChangeMessage(message = '', tone = 'danger') {
+  const target = document.getElementById('passwordChangeMessage');
+  if (!target) return;
+  target.textContent = message;
+  target.classList.toggle('hidden', !message);
+  target.classList.toggle('text-danger', Boolean(message) && tone === 'danger');
+  target.classList.toggle('text-success', Boolean(message) && tone === 'success');
+  target.setAttribute('role', tone === 'danger' ? 'alert' : 'status');
 }
 
 function openPasswordModal() {
   ensurePasswordModal();
+  setPasswordChangeMessage('');
   const modal = document.getElementById('passwordModal');
   modal?.classList.remove('hidden');
   modal?.classList.add('show');
@@ -339,24 +366,57 @@ function closePasswordModal() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
+  setPasswordChangeMessage('');
+  const submit = document.getElementById('passwordChangeSubmit');
+  if (submit) {
+    submit.disabled = false;
+    submit.textContent = 'Save password';
+  }
 }
 
-async function submitPasswordChange() {
+async function submitPasswordChange(event) {
+  event?.preventDefault();
   const body = {
     currentPassword: document.getElementById('modalCurrentPassword')?.value || '',
     newPassword: document.getElementById('modalNewPassword')?.value || '',
     confirmPassword: document.getElementById('modalConfirmPassword')?.value || ''
   };
 
-  const res = await fetch('/api/users/me/password', {
-    method: 'PUT',
-    headers: authHeaders(),
-    body: JSON.stringify(body)
-  });
-  const data = await res.json();
-  if (!res.ok) return alert(data.error || 'Unable to change password');
-  alert(data.message || 'Password changed successfully');
-  closePasswordModal();
+  if (!body.currentPassword) return setPasswordChangeMessage('Enter your current password.');
+  if (body.newPassword.length < 12) return setPasswordChangeMessage('New password must be at least 12 characters.');
+  if (body.newPassword === body.currentPassword) return setPasswordChangeMessage('New password must be different from the current password.');
+  if (body.newPassword !== body.confirmPassword) return setPasswordChangeMessage('New password and confirmation do not match.');
+
+  const submit = document.getElementById('passwordChangeSubmit');
+  if (submit?.disabled) return;
+  if (submit) {
+    submit.disabled = true;
+    submit.textContent = 'Saving…';
+  }
+  setPasswordChangeMessage('');
+
+  try {
+    const res = await fetch('/api/users/me/password', {
+      method: 'PUT',
+      headers: authHeaders(),
+      credentials: 'same-origin',
+      body: JSON.stringify(body)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setPasswordChangeMessage(data.error || data.message || 'Unable to change password. Please try again.');
+      return;
+    }
+    closePasswordModal();
+    showAppAlert(data.message || 'Password changed successfully.');
+  } catch {
+    setPasswordChangeMessage('Unable to reach the server. Check your connection and try again.');
+  } finally {
+    if (submit) {
+      submit.disabled = false;
+      submit.textContent = 'Save password';
+    }
+  }
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
