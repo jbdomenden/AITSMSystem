@@ -34,16 +34,16 @@ jobs:
         run: ./gradlew dependencyCheckAnalyze
       - name: Upload dependency-check report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: dependency-check-${{ github.sha }}
           path: build/reports/dependency-check/
           if-no-files-found: warn
       - name: Secret scan
         if: always()
-        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 git --source=/repo --redact --no-banner
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 git /repo --redact --no-banner
       - name: Upload deployable JAR
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: aitsm-${{ github.sha }}
           path: build/libs/aitsm-all.jar
