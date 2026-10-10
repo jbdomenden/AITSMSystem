@@ -24,6 +24,7 @@
             <span class='password-toggle-icon password-toggle-hide hidden' aria-hidden='true'>🙈</span>
           </button>
         </div>
+        <div class='auth-field-link'><button type='button' class='link-button text-primary' onclick='openForgotPasswordModal()'>Forgot password?</button></div>
       </div>
     </div>
     <label class="remember-row">
@@ -33,6 +34,46 @@
     <button class='btn btn-primary auth-login-btn' onclick='login()'>Login</button>
     <p class='small auth-links'>Need an account? <a href='/signup.html' class='text-primary'>sign up</a>.</p>
   </section>
+
+  <div id='forgotPasswordModal' class='modal-overlay hidden' role='dialog' aria-modal='true' aria-labelledby='forgotPasswordTitle'>
+    <section class='modal-card'>
+      <form id='forgotPasswordForm' class='form-grid single-col'>
+        <div class='card-head'><h3 id='forgotPasswordTitle' class='section-title'>Reset your password</h3></div>
+        <p class='small'>Enter your account email. If the account is eligible, we will send a secure reset link.</p>
+        <div class='form-group'>
+          <label for='forgotPasswordEmail'>Email</label>
+          <input id='forgotPasswordEmail' type='email' autocomplete='email' required placeholder='you@company.com'>
+        </div>
+        <p id='forgotPasswordMessage' class='small hidden' role='status' aria-live='polite'></p>
+        <div class='inline-actions' style='justify-content:flex-end'>
+          <button id='forgotPasswordCancel' type='button' class='btn btn-ghost'>Cancel</button>
+          <button id='forgotPasswordSubmit' type='submit' class='btn btn-primary'>Send reset link</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <div id='resetPasswordModal' class='modal-overlay hidden' role='dialog' aria-modal='true' aria-labelledby='resetPasswordTitle'>
+    <section class='modal-card'>
+      <form id='resetPasswordForm' class='form-grid single-col'>
+        <div class='card-head'><h3 id='resetPasswordTitle' class='section-title'>Choose a new password</h3></div>
+        <p class='small'>Use at least 12 characters. Completing this reset signs out all existing sessions.</p>
+        <div class='form-group'>
+          <label for='resetNewPassword'>New password</label>
+          <input id='resetNewPassword' type='password' autocomplete='new-password' minlength='12' required>
+        </div>
+        <div class='form-group'>
+          <label for='resetConfirmPassword'>Confirm new password</label>
+          <input id='resetConfirmPassword' type='password' autocomplete='new-password' minlength='12' required>
+        </div>
+        <p id='resetPasswordMessage' class='small hidden' role='status' aria-live='polite'></p>
+        <div class='inline-actions' style='justify-content:flex-end'>
+          <button id='resetPasswordCancel' type='button' class='btn btn-ghost'>Cancel</button>
+          <button id='resetPasswordSubmit' type='submit' class='btn btn-primary'>Update password</button>
+        </div>
+      </form>
+    </section>
+  </div>
 
   <div id='mfaEnrollmentModal' class='modal-overlay hidden' role='dialog' aria-modal='true' aria-labelledby='mfaEnrollmentTitle'>
     <section class='modal-card mfa-enrollment-card'>
@@ -63,6 +104,6 @@
     </section>
   </div>
   <script src='/modules/common/js/app.js?v=password-session-v3'></script>
-  <script src='/login/js/auth.js?v=mfa-enrollment-v4'></script>
+  <script src='/login/js/auth.js?v=password-recovery-v1'></script>
 </body>
 </html>

@@ -440,6 +440,18 @@ textarea { resize: vertical; min-height: 120px; }
 .auth-login-btn { width: 100%; margin-top: 8px; background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%); border-radius: 14px; }
 .remember-row { display: flex; align-items: center; gap: 8px; margin: 10px 0 2px; color: #c8d5f7; font-size: 14px; }
 .auth-links { margin-top: 12px; text-align: left; }
+.auth-field-link { display: flex; justify-content: flex-end; margin-top: 8px; }
+.link-button {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.link-button:hover { text-decoration-thickness: 2px; }
 .auth-divider { display: flex; align-items: center; gap: 10px; margin: 18px 0 12px; color: #b8c6e8; font-size: 12px; }
 .auth-divider::before, .auth-divider::after { content: ''; height: 1px; background: rgba(184, 198, 232, .28); flex: 1; }
 .auth-divider span { white-space: nowrap; }

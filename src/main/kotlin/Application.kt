@@ -160,7 +160,7 @@ fun Application.module() {
 
         get("/") { call.respondRedirect("/index/html/index.html") }
         get("/index.html") { call.respondRedirect("/index/html/index.html") }
-        get("/login.html") { call.respondRedirect("/login/html/login.html") }
+        get("/login.html") { call.redirectKeepingQuery("/login/html/login.html") }
         get("/signup.html") { call.respondRedirect("/signup/html/signup.html") }
         get("/dashboard-admin.html") { call.respondRedirect("/dashboard-admin/html/dashboard-admin.html") }
         get("/dashboard-user.html") { call.respondRedirect("/dashboard-user/html/dashboard-user.html") }
