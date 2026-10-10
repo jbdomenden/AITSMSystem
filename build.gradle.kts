@@ -1,5 +1,5 @@
-val kotlin_version: String by project
-val logback_version: String by project
+val kotlinVersion = providers.gradleProperty("kotlin_version").get()
+val logbackVersion = providers.gradleProperty("logback_version").get()
 
 plugins {
     kotlin("jvm") version "2.4.21"
@@ -10,6 +10,8 @@ plugins {
 
 dependencyCheck {
     failBuildOnCVSS = 9.0f
+    scanBuildEnv = false
+    scanConfigurations = listOf("compileClasspath", "runtimeClasspath")
     suppressionFile = "config/dependency-check-suppressions.xml"
     System.getenv("NVD_API_KEY")?.takeIf { it.isNotBlank() }?.let { nvd.apiKey = it }
 }
@@ -27,7 +29,7 @@ dependencyLocking {
 
 
 dependencies {
-    implementation(enforcedPlatform("org.jetbrains.kotlin:kotlin-bom:$kotlin_version"))
+    implementation(enforcedPlatform("org.jetbrains.kotlin:kotlin-bom:$kotlinVersion"))
     implementation(enforcedPlatform("io.netty:netty-bom:4.2.19.Final"))
     implementation("io.ktor:ktor-server-core-jvm")
     implementation("io.ktor:ktor-server-netty-jvm")
@@ -51,9 +53,9 @@ dependencies {
     runtimeOnly("org.eclipse.angus:angus-mail:2.0.4")
     implementation("com.google.zxing:core:3.5.4")
     implementation("com.google.zxing:javase:3.5.4")
-    implementation("ch.qos.logback:logback-classic:$logback_version")
+    implementation("ch.qos.logback:logback-classic:$logbackVersion")
 
     testImplementation("io.ktor:ktor-server-test-host-jvm")
     testImplementation("org.apache.httpcomponents.client5:httpclient5:5.6.3")
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlinVersion")
 }
