@@ -33,6 +33,7 @@ import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.defaultheaders.*
+import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
@@ -95,6 +96,12 @@ fun Application.module() {
         }
     }
     install(StatusPages) {
+        exception<BadRequestException> { call, cause ->
+            call.respond(
+                HttpStatusCode.BadRequest,
+                ApiErrorResponse(HttpStatusCode.BadRequest.value, cause.message ?: "Invalid request")
+            )
+        }
         exception<IllegalArgumentException> { call, cause ->
             if (call.request.path() == "/settings/asset-ip-prefixes") {
                 call.respond(
