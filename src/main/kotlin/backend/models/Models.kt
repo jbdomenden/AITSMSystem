@@ -14,6 +14,10 @@ enum class TicketStatus {
 enum class UserRole {
     SUPERADMIN,
     ADMIN,
+    IT_ADMIN,
+    SUPPORT_AGENT,
+    ASSET_MANAGER,
+    AUDITOR,
     END_USER;
 
     fun asHeaderValue(): String = name.lowercase().replace('_', '-')
@@ -22,10 +26,17 @@ enum class UserRole {
         fun from(value: String?): UserRole = when (value?.trim()?.lowercase()) {
             "superadmin" -> SUPERADMIN
             "admin" -> ADMIN
+            "it_admin", "it-admin" -> IT_ADMIN
+            "support_agent", "support-agent" -> SUPPORT_AGENT
+            "asset_manager", "asset-manager" -> ASSET_MANAGER
+            "auditor" -> AUDITOR
             else -> END_USER
         }
     }
 }
+
+@Serializable
+enum class AccountState { INVITED, PENDING_VERIFICATION, PENDING_APPROVAL, ACTIVE, SUSPENDED, LOCKED, DISABLED }
 
 @Serializable
 data class PaginationMeta(
@@ -51,6 +62,7 @@ data class User(
     val profilePhotoUrl: String? = null,
     val role: UserRole,
     val emailVerified: Boolean = false,
+    val accountState: AccountState = AccountState.PENDING_VERIFICATION,
     val createdAt: String
 )
 
@@ -77,30 +89,35 @@ data class ProfilePhotoRequest(
 data class RegisterRequest(
     val fullName: String,
     val email: String,
-    val company: String,
+    val company: String = "",
     val department: String,
     val password: String,
     val confirmPassword: String,
     val eulaAccepted: Boolean,
-    val eulaVersion: String = "1.0"
+    val eulaVersion: String = "1.0",
+    val invitationToken: String = ""
 )
+@Serializable data class InvitationCreateRequest(val email: String, val role: UserRole = UserRole.END_USER)
+@Serializable data class InvitationAcceptRequest(val token: String, val fullName: String, val password: String, val confirmPassword: String, val department: String, val eulaAccepted: Boolean, val eulaVersion: String = "1.0")
+@Serializable data class InvitationView(val id: String, val email: String, val role: UserRole, val createdAt: String, val expiresAt: String, val acceptedAt: String? = null, val revokedAt: String? = null)
+@Serializable data class InvitationInfo(val email: String, val role: UserRole)
 
-@Serializable data class LoginRequest(val email: String, val password: String)
-@Serializable data class AuthResponse(val token: String, val user: User)
-@Serializable
-data class OAuthLoginResult(
-    val status: String,
-    val message: String,
-    val auth: AuthResponse? = null,
-    // Kept at the top level as well so the OAuth result is compatible with
-    // the regular login response and browser-cached login pages.
-    val token: String? = auth?.token,
-    val user: User? = auth?.user
-)
+@Serializable data class LoginRequest(val email: String, val password: String, val mfaCode: String? = null, val recoveryCode: String? = null)
+@Serializable data class ForgotPasswordRequest(val email: String)
+@Serializable data class CompletePasswordResetRequest(val token: String, val newPassword: String, val confirmPassword: String)
+@Serializable data class AuthResponse(val user: User, val mfaRequired: Boolean = false, val mfaEnrollmentRequired: Boolean = false)
+@Serializable data class MfaConfirmRequest(val code: String)
+@Serializable data class MfaLoginRequest(val code: String? = null, val recoveryCode: String? = null)
+@Serializable data class ReauthRequest(val scope: String, val password: String? = null, val mfaCode: String? = null, val recoveryCode: String? = null)
+@Serializable data class ReauthResponse(val token: String, val scope: String, val expiresAt: String)
+@Serializable data class MfaEnrollmentResponse(val otpauthUri: String, val manualKey: String, val qrCodeDataUrl: String)
+@Serializable data class MfaRecoveryResponse(val recoveryCodes: List<String>)
+@Serializable data class SessionView(val id: String, val current: Boolean, val createdAt: String, val lastSeenAt: String, val expiresAt: String, val device: String?, val approximateIp: String?)
 @Serializable data class RegistrationResponse(val message: String, val email: String, val devVerificationCode: String? = null)
 @Serializable data class VerifyEmailRequest(val email: String, val code: String)
 @Serializable data class ResendVerificationRequest(val email: String)
 @Serializable data class RoleUpdateRequest(val role: UserRole)
+@Serializable data class AccountStateUpdateRequest(val state: AccountState)
 
 @Serializable data class ProfileUpdateRequest(val fullName: String, val company: String, val department: String)
 @Serializable data class PasswordResetRequest(val newPassword: String, val confirmPassword: String)
@@ -222,7 +239,7 @@ data class Notification(
 @Serializable data class SLA(val id: Int, val priority: String, val responseTime: Int, val resolutionTime: Int)
 @Serializable data class KnowledgeArticle(val id: Int, val title: String, val content: String, val category: String, val createdAt: String)
 @Serializable data class KnowledgeRequest(val title: String, val content: String, val category: String)
-@Serializable data class AuditLog(val id: Int, val userId: Int?, val action: String, val entity: String, val timestamp: String)
+@Serializable data class AuditLog(val id: Int, val userId: Int?, val action: String, val entity: String, val timestamp: String, val target: String? = null, val result: String = "SUCCESS", val requestId: String? = null, val sourceIp: String? = null, val userAgent: String? = null, val metadata: String? = null)
 
 @Serializable data class TroubleshootingResponse(val suggestions: List<String>)
 @Serializable data class AnalyticsResponse(val metric: String, val points: List<Map<String, String>>)

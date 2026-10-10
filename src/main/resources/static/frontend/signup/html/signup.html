@@ -10,13 +10,12 @@
 <section class='auth-panel auth-panel-wide'>
   <p class='eyebrow auth-eyebrow'>End-User Portal</p>
   <h2 class='auth-heading'>Create your ticketing account</h2>
-  <p class='auth-subtitle auth-subtitle-left'>Self-registration is available for end users only. Admin accounts are provisioned by system owners.</p>
+  <p class='auth-subtitle auth-subtitle-left'>Registration is available only through a company invitation.</p>
 
   <div id='registrationStep'>
     <div class='form-grid signup-grid'>
       <div class='form-group'><label>Full Name</label><input id='fullName'></div>
-      <div class='form-group'><label>Email Address</label><input id='email' type='email'></div>
-      <div class='form-group'><label>Company</label><input id='company'></div>
+      <div class='form-group'><label>Invited Email Address</label><input id='email' type='email' readonly></div>
       <div class='form-group'><label>Department</label><input id='department'></div>
       <div class='form-group'><label>Password</label><input id='password' type='password'></div>
       <div class='form-group'><label>Confirm Password</label><input id='confirmPassword' type='password'></div>
@@ -27,11 +26,11 @@
       <button type='button' class='eula-link-btn' onclick='openEulaModal()'>I have read and agree to the End-User License Agreement.</button>
     </div>
 
-    <div class='inline-actions auth-actions'><button class='btn btn-primary auth-login-btn' onclick='signup()'>Register End-User Account</button></div>
+    <div class='inline-actions auth-actions'><button class='btn btn-primary auth-login-btn' onclick='signup()'>Accept Invitation</button></div>
     <p class='small auth-links'>Already have an account? <a href='/login.html' class='text-primary'>login</a>.</p>
   </div>
 
-  <div id='verificationStep' style='display:none'>
+  <div id='verificationStep' style='display:none' hidden>
     <h3 class='auth-section-title'>Email Verification</h3>
     <p class='small'>Enter the verification code sent to your email address.</p>
     <div class='form-grid signup-grid'>

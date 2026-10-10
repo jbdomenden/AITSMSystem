@@ -448,8 +448,17 @@ textarea { resize: vertical; min-height: 120px; }
 .auth-provider-btn:hover, .auth-provider-btn:focus-visible { background: #fff; border-color: #60a5fa; }
 .provider-mark { width: 20px; height: 20px; display: inline-grid; place-items: center; margin-right: 8px; border-radius: 4px; font-weight: 800; }
 .provider-google { color: #4285f4; }
-.provider-microsoft { color: #0078d4; font-size: 22px; line-height: 1; }
 .auth-oauth-message { min-height: 18px; margin: 10px 0 0; color: #bfdbfe; }
+.mfa-enrollment-card { width: min(520px, 100%); text-align: center; }
+.mfa-enrollment-card h3 { margin: 4px 0 8px; color: var(--text); }
+.mfa-qr-code { display: block; width: 240px; height: 240px; margin: 16px auto; border: 10px solid #fff; border-radius: 12px; }
+.mfa-manual-key { display: block; margin: 10px 0 16px; padding: 10px; border-radius: 8px; background: #eef2ff; color: #1e293b; overflow-wrap: anywhere; user-select: all; }
+.mfa-code-group { text-align: left; }
+.mfa-code-group input { text-align: center; font-size: 22px; letter-spacing: .3em; }
+.mfa-enrollment-error { min-height: 20px; color: #b91c1c; text-align: left; }
+.mfa-enrollment-actions { justify-content: flex-end; }
+.mfa-recovery-codes { padding: 16px; border-radius: 10px; background: #0f172a; color: #e2e8f0; text-align: left; line-height: 1.6; user-select: all; }
+.mfa-finish-button { width: 100%; margin-top: 12px; }
 .auth-dark .text-primary { color: #8ec7ff; }
 .auth-panel-wide { width: min(700px, 100%); }
 .signup-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
@@ -1354,3 +1363,35 @@ body.global-search-open { overflow:hidden; }
 .status-pill-fail { background: #fee2e2; color: #991b1b; }
 
 .gemini-card .inline-actions { flex-wrap: wrap; }
+
+/* Fail visibly and keep content usable if a role shell is delayed or cannot load. */
+.utility-bar:empty::after {
+  content: "Loading workspace…";
+  color: #cbd5e1;
+  font-size: 13px;
+  padding-left: 4px;
+}
+
+.app-layout:has(> .sidebar:empty) {
+  grid-template-columns: 0 minmax(0, 1fr);
+}
+
+.app-layout > .sidebar:empty {
+  width: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-100%);
+}
+
+.app-layout:has(> .sidebar:empty) > .content {
+  grid-column: 2;
+}
+
+@media (max-width: 980px) {
+  .app-layout:has(> .sidebar:empty) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app-layout:has(> .sidebar:empty) > .content { grid-column: 1; }
+}

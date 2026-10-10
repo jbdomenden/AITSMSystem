@@ -1,9 +1,5 @@
 function saveSession(data) {
-  localStorage.setItem('userId', data.user.id);
-  const normalizedRole = String(data.user.role || '').toLowerCase();
-  localStorage.setItem('role', normalizedRole);
-  localStorage.setItem('email', data.user.email || '');
-  localStorage.setItem('fullName', data.user.fullName || '');
+  window.currentUser = data.user;
 }
 
 function toggleVerificationStep(email) {
@@ -17,10 +13,11 @@ function toggleVerificationStep(email) {
 }
 
 async function signup() {
+  const invitationToken = new URLSearchParams(location.search).get('invite') || '';
+  if (!invitationToken) return alert('A valid invitation link is required.');
   const body = {
+    token: invitationToken,
     fullName: fullName.value.trim(),
-    email: email.value.trim(),
-    company: company.value.trim(),
     department: department.value.trim(),
     password: password.value,
     confirmPassword: confirmPassword.value,
@@ -28,7 +25,7 @@ async function signup() {
   };
   if (!body.eulaAccepted) return alert('Please accept the EULA to continue registration.');
 
-  const res = await fetch('/api/auth/register', {
+  const res = await fetch('/api/auth/invitations/accept', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
@@ -36,9 +33,14 @@ async function signup() {
   const data = await res.json();
   if (!res.ok) return alert(data.error || 'Registration failed');
 
-  const hint = data.devVerificationCode ? `\nVerification code (dev mode): ${data.devVerificationCode}` : '';
-  alert(`${data.message}${hint}`);
-  toggleVerificationStep(data.email || body.email);
+  if (!data.user) return alert('Invitation could not be accepted.');
+  if (data.mfaEnrollmentRequired) {
+    alert('Your administrator account is ready. Sign in to complete mandatory MFA setup.');
+    location.href = '/login.html';
+    return;
+  }
+  saveSession(data);
+  redirectForRole(data.user.role);
 }
 
 async function verifyEmailCode() {
@@ -52,9 +54,13 @@ async function verifyEmailCode() {
   const data = await res.json();
   if (!res.ok) return alert(data.error || 'Verification failed');
 
+  if (data.mfaRequired || data.mfaEnrollmentRequired) {
+    alert('Email verified. Sign in to complete administrator MFA.');
+    location.href = '/login.html';
+    return;
+  }
   saveSession(data);
-  const role = String(data.user.role || '').toLowerCase();
-  location.href = ['admin', 'superadmin'].includes(role) ? '/dashboard-admin.html' : '/dashboard-user.html';
+  redirectForRole(data.user.role);
 }
 
 async function resendVerificationCode() {
@@ -68,7 +74,7 @@ async function resendVerificationCode() {
   const data = await res.json();
   if (!res.ok) return alert(data.error || 'Unable to resend code');
 
-  alert(`Verification code resent.${data.devVerificationCode ? `\nCode (dev mode): ${data.devVerificationCode}` : ''}`);
+  alert(`${data.message || 'Verification code resent.'}${data.devVerificationCode ? `\nCode (dev mode): ${data.devVerificationCode}` : ''}`);
 }
 
 async function login() {
@@ -81,8 +87,7 @@ async function login() {
   if (!res.ok) return alert(data.error || 'Login failed');
 
   saveSession(data);
-  const role = String(data.user.role || '').toLowerCase();
-  location.href = ['admin', 'superadmin'].includes(role) ? '/dashboard-admin.html' : '/dashboard-user.html';
+  redirectForRole(data.user.role);
 }
 
 
@@ -137,6 +142,12 @@ function setPasswordVisibility(inputId, toggleId) {
   sync();
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   setPasswordVisibility('password', 'loginPasswordToggle');
+  const token = new URLSearchParams(location.search).get('invite') || '';
+  if (!token) return alert('A valid invitation link is required to register.');
+  const response = await fetch(`/api/auth/invitations/inspect?token=${encodeURIComponent(token)}`);
+  if (!response.ok) return alert('This invitation is invalid or expired.');
+  const invitation = await response.json();
+  email.value = invitation.email || '';
 });

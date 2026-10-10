@@ -19,8 +19,96 @@ object UsersTable : Table("users") {
     val passwordHash = varchar("password_hash", 255)
     val role = varchar("role", 20).index()
     val emailVerified = bool("email_verified").default(false)
-    val verificationCode = varchar("verification_code", 12).nullable()
+    val accountState = varchar("account_state", 32).default("PENDING_VERIFICATION").index()
+    val verificationCode = varchar("verification_code", 64).nullable()
     val verificationExpiresAt = datetime("verification_expires_at").nullable()
+    val verificationAttempts = integer("verification_attempts").default(0)
+    val verificationSentAt = datetime("verification_sent_at").nullable()
+    val failedLoginAttempts = integer("failed_login_attempts").default(0)
+    val lockedUntil = datetime("locked_until").nullable()
+    val createdAt = datetime("created_at").index()
+    override val primaryKey = PrimaryKey(id)
+}
+
+object InvitationsTable : Table("invitations") {
+    val id = uuid("id")
+    val email = varchar("email", 200).index()
+    val intendedRole = varchar("intended_role", 32)
+    val tokenHash = varchar("token_hash", 64).uniqueIndex()
+    val inviterUserId = integer("inviter_user_id").references(UsersTable.id)
+    val createdAt = datetime("created_at").index()
+    val expiresAt = datetime("expires_at").index()
+    val acceptedAt = datetime("accepted_at").nullable()
+    val revokedAt = datetime("revoked_at").nullable()
+    override val primaryKey = PrimaryKey(id)
+}
+
+object PasswordResetTokensTable : Table("password_reset_tokens") {
+    val id = uuid("id")
+    val userId = integer("user_id").references(UsersTable.id, onDelete = ReferenceOption.CASCADE).index()
+    val tokenHash = varchar("token_hash", 64).uniqueIndex()
+    val createdAt = datetime("created_at")
+    val expiresAt = datetime("expires_at").index()
+    val usedAt = datetime("used_at").nullable()
+    override val primaryKey = PrimaryKey(id)
+}
+
+object MfaSecretsTable : Table("mfa_secrets") {
+    val userId = integer("user_id").references(UsersTable.id, onDelete = ReferenceOption.CASCADE)
+    val encryptedSecret = text("encrypted_secret")
+    val enabled = bool("enabled").default(false)
+    val lastUsedStep = long("last_used_step").nullable()
+    val createdAt = datetime("created_at")
+    val confirmedAt = datetime("confirmed_at").nullable()
+    override val primaryKey = PrimaryKey(userId)
+}
+
+object MfaRecoveryCodesTable : Table("mfa_recovery_codes") {
+    val id = uuid("id")
+    val userId = integer("user_id").references(UsersTable.id, onDelete = ReferenceOption.CASCADE).index()
+    val codeHash = varchar("code_hash", 100)
+    val usedAt = datetime("used_at").nullable()
+    override val primaryKey = PrimaryKey(id)
+}
+
+object ReauthGrantsTable : Table("reauth_grants") {
+    val id = uuid("id")
+    val tokenHash = varchar("token_hash", 64).uniqueIndex()
+    val sessionId = uuid("session_id").index()
+    val userId = integer("user_id").references(UsersTable.id, onDelete = ReferenceOption.CASCADE).index()
+    val scope = varchar("scope", 80).index()
+    val createdAt = datetime("created_at")
+    val expiresAt = datetime("expires_at").index()
+    val usedAt = datetime("used_at").nullable()
+    override val primaryKey = PrimaryKey(id)
+}
+
+object SessionsTable : Table("auth_sessions") {
+    val id = uuid("id")
+    val tokenHash = varchar("token_hash", 64).uniqueIndex()
+    val csrfHash = varchar("csrf_hash", 64)
+    val userId = integer("user_id").references(UsersTable.id, onDelete = ReferenceOption.CASCADE).index()
+    val createdAt = datetime("created_at").index()
+    val lastSeenAt = datetime("last_seen_at").index()
+    val expiresAt = datetime("expires_at").index()
+    val revokedAt = datetime("revoked_at").nullable().index()
+    val ipAddress = varchar("ip_address", 45).nullable()
+    val userAgent = varchar("user_agent", 500).nullable()
+    val deviceLabel = varchar("device_label", 120).nullable()
+    val mfaComplete = bool("mfa_complete").default(false)
+    override val primaryKey = PrimaryKey(id)
+}
+
+object SecurityEventsTable : Table("security_events") {
+    val id = long("id").autoIncrement()
+    val actorUserId = integer("actor_user_id").nullable().index()
+    val target = varchar("target", 200).nullable().index()
+    val action = varchar("action", 100).index()
+    val result = varchar("result", 20).index()
+    val requestId = varchar("request_id", 80).nullable().index()
+    val sourceIp = varchar("source_ip", 45).nullable()
+    val userAgent = varchar("user_agent", 300).nullable()
+    val metadata = text("metadata").nullable()
     val createdAt = datetime("created_at").index()
     override val primaryKey = PrimaryKey(id)
 }
@@ -145,12 +233,19 @@ object AuditLogsTable : Table("audit_logs") {
     val userId = integer("user_id").nullable().index()
     val action = varchar("action", 160)
     val entity = varchar("entity", 80)
+    val target = varchar("target", 200).nullable().index()
+    val result = varchar("result", 20).default("SUCCESS").index()
+    val requestId = varchar("request_id", 80).nullable().index()
+    val sourceIp = varchar("source_ip", 45).nullable()
+    val userAgent = varchar("user_agent", 300).nullable()
+    val metadata = text("metadata").nullable()
     val timestamp = datetime("timestamp").index()
     override val primaryKey = PrimaryKey(id)
 }
 
 object AIConversationMessagesTable : Table("ai_conversation_messages") {
     val id = integer("id").autoIncrement()
+    val userId = integer("user_id").references(UsersTable.id, onDelete = ReferenceOption.CASCADE).index()
     val sessionId = varchar("session_id", 128).index()
     val role = varchar("role", 32)
     val content = text("content")
@@ -228,16 +323,37 @@ object DatabaseFactory {
             driverClassName = "org.postgresql.Driver"
             maximumPoolSize = 10
             isAutoCommit = false
-            transactionIsolation = "TRANSACTION_REPEATABLE_READ"
+            // Web requests commonly touch the same session and notification rows concurrently.
+            // READ_COMMITTED provides the required statement-level consistency without aborting
+            // independent parallel page-load requests as serialization conflicts.
+            transactionIsolation = "TRANSACTION_READ_COMMITTED"
             validate()
         }
         Database.connect(HikariDataSource(config))
-        transaction {
+        if (!production) transaction {
             exec("ALTER TABLE IF EXISTS devices DROP CONSTRAINT IF EXISTS devices_assigned_user_fkey")
             exec("ALTER TABLE IF EXISTS ticket_history DROP CONSTRAINT IF EXISTS ticket_history_updated_by_fkey")
+            exec("""
+                DO ${'$'}${'$'}
+                BEGIN
+                    IF to_regclass('public.ai_conversation_messages') IS NOT NULL THEN
+                        ALTER TABLE ai_conversation_messages ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
+                        DELETE FROM ai_conversation_messages WHERE user_id IS NULL;
+                        ALTER TABLE ai_conversation_messages ALTER COLUMN user_id SET NOT NULL;
+                    END IF;
+                END
+                ${'$'}${'$'};
+            """.trimIndent())
 
             SchemaUtils.createMissingTablesAndColumns(
                 UsersTable,
+                SessionsTable,
+                SecurityEventsTable,
+                InvitationsTable,
+                PasswordResetTokensTable,
+                MfaSecretsTable,
+                MfaRecoveryCodesTable,
+                ReauthGrantsTable,
                 ProfilePhotoRequestsTable,
                 ColleagueRequestsTable,
                 DirectMessagesTable,
@@ -256,6 +372,9 @@ object DatabaseFactory {
             )
             exec("CREATE UNIQUE INDEX IF NOT EXISTS profile_photo_requests_one_pending_per_user ON profile_photo_requests(user_id) WHERE status = 'PENDING'")
             exec("CREATE UNIQUE INDEX IF NOT EXISTS colleague_requests_pair_idx ON colleague_requests (LEAST(sender_id, recipient_id), GREATEST(sender_id, recipient_id))")
+            exec("CREATE INDEX IF NOT EXISTS ai_conversation_messages_owner_session_idx ON ai_conversation_messages(user_id, session_id, created_at)")
+            exec("UPDATE users SET account_state = CASE WHEN email_verified THEN 'ACTIVE' ELSE 'PENDING_VERIFICATION' END WHERE account_state IS NULL OR account_state = ''")
+            exec("UPDATE users SET account_state = 'ACTIVE' WHERE email_verified = TRUE AND account_state = 'PENDING_VERIFICATION'")
         }
     }
 }

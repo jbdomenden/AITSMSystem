@@ -7,6 +7,9 @@ import backend.models.InventoryStatusRequest
 import backend.models.InventoryUpsertDetectedRequest
 import backend.models.UserRole
 import backend.security.requireRole
+import backend.security.requireReauthentication
+import backend.services.ReauthScope
+import backend.services.ReauthenticationService
 import backend.services.InventoryService
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -19,7 +22,7 @@ import io.ktor.server.routing.patch
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 
-fun Route.inventoryRoutes(inventoryService: InventoryService) {
+fun Route.inventoryRoutes(inventoryService: InventoryService, reauthentication: ReauthenticationService) {
     route("/api/inventory") {
         get {
             if (!call.requireRole(UserRole.ADMIN)) return@get
@@ -44,6 +47,7 @@ fun Route.inventoryRoutes(inventoryService: InventoryService) {
 
         get("/export") {
             if (!call.requireRole(UserRole.ADMIN)) return@get
+            if (!call.requireReauthentication(reauthentication, ReauthScope.SENSITIVE_EXPORT)) return@get
             val filters = InventoryFilters(
                 search = call.request.queryParameters["search"],
                 status = call.request.queryParameters["status"],

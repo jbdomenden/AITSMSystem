@@ -23,7 +23,11 @@ async function submitAccessApproval() {
   const role = document.getElementById('accessApprovalRole').value;
   if (!department) return alert('Select a department before granting access.');
   try {
-    await fetchJsonOrThrow(`/api/users/${accessApprovalUserId}/access-approval`, { method: 'PUT', body: JSON.stringify({ department, role }) });
+    const reauthToken = await obtainReauthToken('admin-access');
+    await fetchJsonOrThrow(`/api/users/${accessApprovalUserId}/access-approval`, {
+      method: 'PUT', headers: { ...authHeaders(), 'X-Reauth-Token': reauthToken }, body: JSON.stringify({ department, role })
+    });
+    consumeCachedReauth('admin-access');
     closeAccessApprovalModal();
     alert('Account access granted.');
     await loadUserManagement();
@@ -82,12 +86,14 @@ async function fetchJsonOrThrow(url, options = {}) {
 }
 
 async function changeRoleFromUserManagement(userId, role) {
+  const reauthToken = await obtainReauthToken('admin-access');
   const res = await fetch(`/api/users/${userId}/role`, {
     method: 'PUT',
-    headers: authHeaders(),
+    headers: { ...authHeaders(), 'X-Reauth-Token': reauthToken },
     body: JSON.stringify({ role })
   });
   const data = await res.json();
+  consumeCachedReauth('admin-access');
   if (!res.ok) return alert(data.error || 'Unable to update role');
   await loadUserManagement();
 }
@@ -98,12 +104,14 @@ async function resetUserPasswordFromUserManagement(userId, email) {
   const confirmPassword = prompt('Confirm the temporary password:');
   if (confirmPassword == null) return;
 
+  const reauthToken = await obtainReauthToken('admin-access');
   const res = await fetch(`/api/users/${userId}/reset-password`, {
     method: 'PUT',
-    headers: authHeaders(),
+    headers: { ...authHeaders(), 'X-Reauth-Token': reauthToken },
     body: JSON.stringify({ newPassword, confirmPassword })
   });
   const data = await res.json();
+  consumeCachedReauth('admin-access');
   if (!res.ok) return alert(data.error || 'Unable to reset password');
   alert(data.message || 'Password reset successful');
 }
@@ -112,10 +120,12 @@ async function deleteUserFromUserManagement(userId, email) {
   const confirmed = confirm(`Delete account ${email}? This also removes user tickets and notifications.`);
   if (!confirmed) return;
 
+  const reauthToken = await obtainReauthToken('account-delete');
   const res = await fetch(`/api/users/${userId}`, {
     method: 'DELETE',
-    headers: authHeaders()
+    headers: { ...authHeaders(), 'X-Reauth-Token': reauthToken }
   });
+  consumeCachedReauth('account-delete');
   const data = await res.json();
   if (!res.ok) return alert(data.error || 'Unable to delete user');
 
@@ -124,14 +134,28 @@ async function deleteUserFromUserManagement(userId, email) {
 }
 
 async function setUserEmailApprovalFromUserManagement(userId, approved) {
+  const reauthToken = await obtainReauthToken('admin-access');
   const res = await fetch(`/api/users/${userId}/email-approval`, {
     method: 'PUT',
-    headers: authHeaders(),
+    headers: { ...authHeaders(), 'X-Reauth-Token': reauthToken },
     body: JSON.stringify({ approved })
   });
   const data = await res.json();
+  consumeCachedReauth('admin-access');
   if (!res.ok) return alert(data.error || 'Unable to update email approval');
   await loadUserManagement();
+}
+
+async function resetAdministratorMfa(userId, email) {
+  if (!confirm(`Reset MFA for ${email}? Every active session for that administrator will be revoked.`)) return;
+  try {
+    const reauthToken = await obtainReauthToken('mfa-change');
+    await fetchJsonOrThrow(`/api/users/admin/${userId}/mfa-reset`, {
+      method: 'POST', headers: { ...authHeaders(), 'X-Reauth-Token': reauthToken }
+    });
+    consumeCachedReauth('mfa-change');
+    alert('MFA was reset and the administrator must enroll again at next sign-in.');
+  } catch (error) { alert(error.message || 'Unable to reset administrator MFA.'); }
 }
 
 async function openAddAdminFromUserManagement(targetEmail) {
@@ -150,7 +174,7 @@ async function openAddAdminFromUserManagement(targetEmail) {
 
   const grantRes = await fetch('/api/users/admin/grant', {
     method: 'POST',
-    headers: authHeaders(),
+    headers: { ...authHeaders(), 'X-Reauth-Token': verifyData.reauthToken || '' },
     body: JSON.stringify({ targetEmail, verificationToken: verifyData.verificationToken })
   });
   const grantData = await grantRes.json();
@@ -210,17 +234,19 @@ function renderUserManagementRows() {
   }
 
   rows.innerHTML = users.map((u) => {
-    const currentUserId = Number(localStorage.getItem('userId') || 0);
+    const currentUserId = Number(window.currentUser?.id || 0);
     const canChange = u.role !== 'superadmin' && u.id !== currentUserId;
     const encodedEmail = encodeURIComponent(u.email || '');
     const needsAccessProvisioning = !u.emailVerified || String(u.department || '').trim().toLowerCase() === 'pending approval';
     const menuItems = [
       needsAccessProvisioning ? `<button type='button' ${canChange ? '' : 'disabled'} onclick='openAccessApprovalModal(${u.id}, decodeURIComponent("${encodedEmail}"))'>Grant access</button>` : '',
-      u.role === 'admin'
-        ? `<button type='button' ${canChange ? '' : 'disabled'} onclick='changeRoleFromUserManagement(${u.id}, "end-user")'>Set as end-user</button>`
+      normalizeRole(u.role) === 'admin'
+        ? `<button type='button' ${canChange ? '' : 'disabled'} onclick='changeRoleFromUserManagement(${u.id}, "END_USER")'>Set as end-user</button>`
         : `<button type='button' ${canChange ? '' : 'disabled'} onclick='openAddAdminFromUserManagement(decodeURIComponent("${encodedEmail}"))'>Grant admin role</button>`,
       `<button type='button' ${canChange ? '' : 'disabled'} onclick='setUserEmailApprovalFromUserManagement(${u.id}, ${u.emailVerified ? 'false' : 'true'})'>${u.emailVerified ? 'Mark email as pending' : 'Approve email for login'}</button>`,
       `<button type='button' ${canChange ? '' : 'disabled'} onclick='resetUserPasswordFromUserManagement(${u.id}, decodeURIComponent("${encodedEmail}"))'>Reset password</button>`,
+      currentRole() === 'superadmin' && ['admin', 'it-admin'].includes(normalizeRole(u.role))
+        ? `<button type='button' ${canChange ? '' : 'disabled'} onclick='resetAdministratorMfa(${u.id}, decodeURIComponent("${encodedEmail}"))'>Reset administrator MFA</button>` : '',
       `<button type='button' ${canChange ? '' : 'disabled'} onclick='deleteUserFromUserManagement(${u.id}, decodeURIComponent("${encodedEmail}"))'>Delete account</button>`
     ].join('');
 
@@ -232,7 +258,7 @@ function renderUserManagementRows() {
     return `<tr>
       <td>${escapeHtml(u.fullName)}</td>
       <td>${escapeHtml(u.email)}</td>
-      <td><span class='badge ${u.role === 'admin' || u.role === 'superadmin' ? 'in-progress' : 'resolved'}'>${escapeHtml(u.role)}</span></td>
+      <td><span class='badge ${isAdminPortalRole(u.role) ? 'in-progress' : 'resolved'}'>${escapeHtml(normalizeRole(u.role))}</span></td>
       <td>${u.emailVerified ? '<span class="badge resolved">Verified</span>' : '<span class="badge warning">Pending</span>'}</td>
       <td>${actionMenu}</td>
     </tr>`;
@@ -263,8 +289,8 @@ async function loadProfilePhotoApprovals() {
     const requests = await fetchJsonOrThrow('/api/profile-photo-requests/pending');
     clearTableSkeleton(rows);
     if (!requests.length) return renderTableEmptyState(rows, 4, 'No profile photos are waiting for approval.');
-    const reviewerId = Number(localStorage.getItem('userId') || 0);
-    const reviewerRole = String(localStorage.getItem('role') || '').toLowerCase();
+    const reviewerId = Number(window.currentUser?.id || 0);
+    const reviewerRole = String(window.currentUser?.role || '').toLowerCase();
     rows.innerHTML = requests.map((request) => {
       const ownerRole = String(request.userRole || '').toLowerCase();
       const blocked = request.userId === reviewerId || (ownerRole === 'superadmin' && reviewerRole !== 'superadmin');
@@ -361,7 +387,7 @@ async function submitCreateUser(event) {
     department: document.getElementById('internalDepartment')?.value?.trim() || '',
     password: document.getElementById('internalPassword')?.value || '',
     confirmPassword: document.getElementById('internalConfirmPassword')?.value || '',
-    role: document.getElementById('internalRole')?.value || 'end-user',
+    role: document.getElementById('internalRole')?.value || 'END_USER',
     emailVerified: Boolean(document.getElementById('internalEmailVerified')?.checked)
   };
 
@@ -372,12 +398,14 @@ async function submitCreateUser(event) {
   }
 
   setCreateUserMessage('Creating account...');
+  const reauthToken = await obtainReauthToken('admin-access');
   const res = await fetch('/api/users', {
     method: 'POST',
-    headers: authHeaders(),
+    headers: { ...authHeaders(), 'X-Reauth-Token': reauthToken },
     body: JSON.stringify(payload)
   });
   const data = await res.json();
+  consumeCachedReauth('admin-access');
   if (!res.ok) {
     setCreateUserMessage(data.error || 'Unable to create account', 'danger');
     return;
@@ -388,14 +416,74 @@ async function submitCreateUser(event) {
   setTimeout(() => closeCreateUserModal(), 900);
 }
 
+async function loadInvitations() {
+  const rows = document.getElementById('invitationRows');
+  if (!rows) return;
+  try {
+    const invitations = await fetchJsonOrThrow('/api/auth/invitations');
+    const active = invitations.filter(invite => !invite.acceptedAt && !invite.revokedAt);
+    if (!active.length) {
+      rows.innerHTML = `<tr><td colspan='5' class='small'>No active invitations.</td></tr>`;
+      return;
+    }
+    rows.innerHTML = active.map(invite => `<tr>
+      <td>${escapeHtml(invite.email)}</td><td>${escapeHtml(invite.role)}</td>
+      <td>${escapeHtml(new Date(invite.expiresAt).toLocaleString())}</td>
+      <td><span class='badge ${new Date(invite.expiresAt) > new Date() ? 'in-progress' : 'warning'}'>${new Date(invite.expiresAt) > new Date() ? 'Active' : 'Expired'}</span></td>
+      <td><div class='inline-actions'><button class='btn btn-ghost' type='button' onclick='resendInvitation("${invite.id}", ${JSON.stringify(invite.email)}, ${JSON.stringify(invite.role)})'>Resend</button><button class='btn btn-ghost' type='button' onclick='revokeInvitation("${invite.id}")'>Revoke</button></div></td>
+    </tr>`).join('');
+  } catch (error) { rows.innerHTML = `<tr><td colspan='5' class='text-danger'>${escapeHtml(error.message)}</td></tr>`; }
+}
+
+async function createInvitation(event) {
+  event.preventDefault();
+  const email = document.getElementById('invitationEmail').value.trim();
+  const role = document.getElementById('invitationRole').value;
+  try {
+    const reauthToken = await obtainReauthToken('admin-access');
+    await fetchJsonOrThrow('/api/auth/invitations', {
+      method: 'POST', headers: { ...authHeaders(), 'X-Reauth-Token': reauthToken }, body: JSON.stringify({ email, role })
+    });
+    consumeCachedReauth('admin-access');
+    event.target.reset();
+    await loadInvitations();
+    alert('Invitation created. Email delivery depends on the configured mail provider.');
+  } catch (error) { alert(error.message || 'Unable to create invitation.'); }
+}
+
+async function revokeInvitation(id, skipConfirmation = false) {
+  if (!skipConfirmation && !confirm('Revoke this invitation?')) return;
+  const reauthToken = await obtainReauthToken('admin-access');
+  await fetchJsonOrThrow(`/api/auth/invitations/${id}`, {
+    method: 'DELETE', headers: { ...authHeaders(), 'X-Reauth-Token': reauthToken }
+  });
+  consumeCachedReauth('admin-access');
+  await loadInvitations();
+}
+
+async function resendInvitation(id, email, role) {
+  if (!confirm(`Invalidate the current link and send a new invitation to ${email}?`)) return;
+  try {
+    const reauthToken = await obtainReauthToken('admin-access');
+    await fetchJsonOrThrow('/api/auth/invitations', {
+      method: 'POST', headers: { ...authHeaders(), 'X-Reauth-Token': reauthToken }, body: JSON.stringify({ email, role })
+    });
+    consumeCachedReauth('admin-access');
+    await loadInvitations();
+  } catch (error) { alert(error.message || 'Unable to resend invitation.'); }
+}
+
 document.addEventListener('click', () => closeUserMgmtMenus());
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await window.aitsmReady;
   wireUserManagementFilters();
   loadUserManagement();
   loadProfilePhotoApprovals();
+  loadInvitations();
   document.getElementById('openCreateUserBtn')?.addEventListener('click', openCreateUserModal);
   document.getElementById('createUserForm')?.addEventListener('submit', submitCreateUser);
+  document.getElementById('invitationForm')?.addEventListener('submit', createInvitation);
   document.getElementById('createUserModal')?.addEventListener('click', (e) => {
     if (e.target.id === 'createUserModal') closeCreateUserModal();
   });

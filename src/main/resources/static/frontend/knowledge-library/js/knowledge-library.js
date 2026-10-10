@@ -79,10 +79,10 @@ function renderKnowledgeLibrary(items) {
 
   host.innerHTML = items.map((article) => `
     <tr>
-      <td><button type='button' class='btn btn-ghost' onclick='openKnowledgeLibraryModal(${article.id})'>${article.title || 'Untitled'}</button></td>
-      <td>${article.category || 'General'}</td>
-      <td>${formatKnowledgeLibraryDate(article.createdAt)}</td>
-      <td><button type='button' class='btn btn-ghost' onclick='openKnowledgeLibraryModal(${article.id})'>Read</button></td>
+      <td><button type='button' class='btn btn-ghost' onclick='openKnowledgeLibraryModal(${Number(article.id)})'>${aitsmEscapeHtml(article.title || 'Untitled')}</button></td>
+      <td>${aitsmEscapeHtml(article.category || 'General')}</td>
+      <td>${aitsmEscapeHtml(formatKnowledgeLibraryDate(article.createdAt))}</td>
+      <td><button type='button' class='btn btn-ghost' onclick='openKnowledgeLibraryModal(${Number(article.id)})'>Read</button></td>
     </tr>
   `).join('');
 }

@@ -1,6 +1,11 @@
-async function fetchJsonOrThrow(url, options = {}) {
-  const response = await fetch(url, { headers: { ...authHeaders(), ...(options.headers || {}) }, ...options });
-  const data = await response.json();
+async function fetchJsonOrThrow(url, options = {}, requiresReauth = false) {
+  const reauthToken = requiresReauth ? await obtainReauthToken('security-config') : '';
+  const response = await fetch(url, {
+    ...options,
+    headers: { ...authHeaders(), ...(reauthToken ? { 'X-Reauth-Token': reauthToken } : {}), ...(options.headers || {}) }
+  });
+  const data = await response.json().catch(() => ({}));
+  if (requiresReauth) consumeCachedReauth('security-config');
   if (!response.ok) throw new Error(data.error || data.message || 'Request failed');
   return data;
 }
@@ -25,8 +30,8 @@ async function loadAssetDetectionPrefixes() {
 }
 async function saveAssetDetectionPrefixes() {
   const prefixes = document.getElementById('assetIpPrefixes').value.split(/\r?\n/).map(value => value.trim()).filter(Boolean);
-  await fetchJsonOrThrow('/settings/asset-ip-prefixes', { method: 'POST', body: JSON.stringify({ prefixes }) });
-  alert('Asset detection prefixes saved.');
+  await fetchJsonOrThrow('/settings/asset-ip-prefixes', { method: 'POST', body: JSON.stringify({ prefixes }) }, true);
+  showAppAlert('Asset detection prefixes saved.');
 }
 
 async function loadAiConfig() {
@@ -39,15 +44,14 @@ async function saveAiConfig() {
   const model = document.getElementById('aiModel').value.trim();
   if (!model) return setAiMessage('A Gemini model is required.', true);
   setAiButtonsDisabled(true); setAiMessage('Saving Gemini configuration...');
-  try { await fetchJsonOrThrow('/api/ai/config', { method: 'POST', body: JSON.stringify({ model }) }); setAiMessage('Gemini model saved.'); }
+  try { await fetchJsonOrThrow('/api/ai/config', { method: 'POST', body: JSON.stringify({ model }) }, true); setAiMessage('Gemini model saved.'); }
   catch (error) { setAiMessage(error.message || 'Unable to save Gemini configuration.', true); }
   finally { setAiButtonsDisabled(false); }
 }
 async function testAiConnection() {
   setAiButtonsDisabled(true); setAiMessage('Testing Gemini connection...');
   try {
-    await saveAiConfig();
-    const data = await fetchJsonOrThrow('/api/ai/test', { method: 'POST', body: '{}' });
+    const data = await fetchJsonOrThrow('/api/ai/test', { method: 'POST', body: '{}' }, true);
     setAiStatus('Connected', 'ok'); setAiMessage(data.message || 'Gemini connection successful.');
   } catch (error) { setAiStatus('Unavailable', 'fail'); setAiMessage(error.message || 'Unable to connect to Gemini.', true); }
   finally { setAiButtonsDisabled(false); }
@@ -57,5 +61,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('aiTestConnectionBtn')?.addEventListener('click', testAiConnection);
   document.getElementById('aiSaveConfigBtn')?.addEventListener('click', saveAiConfig);
   try { await Promise.all([loadSlaPolicies(), loadAssetDetectionPrefixes(), loadAiConfig()]); }
-  catch (error) { alert(error.message || 'Unable to load settings data'); }
+  catch (error) { showAppAlert(error.message || 'Unable to load settings data'); }
 });

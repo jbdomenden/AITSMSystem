@@ -17,6 +17,12 @@ function userIcon(name) {
   return `<span class='nav-icon svg-icon'>${icons[name] || ''}</span>`;
 }
 
+function userShellEscape(value) {
+  return String(value ?? '').replace(/[&<>'"]/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+  }[char]));
+}
+
 function userNavItems() {
   return [
     { section: 'Workspace', items: [
@@ -82,7 +88,10 @@ async function loadUserHeaderNotifications() {
     const unread = Number(unreadPayload?.unreadCount || 0);
     count.textContent = String(unread);
     count.classList.toggle('hidden', unread === 0);
-    list.innerHTML = `<div style='display:flex;justify-content:flex-end;padding:8px;border-bottom:1px solid #1f325f'><button class='btn btn-ghost' style='padding:4px 8px' onclick='markAllUserNotificationsRead()'>Mark all read</button></div>${items.map((n) => `<button type='button' class='small' style='display:block;width:100%;text-align:left;padding:8px;border:none;border-bottom:1px solid #1f325f;background:${n.isRead ? 'transparent' : 'rgba(37,99,235,.12)'};color:inherit' onclick='openUserNotification(${n.id}, "${String(n.type || '').replaceAll('"', '')}", ${Number(n.relatedUserId || 0)})'><strong style='display:block'>${n.title || 'Notification'}</strong><span>${n.message || 'Notification'}</span><br><span style='opacity:.7'>${n.createdAt || ''}</span></button>`).join('') || "<div class='small' style='padding:8px'>No notifications.</div>"}`;
+    list.innerHTML = `<div style='display:flex;justify-content:flex-end;padding:8px;border-bottom:1px solid #1f325f'><button class='btn btn-ghost' style='padding:4px 8px' onclick='markAllUserNotificationsRead()'>Mark all read</button></div>${items.map((n) => {
+      const safeType = String(n.type || '').replace(/[^a-z0-9_-]/gi, '');
+      return `<button type='button' class='small' style='display:block;width:100%;text-align:left;padding:8px;border:none;border-bottom:1px solid #1f325f;background:${n.isRead ? 'transparent' : 'rgba(37,99,235,.12)'};color:inherit' onclick='openUserNotification(${Number(n.id || 0)}, "${safeType}", ${Number(n.relatedUserId || 0)})'><strong style='display:block'>${userShellEscape(n.title || 'Notification')}</strong><span>${userShellEscape(n.message || 'Notification')}</span><br><span style='opacity:.7'>${userShellEscape(n.createdAt || '')}</span></button>`;
+    }).join('') || "<div class='small' style='padding:8px'>No notifications.</div>"}`;
   } catch {
     list.innerHTML = "<div class='small'>Unable to load notifications.</div>";
   }
@@ -121,6 +130,7 @@ function renderUserUtilityHeader() {
         <a class='menu-action-btn' href='/profile.html'>${userIcon('profile')}<span>Profile</span></a>
         <button type='button' class='menu-action-btn' onclick='openUserHelp()'>${userIcon('help')}<span>Help</span></button>
         <button type='button' class='menu-action-btn' onclick='openPasswordModal()'>${userIcon('password')}<span>Change password</span></button>
+        <a class='menu-action-btn' href='/security.html'>${userIcon('password')}<span>Security & sessions</span></a>
         <button type='button' class='menu-action-btn danger' onclick='logout()'>${userIcon('logout')}<span>Logout</span></button>
       </div>
     </div>`;
@@ -143,8 +153,17 @@ function renderUserUtilityHeader() {
   loadUserHeaderNotifications();
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function initializeUserShell() {
+  const sidebar = document.getElementById('userSidebar');
+  const header = document.getElementById('utilityHeader');
+  if (!sidebar || !header) return false;
+  if (window.__aitsmUserShellInitialized && sidebar.childElementCount && header.childElementCount) return true;
   renderUserSidebar();
   renderUserUtilityHeader();
+  window.__aitsmUserShellInitialized = true;
   if (window.matchMedia('(max-width: 980px)').matches) toggleUserSidebar(true);
-});
+  return Boolean(sidebar.childElementCount && header.childElementCount);
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initializeUserShell, { once: true });
+else initializeUserShell();

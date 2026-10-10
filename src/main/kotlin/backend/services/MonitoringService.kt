@@ -23,9 +23,9 @@ class MonitoringService(
 
     fun hostTelemetry(): HostTelemetryDto {
         val osBean = ManagementFactory.getPlatformMXBean(com.sun.management.OperatingSystemMXBean::class.java)
-        val cpu = (osBean.systemCpuLoad.takeIf { it >= 0 } ?: 0.0) * 100
-        val totalMem = osBean.totalPhysicalMemorySize.coerceAtLeast(1)
-        val freeMem = osBean.freePhysicalMemorySize.coerceAtLeast(0)
+        val cpu = (osBean.cpuLoad.takeIf { it >= 0 } ?: 0.0) * 100
+        val totalMem = osBean.totalMemorySize.coerceAtLeast(1)
+        val freeMem = osBean.freeMemorySize.coerceAtLeast(0)
         val usedMem = (totalMem - freeMem).coerceAtLeast(0)
         val memPct = usedMem.toDouble() / totalMem * 100
 

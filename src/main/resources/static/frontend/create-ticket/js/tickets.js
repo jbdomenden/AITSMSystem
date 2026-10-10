@@ -267,17 +267,17 @@ async function updateMyTicketStatus(id, status){
 async function loadTickets() {
   const rows = document.getElementById('ticketRows');
   if (!rows) return;
-  const role = (localStorage.getItem('role') || '').toLowerCase();
+  const role = currentRole();
   const res = await fetch('/api/tickets', { headers: authHeaders() });
   const data = await res.json();
-  if(!res.ok){ rows.innerHTML = `<tr><td colspan='6' class='small text-danger'>${data.error||'Unable to load tickets'}</td></tr>`; return; }
+  if(!res.ok){ rows.innerHTML = `<tr><td colspan='6' class='small text-danger'>${aitsmEscapeHtml(data.error || 'Unable to load tickets')}</td></tr>`; return; }
   const tickets = normalizeListResponse(data);
 
   rows.innerHTML = tickets.map(t => {
     const klass = (t.status || 'Open').toLowerCase().replace(/\s+/g, '-');
     const actions = role === 'end-user' ? `<td>${actionMenu(t)}</td>` : '<td>-</td>';
-    return `<tr data-ticket-id='${t.id}'>
-      <td><a class='ticket-link' href='${userTicketHref(t.id)}'>#${t.id}</a></td><td><a class='ticket-link ticket-link-title' href='${userTicketHref(t.id)}' title='${t.title || '-'}'>${t.title || '-'}</a></td><td>${t.priority}</td><td><span class='badge ${klass}'>${t.status}</span></td>
+    return `<tr data-ticket-id='${Number(t.id)}'>
+      <td><a class='ticket-link' href='${userTicketHref(t.id)}'>#${Number(t.id)}</a></td><td><a class='ticket-link ticket-link-title' href='${userTicketHref(t.id)}' title='${aitsmEscapeHtml(t.title || '-')}'>${aitsmEscapeHtml(t.title || '-')}</a></td><td>${aitsmEscapeHtml(t.priority || '-')}</td><td><span class='badge ${aitsmEscapeHtml(klass)}'>${aitsmEscapeHtml(t.status || '-')}</span></td>
       <td style='color:${t.overdue ? "var(--danger)" : "inherit"}'>${t.slaRemainingMinutes ?? '-'} min</td>
       ${actions}
     </tr>`;

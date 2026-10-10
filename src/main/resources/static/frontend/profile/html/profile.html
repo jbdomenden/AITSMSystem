@@ -9,7 +9,7 @@
         <div class="profile-photo-wrap">
           <img id="profilePhoto" class="profile-photo" src="/profile/assets/default-avatar.png" alt="Your profile photo">
           <button id="changeProfilePhoto" class="profile-photo-camera" type="button" aria-label="Change profile photo" title="Change profile photo">📷</button>
-          <input id="profilePhotoInput" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+          <input id="profilePhotoInput" type="file" accept="image/jpeg,image/png" hidden>
         </div>
         <div class="profile-identity"><h1 id="profileTitle" class="profile-name">Loading...</h1><p id="profileEmail" class="profile-email"></p></div>
         <div id="profileActions" class="profile-actions"></div>
@@ -27,7 +27,5 @@
     <div class="modal-card"><div class="card-head"><h3 id="profilePhotoSuccessTitle" class="section-title">Submitted and waiting for approval</h3></div><p class="small">Please give us 24-48 hours to review your photo.</p><div class="inline-actions" style="justify-content:flex-end"><button id="closeProfilePhotoSuccess" class="btn btn-primary" type="button">OK</button></div></div>
   </div>
 </main></div><script src="/modules/common/js/app.js"></script><script>
-  const profileIsAdmin = ['admin', 'superadmin'].includes(String(localStorage.getItem('role') || '').toLowerCase());
-  document.getElementById('profileSidebar').id = profileIsAdmin ? 'adminSidebar' : 'userSidebar';
-  document.write(`<script src="/modules/sidebar/js/${profileIsAdmin ? 'admin-shell' : 'user-shell'}.js"><\/script>`);
+  mountRoleAwareShell('profileSidebar');
 </script><script src="/profile/js/profile.js"></script></body></html>

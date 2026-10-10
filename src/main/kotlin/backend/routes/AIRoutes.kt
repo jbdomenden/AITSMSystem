@@ -8,9 +8,14 @@ import backend.models.ai.AITicketDraftRequest
 import backend.models.UserRole
 import backend.security.requireAuthenticated
 import backend.security.requireRole
+import backend.security.RateLimiter
+import backend.security.userId
+import backend.security.requireReauthentication
 import backend.services.ai.AIChatService
 import backend.services.ai.AIConfigService
 import backend.services.ai.TicketAiAdvisor
+import backend.services.ReauthScope
+import backend.services.ReauthenticationService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
@@ -19,25 +24,14 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
-import java.time.Instant
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 
-private val aiRateLimitWindowMs = 60_000L
-private val aiRateLimitMaxRequests = 20
-private val aiRateBucket = ConcurrentHashMap<String, MutableList<Long>>()
+private val aiRateLimiter = RateLimiter(limit = 20, windowMillis = 60_000L)
 
-fun Route.aiRoutes(chatService: AIChatService, configService: AIConfigService, ticketAiAdvisor: TicketAiAdvisor) {
+fun Route.aiRoutes(chatService: AIChatService, configService: AIConfigService, ticketAiAdvisor: TicketAiAdvisor, reauthentication: ReauthenticationService) {
     post("/api/ai/chat") {
         if (!call.requireAuthenticated()) return@post
-        val rateKey = buildRateLimitKey(
-            call.request.headers["X-User-Id"].orEmpty(),
-            call.request.headers["X-Forwarded-For"].orEmpty()
-        )
-        if (isRateLimited(rateKey)) {
-            call.respond(HttpStatusCode.TooManyRequests, mapOf("error" to "Rate limit exceeded. Please try again shortly."))
-            return@post
-        }
+        if (!call.requireAiCapacity()) return@post
 
         val request = call.receive<AIChatRequest>()
         val message = request.message.trim()
@@ -50,23 +44,28 @@ fun Route.aiRoutes(chatService: AIChatService, configService: AIConfigService, t
             return@post
         }
 
-        call.respond(chatService.chat(call.resolveSessionId(), message))
+        call.respond(chatService.chat(call.userId()!!, call.resolveSessionId(), message))
     }
 
     post("/api/ai-assistant/chat") {
         if (!call.requireAuthenticated()) return@post
+        if (!call.requireAiCapacity()) return@post
         val request = call.receive<AIChatRequest>()
         val message = request.message.trim()
         if (message.isBlank()) {
             call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Message is required"))
             return@post
         }
-        call.respond(chatService.chat(call.resolveSessionId(), message))
+        if (message.length > 2_000) {
+            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Message exceeds 2000 characters"))
+            return@post
+        }
+        call.respond(chatService.chat(call.userId()!!, call.resolveSessionId(), message))
     }
 
     post("/api/ai/clear") {
         if (!call.requireAuthenticated()) return@post
-        chatService.clearConversation(call.resolveSessionId())
+        chatService.clearConversation(call.userId()!!, call.resolveSessionId())
         call.respond(HttpStatusCode.OK, mapOf("cleared" to true))
     }
 
@@ -78,14 +77,7 @@ fun Route.aiRoutes(chatService: AIChatService, configService: AIConfigService, t
 
     post("/api/ai/ticket-insights") {
         if (!call.requireAuthenticated()) return@post
-        val rateKey = buildRateLimitKey(
-            call.request.headers["X-User-Id"].orEmpty(),
-            call.request.headers["X-Forwarded-For"].orEmpty()
-        )
-        if (isRateLimited(rateKey)) {
-            call.respond(HttpStatusCode.TooManyRequests, mapOf("error" to "Rate limit exceeded. Please try again shortly."))
-            return@post
-        }
+        if (!call.requireAiCapacity()) return@post
         val request = call.receive<TicketAiAnalysisRequest>()
         require(request.description.trim().length >= 10) { "Describe the issue in at least 10 characters." }
         call.respond(ticketAiAdvisor.analyze(request))
@@ -93,14 +85,7 @@ fun Route.aiRoutes(chatService: AIChatService, configService: AIConfigService, t
 
     post("/api/ai/tickets/{id}/assist") {
         if (!call.requireRole(UserRole.ADMIN)) return@post
-        val rateKey = buildRateLimitKey(
-            call.request.headers["X-User-Id"].orEmpty(),
-            call.request.headers["X-Forwarded-For"].orEmpty()
-        )
-        if (isRateLimited(rateKey)) {
-            call.respond(HttpStatusCode.TooManyRequests, mapOf("error" to "Rate limit exceeded. Please try again shortly."))
-            return@post
-        }
+        if (!call.requireAiCapacity()) return@post
         val ticketId = call.parameters["id"]?.toIntOrNull()
             ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid ticket id"))
         val assistance = ticketAiAdvisor.assist(ticketId)
@@ -115,12 +100,14 @@ fun Route.aiRoutes(chatService: AIChatService, configService: AIConfigService, t
 
     post("/api/ai/config") {
         if (!call.requireRole(UserRole.ADMIN)) return@post
+        if (!call.requireReauthentication(reauthentication, ReauthScope.SECURITY_CONFIG)) return@post
         val request = call.receive<AIConfigUpdateRequest>()
         call.respond(configService.update(request))
     }
 
     post("/api/ai/test") {
         if (!call.requireRole(UserRole.ADMIN)) return@post
+        if (!call.requireReauthentication(reauthentication, ReauthScope.SECURITY_CONFIG)) return@post
         val result = chatService.testConnection()
         val response = if (result.ok) {
             AIConnectionTestResponse(success = true, message = "Connected to Gemini successfully")
@@ -137,19 +124,14 @@ fun Route.aiRoutes(chatService: AIChatService, configService: AIConfigService, t
 
 private fun ApplicationCall.resolveSessionId(): String {
     val raw = request.headers["X-AI-Session-Id"].orEmpty().trim()
-    return if (raw.isNotBlank()) raw.take(128) else "anon-${UUID.randomUUID()}"
+    return if (raw.matches(Regex("[A-Za-z0-9._:-]{1,128}"))) raw else "session-${UUID.randomUUID()}"
 }
 
-private fun buildRateLimitKey(userId: String, remoteHost: String): String =
-    if (userId.isNotBlank()) "u:$userId" else "ip:$remoteHost"
-
-private fun isRateLimited(key: String): Boolean {
-    val now = Instant.now().toEpochMilli()
-    val bucket = aiRateBucket.computeIfAbsent(key) { mutableListOf() }
-    synchronized(bucket) {
-        bucket.removeIf { timestamp -> now - timestamp > aiRateLimitWindowMs }
-        if (bucket.size >= aiRateLimitMaxRequests) return true
-        bucket += now
+private suspend fun ApplicationCall.requireAiCapacity(): Boolean {
+    val actor = userId() ?: return false
+    if (!aiRateLimiter.allow("user:$actor")) {
+        respond(HttpStatusCode.TooManyRequests, mapOf("error" to "Rate limit exceeded. Please try again shortly."))
+        return false
     }
-    return false
+    return true
 }

@@ -1,0 +1,9 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Security & Sessions | AITSM</title><link rel="stylesheet" href="/shared/css/styles.css"></head>
+<body><div class="app-layout"><aside id="securitySidebar" class="sidebar"></aside><main class="content">
+  <section id="utilityHeader" class="utility-bar card"></section>
+  <div class="topbar"><div><h1 class="page-title">Security & Sessions</h1><p class="page-subtitle">Manage multi-factor authentication and signed-in devices.</p></div></div>
+  <section class="card"><h2 class="section-title">Multi-factor authentication</h2><p id="mfaStatus" class="small">Loading…</p><div id="mfaActions" class="inline-actions"></div><div id="mfaEnrollment"></div><div id="recoveryCodes"></div></section>
+  <section class="card"><h2 class="section-title">Active sessions</h2><p class="small">Network addresses are deliberately approximate.</p><div id="sessions"></div><div class="inline-actions"><button class="btn btn-danger" onclick="logoutEverywhere()">Sign out everywhere</button></div></section>
+  <section class="card"><h2 class="section-title">Recent security activity</h2><p class="small">Events are read-only and shown without raw secrets or precise network addresses.</p><div id="securityEvents"></div></section>
+</main></div><script src="/modules/common/js/app.js"></script><script>mountRoleAwareShell('securitySidebar');</script><script src="/security/js/security.js"></script></body></html>

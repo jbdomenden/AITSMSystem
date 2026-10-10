@@ -4,9 +4,12 @@ This guide explains how to use the system as an end-user or admin.
 
 ## 1. Sign Up and Login
 1. Open the application in your browser.
-2. Go to **Sign Up** and fill in your details.
-3. Complete email verification using the code.
-4. Login with your credentials.
+2. Open the invitation link sent by your company administrator.
+3. Confirm the locked invited email, accept the EULA, and create your password.
+4. Administrators scan the MFA QR code (or use the manual key), confirm one code, and store recovery codes offline.
+5. Login with your credentials.
+
+Open `/security.html` to enroll or manage MFA, regenerate one-time recovery codes after reauthentication, review recent security activity, revoke another session, or sign out everywhere. Network information is deliberately approximate.
 
 ---
 
@@ -50,7 +53,9 @@ This guide explains how to use the system as an end-user or admin.
 
 ### 3.1 User Management
 - List users, adjust supported role state, reset passwords, approve email status, create internal accounts, delete users.
-- Admin grant flow requires sensitive verification before granting admin rights.
+- Send, resend, list, and revoke single-use invitations. Resending invalidates the old link.
+- Sensitive actions prompt for recent password or MFA verification. Grants are short-lived, scoped, server-side, and single-use for mutations.
+- Only a superadmin can perform the audited MFA reset for another administrator; this revokes all target sessions.
 
 ### 3.2 Device Management
 - Register LAN devices.

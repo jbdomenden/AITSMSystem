@@ -5,7 +5,7 @@
   let sending = false;
   let lastRenderedMessageId = null;
 
-  const currentUserId = () => Number(localStorage.getItem('userId') || 0);
+  const currentUserId = () => Number(window.currentUser?.id || 0);
 
   async function api(url, options = {}) {
     const response = await fetch(url, {
@@ -356,7 +356,7 @@
     await Promise.all([loadSearch(), loadRequests(), loadConversations()]);
   }
 
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', async () => {
     document.querySelectorAll('[data-colleague-tab]').forEach((tab) => tab.addEventListener('click', () => selectMobilePanel(tab.dataset.colleagueTab)));
     document.getElementById('colleagueSearch')?.addEventListener('input', () => {
       window.clearTimeout(searchTimer);
@@ -370,6 +370,8 @@
       if (activeColleague && !document.hidden) loadMessages();
     });
 
+    await window.aitsmReady;
+    if (!window.currentUser) return;
     loadAll().then(async () => {
       const chatId = Number(new URLSearchParams(location.search).get('chat') || 0);
       if (chatId > 0) {

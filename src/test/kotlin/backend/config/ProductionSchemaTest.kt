@@ -1,0 +1,38 @@
+package backend.config
+
+import java.nio.file.Files
+import java.nio.file.Path
+import kotlin.test.Test
+import kotlin.test.assertTrue
+
+class ProductionSchemaTest {
+    @Test
+    fun `production SQL covers every runtime table`() {
+        val sql = buildString {
+            appendLine(Files.readString(Path.of("db/schema.sql")))
+            Files.list(Path.of("db/migrations")).use { migrations ->
+                migrations.sorted().forEach { appendLine(Files.readString(it)) }
+            }
+        }.lowercase()
+
+        val runtimeTables = setOf(
+            "users", "invitations", "password_reset_tokens", "mfa_secrets", "mfa_recovery_codes",
+            "reauth_grants", "auth_sessions", "security_events", "profile_photo_requests",
+            "colleague_requests", "direct_messages", "eula_acceptance", "devices", "tickets",
+            "ticket_history", "notifications", "sla_policies", "system_settings", "knowledge_articles",
+            "audit_logs", "ai_conversation_messages", "inventory_assets", "inventory_asset_snapshots"
+        )
+
+        runtimeTables.forEach { table ->
+            assertTrue(
+                Regex("create\\s+table\\s+if\\s+not\\s+exists\\s+$table\\b").containsMatchIn(sql),
+                "Production SQL is missing table $table"
+            )
+        }
+        assertTrue(
+            Regex("alter\\s+table\\s+notifications[\\s\\S]*?related_user_id").containsMatchIn(sql) ||
+                Regex("create\\s+table\\s+if\\s+not\\s+exists\\s+notifications[\\s\\S]*?related_user_id").containsMatchIn(sql),
+            "Production SQL is missing notifications.related_user_id"
+        )
+    }
+}

@@ -73,11 +73,7 @@
     </main>
   </div>
   <script src="/modules/common/js/app.js"></script>
-  <script>
-    const colleagueAdmin = ['admin', 'superadmin'].includes(String(localStorage.getItem('role') || '').toLowerCase());
-    document.getElementById('colleagueSidebar').id = colleagueAdmin ? 'adminSidebar' : 'userSidebar';
-    document.write(`<script src="/modules/sidebar/js/${colleagueAdmin ? 'admin-shell' : 'user-shell'}.js"><\/script>`);
-  </script>
+  <script>mountRoleAwareShell('colleagueSidebar');</script>
   <script src="/colleagues/js/colleagues.js"></script>
 </body>
 </html>

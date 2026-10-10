@@ -4,9 +4,7 @@ This file lists backend endpoints, what they do, and POST payload examples for q
 
 ## Common Notes
 - Base URL (local): `http://localhost:8070`
-- Auth is header-based in this project:
-  - `X-User-Id: <int>`
-  - `X-User-Role: end-user | admin | superadmin`
+- Authentication uses the server-issued `aitsm_session` HttpOnly cookie. State-changing browser requests also send `X-CSRF-Token` matching the session-bound `aitsm_csrf` cookie. Legacy identity headers are rejected.
 - AI chat session continuity uses: `X-AI-Session-Id: <uuid/string>`
 
 ---
@@ -14,10 +12,10 @@ This file lists backend endpoints, what they do, and POST payload examples for q
 ## System / App
 
 ### GET `/api/health`
-- Returns health + environment info.
+- Public liveness probe; returns only `{ "status": "ok" }`.
 
 ### GET `/metrics`
-- Returns in-memory request counters and durations.
+- Returns bounded in-memory request counters and durations. Requires `SECURITY_MANAGE` permission.
 
 ### GET `/docs`
 - Placeholder endpoint for docs status.
@@ -27,7 +25,7 @@ This file lists backend endpoints, what they do, and POST payload examples for q
 ## Authentication (`/api/auth`)
 
 ### POST `/api/auth/register`
-- Registers a new end-user (email verification required).
+- Disabled; registration requires a single-use invitation.
 - Example input:
 ```json
 {
@@ -57,7 +55,7 @@ This file lists backend endpoints, what they do, and POST payload examples for q
 ```
 
 ### POST `/api/auth/login`
-- Logs in and returns token + user.
+- Validates credentials and account state, then sets an opaque HttpOnly session cookie. Administrator sessions remain restricted until MFA is completed.
 - Example input:
 ```json
 { "email": "jane@company.com", "password": "StrongPass123!" }
@@ -69,6 +67,17 @@ This file lists backend endpoints, what they do, and POST payload examples for q
 ```json
 {}
 ```
+
+### POST `/api/auth/reauth`
+- Verifies the current password or MFA and returns a five-minute, session-bound grant for one exact sensitive-action scope.
+- Send it only in `X-Reauth-Token`; do not persist it in browser storage.
+- Scopes: `admin-access`, `mfa-change`, `security-config`, `sensitive-export`, `account-delete`, `recovery-codes`.
+
+### MFA, sessions, invitations, and security events
+- MFA endpoints support status, enrollment, confirmation, login completion, recovery-code regeneration, and optional end-user disable.
+- Sessions can be listed, individually revoked, or revoked together with logout-all.
+- Invitation mutations require recent `admin-access` reauthentication; resending invalidates the previous link.
+- `GET /api/auth/security-events` returns only the signed-in user's recent activity and omits source IPs.
 
 ---
 
@@ -99,7 +108,7 @@ This file lists backend endpoints, what they do, and POST payload examples for q
 - Lists users (admin+).
 
 ### POST `/api/users`
-- Creates internal user (admin+).
+- Creates an internal user (admin+) and requires an `admin-access` reauthentication grant.
 - Example input:
 ```json
 {
@@ -136,7 +145,10 @@ This file lists backend endpoints, what they do, and POST payload examples for q
 ```
 
 ### DELETE `/api/users/{id}`
-- Deletes a user.
+- Deletes a user and requires an `account-delete` reauthentication grant.
+
+### POST `/api/users/admin/{id}/mfa-reset`
+- Audited `SUPERADMIN` recovery for another administrator. Requires an `mfa-change` grant and revokes all target sessions.
 
 ### POST `/api/users/admin/eligibility`
 - Checks if target email can be granted admin.

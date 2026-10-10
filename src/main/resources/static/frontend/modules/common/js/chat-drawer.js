@@ -42,7 +42,7 @@
   }
 
   function currentUserId() {
-    return Number(localStorage.getItem('userId') || 0);
+    return Number(window.currentUser?.id || 0);
   }
 
   function formatTime(value) {

@@ -31,7 +31,11 @@ To build or run the project, use one of the following tasks:
 | `./gradlew run`                         | Run the server                                                       |
 | `./gradlew runDocker`                   | Run using the local docker image                                     |
 
-If the server starts successfully, you'll see the following output:
+The repository includes a production multi-stage `Dockerfile`. Build it with `docker build -t aitsm .`; inject production variables from a secret manager and mount durable storage at `/app/uploads`.
+
+Follow `DEPLOYMENT.md` for database migration order, required secrets, bootstrap, smoke tests, and rollback.
+
+If the server starts successfully, it listens on the configured `PORT` (default `8070`).
 
 ```
 2024-12-04 14:32:45.584 [main] INFO  Application - Application started in 0.303 seconds.
@@ -45,38 +49,53 @@ Copy `.env.example` to `.env` and set values for your environment before startup
 
 The server now requires credentials and provider configuration via environment variables (no hard-coded defaults for secrets).
 
-Required in all environments:
+Development has local PostgreSQL defaults for compatibility. Explicitly set these in shared development, CI, staging, and production:
 
 - `DB_URL`
 - `DB_USER`
 - `DB_PASSWORD`
 
-Required in production (`APP_ENV=production`):
+Production (`APP_ENV=production`) fails closed unless these are valid:
 
-- `SUPERADMIN_EMAIL`
-- `SUPERADMIN_PASSWORD`
+- `DB_URL` with `sslmode=verify-full` (or the authenticated Cloud SQL Java connector), `DB_USER`, `DB_PASSWORD`
+- HTTPS `APP_BASE_URL` and HTTPS-only `CORS_ALLOWED_ORIGINS`
+- `COMPANY_NAME` and a base64-encoded 32-byte `MFA_ENCRYPTION_KEY`
+- `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM` with STARTTLS enabled
+- `GEMINI_API_KEY` (`AI_PROVIDER=gemini`)
+- `AUTH_EXPOSE_DEV_VERIFICATION_CODE=false`
 
 Optional:
 
+- `BOOTSTRAP_SUPERADMIN` (normally `false`)
+- `SUPERADMIN_EMAIL` and a 16+ character `SUPERADMIN_PASSWORD` only while bootstrap is enabled
 - `SUPERADMIN_NAME`
 - `SUPERADMIN_COMPANY`
 - `SUPERADMIN_DEPARTMENT`
-- `CORS_ALLOWED_ORIGINS`
-- `AI_PROVIDER` (set to `gemini`)
-- `GEMINI_API_KEY` (store only in a deployment secret manager or ignored `.env` file)
 - `GEMINI_MODEL`
 - `AI_TIMEOUT_MILLIS`
 
 
 ## Email verification
 
-End-user sign up now requires email verification before first login.
+Account creation is invitation-only. An administrator sends an invitation, and the recipient accepts it from the signup page.
 
-- `POST /api/auth/register` creates the account and generates a 6-digit verification code (15-minute expiry).
-- `POST /api/auth/verify-email` verifies the code and returns an authenticated session payload.
-- `POST /api/auth/resend-verification` regenerates the code for unverified users.
+- `POST /api/auth/register` is disabled.
+- `POST /api/auth/invitations/accept` consumes the single-use invitation and creates the account.
+- Verification endpoints remain available for legacy pending-verification accounts.
 
-> In this environment, no SMTP server is configured, so the API returns `devVerificationCode` in the response for testing.
+Verification codes are delivered through SMTP when `SMTP_USERNAME`, `SMTP_PASSWORD`, and `SMTP_FROM` are configured. Brevo can be configured with `SMTP_HOST=smtp-relay.brevo.com`, port `587`, and TLS enabled. Keep the SMTP key in `.env` or a deployment secret manager. Set `AUTH_EXPOSE_DEV_VERIFICATION_CODE=true` only for local development without email delivery.
+
+## Production security model
+
+AITSM uses opaque 256-bit session tokens. The browser receives the raw value only in an `HttpOnly`, `SameSite=Lax` cookie; PostgreSQL stores only its SHA-256 hash. Production cookies are `Secure`, protected API responses are non-cacheable, legacy identity headers are rejected, and mutations require a session-bound CSRF header plus origin validation. Browser code obtains display identity from `/api/auth/me` and does not persist trusted identity or roles in local storage.
+
+Registration is invitation-only. Invitation and password-reset tokens are random, hashed at rest, expiring, revocable, and single-use. Company is assigned from `COMPANY_NAME`. Verification codes are hashed with attempt and resend limits. Login has per-IP rate limits and temporary account lockout. Administrative accounts must enroll and complete TOTP MFA; secrets use AES-GCM under `MFA_ENCRYPTION_KEY`, replayed steps are rejected, and recovery codes are one-time bcrypt hashes.
+
+Sensitive administration, MFA changes, exports, account deletion, recovery-code regeneration, and security configuration use five-minute reauthentication grants. Only hashes are persisted; grants are bound to the current user, session, and exact scope, and mutation grants are single-use. The user-management page includes invitation lifecycle controls and an audited superadmin-only recovery path for another administrator's MFA.
+
+For a new database, apply `db/schema.sql` and then every file in `db/migrations` in version order. For an existing database, apply unapplied migrations through `V003__reconcile_verified_account_state.sql`. V002 intentionally deletes legacy AI messages that have no user owner; V003 repairs already-verified accounts left in the pre-activation state. Production performs no schema mutation at startup. See `SECURITY.md` for the full release gate.
+
+Focused verification: `./gradlew test --tests backend.security.SecurityBoundariesTest`. Full verification: `./gradlew test`. CI also runs OWASP Dependency-Check and Gitleaks.
 
 ## Admin role management
 

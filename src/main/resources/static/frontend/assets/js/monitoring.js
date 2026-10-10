@@ -84,7 +84,7 @@ function updateMonitoringLiveStatus(state = 'idle', message) {
 function telemetryBadge(device) {
   const label = device.telemetryAvailable ? (device.telemetrySourceType || 'Telemetry') : 'Unavailable';
   const tone = device.telemetryAvailable ? 'resolved' : 'warning';
-  return `<span class='badge ${tone} monitor-telemetry-badge' title='${label}'>${label}</span>`;
+  return `<span class='badge ${tone} monitor-telemetry-badge' title='${escapeHtml(label)}'>${escapeHtml(label)}</span>`;
 }
 
 function renderMonitorSummary(summary) {
@@ -134,11 +134,11 @@ function renderMonitorCards(devices) {
   wrap.innerHTML = devices.map(d => `
     <article class='card monitor-device-card'>
       <div class='card-head monitor-device-head'>
-        <h3 class='section-title monitor-device-title' title='${d.hostname || d.ipAddress}'>${d.hostname || d.ipAddress}</h3>
+        <h3 class='section-title monitor-device-title' title='${escapeHtml(d.hostname || d.ipAddress)}'>${escapeHtml(d.hostname || d.ipAddress)}</h3>
         ${telemetryBadge(d)}
       </div>
       <div class='small monitor-device-meta'>
-        <span class='monitor-text-wrap'>${d.ipAddress || '-'}</span>
+        <span class='monitor-text-wrap'>${escapeHtml(d.ipAddress || '-')}</span>
         <span class='monitor-meta-separator' aria-hidden='true'>•</span>
         <span>Reachable: ${d.reachable ? 'Yes' : 'No'}</span>
       </div>
@@ -159,9 +159,9 @@ function renderMonitorTable(devices) {
   }
 
   rows.innerHTML = devices.map(d => `<tr>
-    <td>${d.hostname || '-'}</td>
-    <td>${d.ipAddress}</td>
-    <td>${d.telemetrySourceType || '-'}</td>
+    <td>${escapeHtml(d.hostname || '-')}</td>
+    <td>${escapeHtml(d.ipAddress || '-')}</td>
+    <td>${escapeHtml(d.telemetrySourceType || '-')}</td>
     <td>${d.reachable ? 'Online' : 'Offline'}</td>
     <td>${d.cpuUsagePercent != null ? `${Number(d.cpuUsagePercent).toFixed(1)}%` : '-'}</td>
     <td>${d.memoryUsagePercent != null ? `${Number(d.memoryUsagePercent).toFixed(1)}%` : '-'}</td>
@@ -176,7 +176,7 @@ function renderLanIpSuggestions(ips) {
   const uniqueIps = [...new Set((ips || []).map((ip) => (ip || '').trim()).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
-  suggestions.innerHTML = uniqueIps.map((ip) => `<option value="${ip}"></option>`).join('');
+  suggestions.innerHTML = uniqueIps.map((ip) => `<option value="${escapeHtml(ip)}"></option>`).join('');
 }
 
 function updateDepartmentSelectOptions(selectedValue = '') {
@@ -361,8 +361,8 @@ function seedAssignedUserFromSession() {
   const assignedInput = document.getElementById('assignedUser');
   if (!assignedInput) return;
   if ((assignedInput.value || '').trim()) return;
-  const fullName = (localStorage.getItem('fullName') || '').trim();
-  const email = (localStorage.getItem('email') || '').trim();
+  const fullName = (window.currentUser?.fullName || '').trim();
+  const email = (window.currentUser?.email || '').trim();
   const preferred = fullName || email;
   if (!preferred) return;
 
@@ -462,7 +462,8 @@ function startEditDeviceById(id) {
   startEditDevice(device);
 }
 
-async function deleteDevice(id, label) {
+async function deleteDevice(id) {
+  const label = deviceRegistry.find((entry) => entry.id === id)?.deviceName;
   const confirmed = window.confirm(`Delete asset "${label || `#${id}`}"?`);
   if (!confirmed) return;
 
@@ -547,20 +548,20 @@ async function loadDevices() {
     return;
   }
   rows.innerHTML = safe.map(d => `<tr>
-    <td>${d.deviceName || '-'}</td>
-    <td>${d.ipAddress || '-'}</td>
-    <td>${d.department || '-'}</td>
-    <td>${d.assignedUser || '-'}</td>
-    <td><span class='badge ${statusBadge(d.status)}'>${d.status || '-'}</span></td>
+    <td>${escapeHtml(d.deviceName || '-')}</td>
+    <td>${escapeHtml(d.ipAddress || '-')}</td>
+    <td>${escapeHtml(d.department || '-')}</td>
+    <td>${escapeHtml(d.assignedUser || '-')}</td>
+    <td><span class='badge ${statusBadge(d.status)}'>${escapeHtml(d.status || '-')}</span></td>
     <td>${d.cpuUsage != null ? `${Number(d.cpuUsage).toFixed(0)}%` : '-'}</td>
     <td>${d.memoryUsage != null ? `${Number(d.memoryUsage).toFixed(0)}%` : '-'}</td>
     <td>${formatLastSeen(d.lastSeen)}</td>
     <td>
       <div class='table-actions'>
-        <button class='btn btn-ghost icon-only-btn' type='button' onclick='startEditDeviceById(${d.id})' aria-label='Edit ${d.deviceName || 'device'}' title='Edit'>
+        <button class='btn btn-ghost icon-only-btn' type='button' onclick='startEditDeviceById(${Number(d.id)})' aria-label='Edit ${escapeHtml(d.deviceName || 'device')}' title='Edit'>
           ✎
         </button>
-        <button class='btn btn-ghost icon-only-btn text-danger' type='button' onclick='deleteDevice(${d.id}, ${JSON.stringify(d.deviceName || '')})' aria-label='Delete ${d.deviceName || 'device'}' title='Delete'>
+        <button class='btn btn-ghost icon-only-btn text-danger' type='button' onclick='deleteDevice(${Number(d.id)})' aria-label='Delete ${escapeHtml(d.deviceName || 'device')}' title='Delete'>
           🗑
         </button>
       </div>

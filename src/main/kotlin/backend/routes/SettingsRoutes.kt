@@ -4,7 +4,10 @@ import backend.models.AssetIpPrefixesRequest
 import backend.models.AssetIpPrefixesResponse
 import backend.models.UserRole
 import backend.security.requireRole
+import backend.security.requireReauthentication
 import backend.services.AssetDetectionService
+import backend.services.ReauthScope
+import backend.services.ReauthenticationService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.request.receiveText
 import io.ktor.server.response.respond
@@ -17,7 +20,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-fun Route.settingsRoutes(assetDetectionService: AssetDetectionService) {
+fun Route.settingsRoutes(assetDetectionService: AssetDetectionService, reauthentication: ReauthenticationService) {
     route("/settings") {
         get("/asset-ip-prefixes") {
             if (!call.requireRole(UserRole.ADMIN)) return@get
@@ -26,6 +29,7 @@ fun Route.settingsRoutes(assetDetectionService: AssetDetectionService) {
 
         post("/asset-ip-prefixes") {
             if (!call.requireRole(UserRole.ADMIN)) return@post
+            if (!call.requireReauthentication(reauthentication, ReauthScope.SECURITY_CONFIG)) return@post
             runCatching {
                 val rawBody = call.receiveText()
                 val payload = runCatching { Json.parseToJsonElement(rawBody).jsonObject }

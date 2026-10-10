@@ -124,7 +124,7 @@ function updateMonitoringLiveStatus(state = 'idle', message) {
 function telemetryBadge(device) {
   const label = device.telemetryAvailable ? (device.telemetrySourceType || 'Telemetry') : 'Unavailable';
   const tone = device.telemetryAvailable ? 'resolved' : 'warning';
-  return `<span class='badge ${tone} monitor-telemetry-badge' title='${label}'>${label}</span>`;
+  return `<span class='badge ${tone} monitor-telemetry-badge' title='${aitsmEscapeHtml(label)}'>${aitsmEscapeHtml(label)}</span>`;
 }
 
 function renderMonitorSummary(summary) {
@@ -155,7 +155,7 @@ function renderMonitoringHealthPanel(summary, devices) {
   const available = devices.filter(d => d.telemetryAvailable).length;
   panel.innerHTML = `
     <div class='insight-grid monitor-health-grid'>
-      <div class='insight-item'><div class='insight-label'>Host</div><div class='insight-value monitor-text-wrap'>${host.hostname}</div></div>
+      <div class='insight-item'><div class='insight-label'>Host</div><div class='insight-value monitor-text-wrap'>${aitsmEscapeHtml(host.hostname || '-')}</div></div>
       <div class='insight-item'><div class='insight-label'>Host Memory</div><div class='insight-value'>${Number(host.memoryUsagePercent ?? 0).toFixed(1)}%</div></div>
       <div class='insight-item'><div class='insight-label'>Telemetry coverage</div><div class='insight-value'>${available}/${devices.length}</div></div>
       <div class='insight-item'><div class='insight-label'>Last updated</div><div class='insight-value monitor-text-wrap monitor-updated-at'>${formatLastSeen(summary.timestamp || host.timestamp || monitoringLastUpdatedAt)}</div></div>
@@ -182,11 +182,11 @@ function renderMonitorCards(devices) {
   wrap.innerHTML = highlight.map(d => `
     <article class='card monitor-device-card'>
       <div class='card-head monitor-device-head'>
-        <h3 class='section-title monitor-device-title' title='${d.hostname || d.ipAddress}'>${d.hostname || d.ipAddress}</h3>
+        <h3 class='section-title monitor-device-title' title='${aitsmEscapeHtml(d.hostname || d.ipAddress)}'>${aitsmEscapeHtml(d.hostname || d.ipAddress)}</h3>
         ${telemetryBadge(d)}
       </div>
       <div class='small monitor-device-meta'>
-        <span class='monitor-text-wrap'>${d.ipAddress || '-'}</span>
+        <span class='monitor-text-wrap'>${aitsmEscapeHtml(d.ipAddress || '-')}</span>
         <span class='monitor-meta-separator' aria-hidden='true'>•</span>
         <span>Reachable: ${d.reachable ? 'Yes' : 'No'}</span>
       </div>
@@ -214,9 +214,9 @@ function renderMonitorTable(devices) {
   }
 
   rows.innerHTML = visible.map(d => `<tr>
-    <td>${d.hostname || '-'}</td>
-    <td>${d.ipAddress}</td>
-    <td>${d.telemetrySourceType || '-'}</td>
+    <td>${aitsmEscapeHtml(d.hostname || '-')}</td>
+    <td>${aitsmEscapeHtml(d.ipAddress || '-')}</td>
+    <td>${aitsmEscapeHtml(d.telemetrySourceType || '-')}</td>
     <td>${d.reachable ? 'Online' : 'Offline'}</td>
     <td>${d.cpuUsagePercent != null ? `${Number(d.cpuUsagePercent).toFixed(1)}%` : '-'}</td>
     <td>${d.memoryUsagePercent != null ? `${Number(d.memoryUsagePercent).toFixed(1)}%` : '-'}</td>
@@ -231,7 +231,7 @@ function renderLanIpSuggestions(ips) {
   const uniqueIps = [...new Set((ips || []).map((ip) => (ip || '').trim()).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
-  suggestions.innerHTML = uniqueIps.map((ip) => `<option value="${ip}"></option>`).join('');
+  suggestions.innerHTML = uniqueIps.map((ip) => `<option value="${aitsmEscapeHtml(ip)}"></option>`).join('');
 }
 
 function setRefreshDiscoveryBusy(isBusy) {
@@ -335,8 +335,8 @@ function seedAssignedUserFromSession() {
   const assignedInput = document.getElementById('assignedUser');
   if (!assignedInput) return;
   if (assignedInput.value.trim()) return;
-  const fullName = (localStorage.getItem('fullName') || '').trim();
-  const email = (localStorage.getItem('email') || '').trim();
+  const fullName = (window.currentUser?.fullName || '').trim();
+  const email = (window.currentUser?.email || '').trim();
   assignedInput.value = fullName || email;
 }
 
@@ -411,7 +411,8 @@ function startEditDeviceById(id) {
   startEditDevice(device);
 }
 
-async function deleteDevice(id, label) {
+async function deleteDevice(id) {
+  const label = deviceRegistry.find((entry) => entry.id === id)?.deviceName;
   const confirmed = window.confirm(`Delete asset "${label || `#${id}`}"?`);
   if (!confirmed) return;
 
@@ -480,20 +481,20 @@ async function loadDevices() {
     return;
   }
   rows.innerHTML = safe.map(d => `<tr>
-    <td>${d.deviceName || '-'}</td>
-    <td>${d.ipAddress || '-'}</td>
-    <td>${d.department || '-'}</td>
-    <td>${d.assignedUser || '-'}</td>
-    <td><span class='badge ${statusBadge(d.status)}'>${d.status || '-'}</span></td>
+    <td>${aitsmEscapeHtml(d.deviceName || '-')}</td>
+    <td>${aitsmEscapeHtml(d.ipAddress || '-')}</td>
+    <td>${aitsmEscapeHtml(d.department || '-')}</td>
+    <td>${aitsmEscapeHtml(d.assignedUser || '-')}</td>
+    <td><span class='badge ${statusBadge(d.status)}'>${aitsmEscapeHtml(d.status || '-')}</span></td>
     <td>${d.cpuUsage != null ? `${Number(d.cpuUsage).toFixed(0)}%` : '-'}</td>
     <td>${d.memoryUsage != null ? `${Number(d.memoryUsage).toFixed(0)}%` : '-'}</td>
     <td>${formatLastSeen(d.lastSeen)}</td>
     <td>
       <div class='table-actions'>
-        <button class='btn btn-ghost icon-only-btn' type='button' onclick='startEditDeviceById(${d.id})' aria-label='Edit ${d.deviceName || 'device'}' title='Edit'>
+        <button class='btn btn-ghost icon-only-btn' type='button' onclick='startEditDeviceById(${Number(d.id)})' aria-label='Edit ${aitsmEscapeHtml(d.deviceName || 'device')}' title='Edit'>
           ✎
         </button>
-        <button class='btn btn-ghost icon-only-btn text-danger' type='button' onclick='deleteDevice(${d.id}, ${JSON.stringify(d.deviceName || '')})' aria-label='Delete ${d.deviceName || 'device'}' title='Delete'>
+        <button class='btn btn-ghost icon-only-btn text-danger' type='button' onclick='deleteDevice(${Number(d.id)})' aria-label='Delete ${aitsmEscapeHtml(d.deviceName || 'device')}' title='Delete'>
           🗑
         </button>
       </div>

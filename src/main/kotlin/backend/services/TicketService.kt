@@ -4,6 +4,8 @@ import backend.models.Ticket
 import backend.models.TicketRequest
 import backend.models.TicketStatus
 import backend.models.UserRole
+import backend.security.Permission
+import backend.security.PermissionMatrix
 import backend.repository.AuditRepository
 import backend.repository.TicketRepository
 import backend.repository.UserRepository
@@ -49,7 +51,7 @@ class TicketService(
         val existing = repository.get(id) ?: return null
         val requestedAction = statusValue.trim().lowercase()
         val status = parseStatus(statusValue)
-        val admin = role in setOf(UserRole.ADMIN, UserRole.SUPERADMIN)
+        val admin = Permission.TICKET_MANAGE in PermissionMatrix.permissions(role)
         if (existing.status == status) return existing
 
         when {

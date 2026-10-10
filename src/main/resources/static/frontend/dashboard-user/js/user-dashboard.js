@@ -53,11 +53,11 @@ function renderRecentTickets(tickets) {
 
   rows.innerHTML = safeTickets.slice(0, 5).map(t => `
     <tr>
-      <td><a class='ticket-link' href='${userTicketHref(t.id)}'>#${t.id}</a></td>
-      <td><a class='ticket-link ticket-link-title' href='${userTicketHref(t.id)}' title='${t.title || '-'}'>${t.title || '-'}</a></td>
-      <td>${t.priority || '-'}</td>
-      <td><span class='badge ${badgeClassForStatus(t.status)}'>${t.status || 'Unknown'}</span></td>
-      <td>${formatDateTime(t.updatedAt)}</td>
+      <td><a class='ticket-link' href='${userTicketHref(t.id)}'>#${Number(t.id)}</a></td>
+      <td><a class='ticket-link ticket-link-title' href='${userTicketHref(t.id)}' title='${aitsmEscapeHtml(t.title || '-')}'>${aitsmEscapeHtml(t.title || '-')}</a></td>
+      <td>${aitsmEscapeHtml(t.priority || '-')}</td>
+      <td><span class='badge ${badgeClassForStatus(t.status)}'>${aitsmEscapeHtml(t.status || 'Unknown')}</span></td>
+      <td>${aitsmEscapeHtml(formatDateTime(t.updatedAt))}</td>
     </tr>
   `).join('');
 }

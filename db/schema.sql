@@ -1,6 +1,4 @@
-CREATE DATABASE aitsm_db;
-
--- Run below in aitsm_db
+-- Connect to the target application database before running this file.
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   full_name VARCHAR(150) NOT NULL,
@@ -100,6 +98,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   message TEXT NOT NULL,
   type VARCHAR(40) NOT NULL,
   related_ticket_id INT REFERENCES tickets(id),
+  related_user_id INT REFERENCES users(id) ON DELETE SET NULL,
   is_read BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMP NOT NULL,
   read_at TIMESTAMP
@@ -110,6 +109,14 @@ CREATE TABLE IF NOT EXISTS sla_policies (
   priority VARCHAR(20) NOT NULL,
   response_time INT NOT NULL,
   resolution_time INT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS notifications_related_user_idx ON notifications(related_user_id);
+
+CREATE TABLE IF NOT EXISTS system_settings (
+  id SERIAL PRIMARY KEY,
+  key VARCHAR(120) NOT NULL UNIQUE,
+  value TEXT NOT NULL,
+  updated_at TIMESTAMP NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS knowledge_articles (
@@ -127,6 +134,17 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   entity VARCHAR(80) NOT NULL,
   timestamp TIMESTAMP NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS ai_conversation_messages (
+  id SERIAL PRIMARY KEY,
+  user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  session_id VARCHAR(128) NOT NULL,
+  role VARCHAR(32) NOT NULL,
+  content TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ai_conversation_messages_owner_session_idx
+  ON ai_conversation_messages(user_id, session_id, created_at);
 
 CREATE TABLE IF NOT EXISTS inventory_assets (
   id SERIAL PRIMARY KEY,

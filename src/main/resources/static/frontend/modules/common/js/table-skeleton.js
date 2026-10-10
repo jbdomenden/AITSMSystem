@@ -48,14 +48,24 @@
     const body = resolveBody(target);
     if (!body) return;
     clearTableSkeleton(body);
-    body.innerHTML = `<tr><td colspan='${Math.max(1, Number(columnCount) || 1)}' class='small'>${message || 'No records found.'}</td></tr>`;
+    renderMessageRow(body, columnCount, message || 'No records found.', 'small');
   }
 
   function renderTableErrorState(target, columnCount, message) {
     const body = resolveBody(target);
     if (!body) return;
     clearTableSkeleton(body);
-    body.innerHTML = `<tr><td colspan='${Math.max(1, Number(columnCount) || 1)}' class='small text-danger'>${message || 'Unable to load table data.'}</td></tr>`;
+    renderMessageRow(body, columnCount, message || 'Unable to load table data.', 'small text-danger');
+  }
+
+  function renderMessageRow(body, columnCount, message, className) {
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.colSpan = Math.max(1, Number(columnCount) || 1);
+    cell.className = className;
+    cell.textContent = String(message);
+    row.appendChild(cell);
+    body.replaceChildren(row);
   }
 
   global.showTableSkeleton = showTableSkeleton;

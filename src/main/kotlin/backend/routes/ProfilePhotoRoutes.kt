@@ -6,19 +6,29 @@ import backend.security.requireRole
 import backend.security.userId
 import backend.services.ProfilePhotoService
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.HttpHeaders
 import io.ktor.http.content.PartData
 import io.ktor.http.content.forEachPart
 import io.ktor.server.request.receiveMultipart
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondFile
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
-import io.ktor.utils.io.core.readBytes
 import io.ktor.utils.io.readRemaining
+import kotlinx.io.readByteArray
 
 fun Route.profilePhotoRoutes(service: ProfilePhotoService) {
+    get("/uploads/profile-photos/{filename}") {
+        val actor = call.userId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
+        val filename = call.parameters["filename"] ?: return@get call.respond(HttpStatusCode.NotFound)
+        val photo = service.photoForViewer(filename, actor) ?: return@get call.respond(HttpStatusCode.NotFound)
+        call.response.headers.append(HttpHeaders.CacheControl, "private, max-age=300")
+        call.respondFile(photo.toFile())
+    }
+
     route("/api/profile-photo-requests") {
         post {
             val actor = call.userId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
@@ -30,7 +40,7 @@ fun Route.profilePhotoRoutes(service: ProfilePhotoService) {
                 if (part is PartData.FileItem && part.name == "photo") {
                     filename = part.originalFileName
                     contentType = part.contentType
-                    bytes = part.provider().readRemaining().readBytes()
+                    bytes = part.provider().readRemaining(5L * 1024 * 1024 + 1).readByteArray()
                 }
                 part.dispose()
             }

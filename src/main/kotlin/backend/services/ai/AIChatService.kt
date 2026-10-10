@@ -38,19 +38,22 @@ class AIChatService(
         logger.info("AI model configured: {}", config.model)
     }
 
-    fun chat(sessionId: String, message: String): AIChatResponse {
+    fun chat(userId: Int, sessionId: String, message: String): AIChatResponse {
         val cleanInput = AIContentSanitizer.redact(message).trim().take(2_000)
         require(cleanInput.isNotBlank()) { "Message is required" }
 
         cleanupStaleSessions()
-        val history = conversationStore.computeIfAbsent(sessionId) { conversationRepository.loadSession(sessionId, conversationLimit) }
+        val ownerSessionKey = ownerSessionKey(userId, sessionId)
+        val history = conversationStore.computeIfAbsent(ownerSessionKey) {
+            conversationRepository.loadSession(userId, sessionId, conversationLimit)
+        }
         synchronized(history) {
             val userMessage = AIMessage(role = "user", content = cleanInput)
             history += userMessage
-            conversationRepository.appendMessage(sessionId, userMessage)
+            conversationRepository.appendMessage(userId, sessionId, userMessage)
             trimConversation(history)
         }
-        sessionLastSeen[sessionId] = Instant.now().toEpochMilli()
+        sessionLastSeen[ownerSessionKey] = Instant.now().toEpochMilli()
 
         val cfg = configService.snapshot()
         val promptMessages = buildList {
@@ -81,7 +84,7 @@ class AIChatService(
         synchronized(history) {
             val assistant = AIMessage(role = "assistant", content = plainReply)
             history += assistant
-            conversationRepository.appendMessage(sessionId, assistant)
+            conversationRepository.appendMessage(userId, sessionId, assistant)
             trimConversation(history)
         }
 
@@ -97,10 +100,11 @@ class AIChatService(
         )
     }
 
-    fun clearConversation(sessionId: String) {
-        conversationStore.remove(sessionId)
-        sessionLastSeen.remove(sessionId)
-        conversationRepository.clearSession(sessionId)
+    fun clearConversation(userId: Int, sessionId: String) {
+        val ownerSessionKey = ownerSessionKey(userId, sessionId)
+        conversationStore.remove(ownerSessionKey)
+        sessionLastSeen.remove(ownerSessionKey)
+        conversationRepository.clearSession(userId, sessionId)
     }
 
     fun testConnection(): AIProviderResult {
@@ -183,6 +187,8 @@ class AIChatService(
             history.addAll(trimmed)
         }
     }
+
+    private fun ownerSessionKey(userId: Int, sessionId: String): String = "$userId:$sessionId"
 
     private fun cleanupStaleSessions() {
         val now = Instant.now().toEpochMilli()

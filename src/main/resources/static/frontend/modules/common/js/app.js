@@ -1,28 +1,170 @@
 const apiBase = '';
 
+function aitsmEscapeHtml(value) {
+  return String(value ?? '').replace(/[&<>'"]/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+  }[char]));
+}
+
 function normalizeRole(role) {
-  return String(role || '').toLowerCase();
+  return String(role || '').toLowerCase().replaceAll('_', '-');
 }
 
 function currentRole() {
-  return normalizeRole(localStorage.getItem('role'));
+  return normalizeRole(window.currentUser?.role);
 }
 
-const authHeaders = () => ({
-  'Content-Type': 'application/json',
-  'X-User-Id': localStorage.getItem('userId') || '',
-  'X-User-Role': currentRole()
-});
+function isAdminPortalRole(role = currentRole()) {
+  return ['admin', 'it-admin', 'superadmin'].includes(normalizeRole(role));
+}
 
-function logout() {
+function readCookie(name) {
+  const prefix = `${encodeURIComponent(name)}=`;
+  return document.cookie.split(';').map(v => v.trim()).find(v => v.startsWith(prefix))?.slice(prefix.length) || '';
+}
+
+const authHeaders = () => ({ 'Content-Type': 'application/json', 'X-CSRF-Token': decodeURIComponent(readCookie('aitsm_csrf')) });
+const reauthCache = new Map();
+let pendingReauthPassword = null;
+
+function ensureReauthModal() {
+  if (document.getElementById('reauthModal')) return;
+  const modal = document.createElement('div');
+  modal.id = 'reauthModal';
+  modal.className = 'modal-overlay hidden';
+  modal.innerHTML = `
+    <section class='modal-card app-alert-card' role='dialog' aria-modal='true' aria-labelledby='reauthModalTitle'>
+      <div class='card-head'>
+        <div>
+          <h3 id='reauthModalTitle' class='section-title'>Confirm it is you</h3>
+          <p class='small'>Enter your current password before making this sensitive change.</p>
+        </div>
+      </div>
+      <form id='reauthForm' class='form-grid single-col'>
+        <div class='form-group'>
+          <label for='reauthPassword'>Current password</label>
+          <input id='reauthPassword' type='password' autocomplete='current-password' required>
+        </div>
+        <p id='reauthMessage' class='small text-danger hidden' role='alert'></p>
+        <div class='inline-actions' style='justify-content:flex-end'>
+          <button id='reauthCancelBtn' class='btn btn-ghost' type='button'>Cancel</button>
+          <button class='btn btn-primary' type='submit'>Continue</button>
+        </div>
+      </form>
+    </section>`;
+  document.body.appendChild(modal);
+
+  document.getElementById('reauthForm')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const password = document.getElementById('reauthPassword')?.value || '';
+    if (!password) return;
+    finishReauthPassword(password);
+  });
+  document.getElementById('reauthCancelBtn')?.addEventListener('click', () => finishReauthPassword(null));
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) finishReauthPassword(null);
+  });
+  modal.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') finishReauthPassword(null);
+  });
+}
+
+function finishReauthPassword(password) {
+  const modal = document.getElementById('reauthModal');
+  modal?.classList.remove('show');
+  modal?.classList.add('hidden');
+  const input = document.getElementById('reauthPassword');
+  if (input) input.value = '';
+  const resolve = pendingReauthPassword?.resolve;
+  pendingReauthPassword = null;
+  resolve?.(password);
+}
+
+function requestReauthPassword() {
+  if (pendingReauthPassword) return pendingReauthPassword.promise;
+  ensureReauthModal();
+  let resolvePassword;
+  const promise = new Promise(resolve => { resolvePassword = resolve; });
+  pendingReauthPassword = { promise, resolve: resolvePassword };
+  const message = document.getElementById('reauthMessage');
+  message?.classList.add('hidden');
+  const modal = document.getElementById('reauthModal');
+  modal?.classList.remove('hidden');
+  modal?.classList.add('show');
+  window.setTimeout(() => document.getElementById('reauthPassword')?.focus(), 0);
+  return promise;
+}
+
+async function obtainReauthToken(scope, force = false) {
+  const cached = reauthCache.get(scope);
+  if (!force && cached && cached.expiresAt > Date.now() + 5000) return cached.token;
+  const password = await requestReauthPassword();
+  if (!password) throw new Error('Reauthentication cancelled');
+  const response = await fetch('/api/auth/reauth', {
+    method: 'POST', headers: authHeaders(), body: JSON.stringify({ scope, password })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    reauthCache.delete(scope);
+    throw new Error(data.error || 'Reauthentication failed');
+  }
+  reauthCache.set(scope, { token: data.token, expiresAt: Date.parse(data.expiresAt) || Date.now() + 240000 });
+  return data.token;
+}
+
+function consumeCachedReauth(scope) { reauthCache.delete(scope); }
+
+async function loadAuthenticatedUser() {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await fetch('/api/auth/me', { credentials: 'same-origin', cache: 'no-store' });
+      if (response.status === 401 || response.status === 403) return null;
+      if (!response.ok) throw new Error(`Session lookup failed with ${response.status}`);
+      window.currentUser = await response.json();
+      return window.currentUser;
+    } catch (error) {
+      if (attempt === 0) await new Promise(resolve => window.setTimeout(resolve, 250));
+      else {
+        window.__aitsmBootstrapFailed = true;
+        console.error('AITSM session bootstrap failed', error);
+      }
+    }
+  }
+  return null;
+}
+
+window.aitsmReady = loadAuthenticatedUser();
+
+function sharedStylesReady() {
+  return getComputedStyle(document.documentElement).getPropertyValue('--primary').trim().length > 0;
+}
+
+async function ensureSharedStylesheet() {
+  if (sharedStylesReady()) return true;
+  document.querySelectorAll('link[data-aitsm-style-retry]').forEach(link => link.remove());
+  const loaded = await new Promise(resolve => {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `/shared/css/styles.css?v=frontend-recovery-v3-${Date.now()}`;
+    link.dataset.aitsmStyleRetry = 'true';
+    link.addEventListener('load', () => resolve(true), { once: true });
+    link.addEventListener('error', () => resolve(false), { once: true });
+    document.head.appendChild(link);
+  });
+  const ready = loaded && sharedStylesReady();
+  document.body.classList.toggle('stylesheet-load-failed', !ready);
+  return ready;
+}
+
+async function logout() {
+  await fetch('/api/auth/logout', { method: 'POST', headers: authHeaders(), credentials: 'same-origin' }).catch(() => {});
   sessionStorage.removeItem('aitsm.chat.drawer.v1');
-  localStorage.clear();
+  window.currentUser = null;
   location.href = '/login.html';
 }
 
 function redirectForRole(role) {
-  const normalizedRole = normalizeRole(role);
-  location.href = ['admin', 'superadmin'].includes(normalizedRole) ? '/dashboard-admin.html' : '/dashboard-user.html';
+  location.href = isAdminPortalRole(role) ? '/dashboard-admin.html' : '/dashboard-user.html';
 }
 
 function enforcePageAccess() {
@@ -31,19 +173,76 @@ function enforcePageAccess() {
   const adminOnlyPages = ['dashboard-admin.html', 'ticket-management.html', 'monitoring.html', 'inventory.html', 'assets.html', 'settings.html', 'user-management.html', 'knowledge.html'];
   const endUserOnlyPages = ['dashboard-user.html', 'create-ticket.html', 'tickets.html', 'knowledge-library.html', 'ai-assistant.html', 'signup.html'];
 
+  if (!role && window.__aitsmBootstrapFailed) {
+    showAppAlert('The server could not finish loading your session. Check the connection and refresh this page.');
+    return;
+  }
+
   if (!role && page !== 'login.html' && page !== 'index.html' && page !== 'signup.html') {
     location.href = '/login.html';
     return;
   }
 
-  if (['admin', 'superadmin'].includes(role) && endUserOnlyPages.includes(page)) {
+  if (isAdminPortalRole(role) && endUserOnlyPages.includes(page)) {
     location.href = '/dashboard-admin.html';
     return;
   }
 
-  if (!['admin', 'superadmin'].includes(role) && adminOnlyPages.includes(page)) {
+  if (!isAdminPortalRole(role) && adminOnlyPages.includes(page)) {
     location.href = '/dashboard-user.html';
   }
+}
+
+async function mountRoleAwareShell(hostId) {
+  const host = document.getElementById(hostId);
+  if (!host) return;
+  await window.aitsmReady;
+  if (!window.currentUser) return;
+
+  const admin = isAdminPortalRole();
+  host.id = admin ? 'adminSidebar' : 'userSidebar';
+  await ensureRoleShell(admin);
+}
+
+function shellInitializer(admin) {
+  return window[admin ? 'initializeAdminShell' : 'initializeUserShell'];
+}
+
+async function ensureRoleShell(admin = isAdminPortalRole()) {
+  const expectedId = admin ? 'adminSidebar' : 'userSidebar';
+  const host = document.getElementById(expectedId) || document.querySelector('.app-layout > .sidebar');
+  if (!host) return true;
+  host.id = expectedId;
+
+  const initialize = shellInitializer(admin);
+  if (typeof initialize === 'function') {
+    initialize();
+    if (host.childElementCount && document.getElementById('utilityHeader')?.childElementCount) return true;
+  }
+
+  const shellName = admin ? 'admin-shell' : 'user-shell';
+  document.querySelectorAll(`script[src*="/modules/sidebar/js/${shellName}.js"]`).forEach(script => script.remove());
+  const loaded = await new Promise(resolve => {
+    const script = document.createElement('script');
+    script.src = `/modules/sidebar/js/${shellName}.js?v=workspace-shell-v2`;
+    script.dataset.aitsmRoleShell = 'true';
+    script.addEventListener('load', () => resolve(true), { once: true });
+    script.addEventListener('error', () => resolve(false), { once: true });
+    document.body.appendChild(script);
+  });
+
+  const retry = shellInitializer(admin);
+  if (loaded && typeof retry === 'function') retry();
+  const ready = Boolean(host.childElementCount && document.getElementById('utilityHeader')?.childElementCount);
+  document.body.classList.toggle('shell-load-failed', !ready);
+  if (!ready) showAppAlert('Navigation could not be loaded. Check the server connection and refresh the page.');
+  return ready;
+}
+
+async function ensureWorkspaceShell() {
+  await window.aitsmReady;
+  if (!window.currentUser) return;
+  await ensureRoleShell(isAdminPortalRole());
 }
 
 function injectGlobalHeader() {
@@ -52,8 +251,8 @@ function injectGlobalHeader() {
   const content = document.querySelector('main.content');
   if (!content || document.getElementById('globalAppHeader') || document.getElementById('utilityHeader')) return;
 
-  const userEmail = localStorage.getItem('email') || '';
-  const roleLabel = role === 'superadmin' ? 'Super Admin' : (role === 'admin' ? 'Admin' : 'End User');
+  const userEmail = window.currentUser?.email || '';
+  const roleLabel = role === 'superadmin' ? 'Super Admin' : (isAdminPortalRole(role) ? 'Admin' : 'End User');
 
   const header = document.createElement('header');
   header.id = 'globalAppHeader';
@@ -160,9 +359,12 @@ async function submitPasswordChange() {
   closePasswordModal();
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await ensureSharedStylesheet();
   ensurePageSplash();
+  await window.aitsmReady;
   enforcePageAccess();
+  await ensureWorkspaceShell();
   injectGlobalHeader();
   markActiveNav();
   ensureChatDrawer();
@@ -254,7 +456,7 @@ function openAitsmChat(colleagueId = null) {
 }
 
 function globalNavigationItems() {
-  const admin = ['admin', 'superadmin'].includes(currentRole());
+  const admin = isAdminPortalRole();
   return admin
     ? [{ label: 'Dashboard', href: '/dashboard-admin.html' }, { label: 'Ticket management', href: '/ticket-management.html' }, { label: 'User management', href: '/user-management.html' }, { label: 'Settings', href: '/settings.html' }, { label: 'Colleagues & Chat', href: '/colleagues.html' }, { label: 'Profile', href: '/profile.html' }]
     : [{ label: 'Dashboard', href: '/dashboard-user.html' }, { label: 'Create ticket', href: '/create-ticket.html' }, { label: 'My tickets', href: '/tickets.html' }, { label: 'Knowledge base', href: '/knowledge-library.html' }, { label: 'AI assistant', href: '/ai-assistant.html' }, { label: 'Colleagues & Chat', href: '/colleagues.html' }, { label: 'Profile', href: '/profile.html' }];

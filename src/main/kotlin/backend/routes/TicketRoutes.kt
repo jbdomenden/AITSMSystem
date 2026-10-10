@@ -9,6 +9,8 @@ import backend.security.requireAuthenticated
 import backend.security.requireRole
 import backend.security.userId
 import backend.security.userRole
+import backend.security.PermissionMatrix
+import backend.security.Permission
 import backend.services.TicketService
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -29,7 +31,7 @@ fun Route.ticketRoutes(ticketService: TicketService) {
         get {
             if (!call.requireAuthenticated()) return@get
             val uid = call.userId()
-            val admin = setOf(UserRole.ADMIN, UserRole.SUPERADMIN).contains(call.userRole())
+            val admin = Permission.TICKET_READ_ALL in PermissionMatrix.permissions(call.userRole())
             val limit = (call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_LIMIT).coerceIn(1, MAX_LIMIT)
             val offset = (call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L).coerceAtLeast(0L)
             val page = ticketService.list(uid, admin, limit, offset)
@@ -48,19 +50,19 @@ fun Route.ticketRoutes(ticketService: TicketService) {
         get("/{id}") {
             if (!call.requireAuthenticated()) return@get
             val actorId = call.userId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
-            val admin = setOf(UserRole.ADMIN, UserRole.SUPERADMIN).contains(call.userRole())
+            val admin = Permission.TICKET_READ_ALL in PermissionMatrix.permissions(call.userRole())
             val id = call.parameters["id"]?.toIntOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
             val ticket = ticketService.get(id) ?: return@get call.respond(HttpStatusCode.NotFound)
-            if (!admin && ticket.userId != actorId) return@get call.respond(HttpStatusCode.Forbidden)
+            if (!admin && ticket.userId != actorId) return@get call.respond(HttpStatusCode.NotFound)
             call.respond(ticket)
         }
         put("/{id}") {
             if (!call.requireAuthenticated()) return@put
             val actorId = call.userId() ?: return@put call.respond(HttpStatusCode.Unauthorized)
-            val admin = setOf(UserRole.ADMIN, UserRole.SUPERADMIN).contains(call.userRole())
+            val admin = Permission.TICKET_MANAGE in PermissionMatrix.permissions(call.userRole())
             val id = call.parameters["id"]?.toIntOrNull() ?: return@put call.respond(HttpStatusCode.BadRequest)
             val existing = ticketService.get(id) ?: return@put call.respond(HttpStatusCode.NotFound)
-            if (!admin && existing.userId != actorId) return@put call.respond(HttpStatusCode.Forbidden)
+            if (!admin && existing.userId != actorId) return@put call.respond(HttpStatusCode.NotFound)
             val updated = ticketService.update(id, call.receive<TicketRequest>(), actorId) ?: return@put call.respond(HttpStatusCode.NotFound)
             call.respond(updated)
         }

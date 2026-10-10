@@ -27,7 +27,7 @@ The backend serves both API routes and static frontend pages.
 2. `DatabaseFactory.init()` connects to PostgreSQL and ensures tables/columns exist.
 3. `ServiceContainer` builds repositories/services.
 4. Seed actions run (`knowledgeRepo.seedDefaults()`, `slaService.seedDefaults()`).
-5. Superadmin bootstrap runs if environment variables are provided (required in production).
+5. Optional superadmin bootstrap runs only when `BOOTSTRAP_SUPERADMIN=true`.
 6. Routes are registered and static frontend is served.
 
 ---
@@ -60,18 +60,22 @@ Routes are composed in `Application.module()` and depend on service/repository a
 
 ## 4. Security and Access Model
 
-### 4.1 Header-based caller identity
-This project uses request headers for role checks:
-- `X-User-Id`
-- `X-User-Role`
+### 4.1 Server-side caller identity
+The raw opaque session token exists only in the `aitsm_session` HttpOnly cookie; only its SHA-256 hash is stored. The backend reloads account state and role from PostgreSQL for every protected request. `X-User-Id` and `X-User-Role` are rejected. State-changing requests require the session-bound `X-CSRF-Token`.
+
+Sensitive actions additionally require a hashed, persisted `reauth_grants` record bound to the session, user, exact scope, and five-minute expiry. Mutation grants are consumed once.
 
 ### 4.2 Roles
 `UserRole` enum:
 - `SUPERADMIN`
 - `ADMIN`
+- `IT_ADMIN`
+- `SUPPORT_AGENT`
+- `ASSET_MANAGER`
+- `AUDITOR`
 - `END_USER`
 
-Role gates are enforced in route handlers via `requireRole(...)`.
+The centralized permission matrix is the primary authorization policy; legacy route helpers map onto explicit permissions.
 
 ### 4.3 Error contract
 Errors are normalized through status pages and `ApiErrorResponse` (status code + message + docs reference).
@@ -149,7 +153,7 @@ This is applied to tickets/devices/knowledge list APIs.
 Use `.env` (from `.env.example`) for runtime values.
 Key variables:
 - DB: `DB_URL`, `DB_USER`, `DB_PASSWORD`
-- Production superadmin: `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD`
+- Optional one-time production bootstrap: `BOOTSTRAP_SUPERADMIN`, `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD`
 - AI: `AI_PROVIDER=gemini`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `AI_TIMEOUT_MILLIS`. Keep the API key in deployment secrets or ignored `.env`, never source control.
 
 ---
@@ -165,7 +169,7 @@ The AI assistant frontend module is `js/ai-assistant.js`.
 ---
 
 ## 11. Observability
-- `/metrics` provides lightweight in-memory request counters and durations.
+- `/metrics` provides bounded in-memory request counters and durations to callers with security-management permission.
 - `CallLogging` and status-page handling support runtime diagnostics.
 
 ---

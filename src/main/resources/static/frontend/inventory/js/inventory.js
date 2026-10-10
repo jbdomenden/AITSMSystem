@@ -15,8 +15,9 @@ function inventoryStatusBadge(status) {
   return 'in-progress';
 }
 
-function inventoryField(label, value) {
-  return `<div class='inventory-field'><div class='inventory-field-label'>${label}</div><div>${value || 'Unavailable'}</div></div>`;
+function inventoryField(label, value, allowHtml = false) {
+  const rendered = allowHtml ? (value || 'Unavailable') : aitsmEscapeHtml(value || 'Unavailable');
+  return `<div class='inventory-field'><div class='inventory-field-label'>${aitsmEscapeHtml(label)}</div><div>${rendered}</div></div>`;
 }
 
 function parseListResponse(payload) {
@@ -108,18 +109,18 @@ function renderInventoryRows(items) {
 
   rows.innerHTML = items.map((asset) => `
     <tr>
-      <td>${asset.deviceName || asset.hostname || 'Unavailable'}</td>
-      <td>${asset.ipAddress || 'Unavailable'}</td>
-      <td>${asset.manufacturer || 'Unavailable'}</td>
-      <td>${asset.model || 'Unavailable'}</td>
-      <td>${asset.processorName || 'Unavailable'}</td>
-      <td>${asset.installedRam || 'Unavailable'}</td>
-      <td>${asset.storageSummary || 'Unavailable'}</td>
-      <td>${asset.osSummary || 'Unavailable'}</td>
-      <td><span class='badge ${inventoryStatusBadge(asset.status)}'>${asset.status || 'unknown'}</span></td>
-      <td>${asset.lastSeenAt || 'Unavailable'}</td>
-      <td>${asset.assignedDepartment || 'Unavailable'}</td>
-      <td><div class='inline-actions'><button class='btn btn-ghost' type='button' onclick='openInventoryDetail(${asset.id})'>View</button><a class='btn btn-ghost' href='/monitoring.html?editDevice=${encodeURIComponent(asset.id)}'>Edit</a></div></td>
+      <td>${aitsmEscapeHtml(asset.deviceName || asset.hostname || 'Unavailable')}</td>
+      <td>${aitsmEscapeHtml(asset.ipAddress || 'Unavailable')}</td>
+      <td>${aitsmEscapeHtml(asset.manufacturer || 'Unavailable')}</td>
+      <td>${aitsmEscapeHtml(asset.model || 'Unavailable')}</td>
+      <td>${aitsmEscapeHtml(asset.processorName || 'Unavailable')}</td>
+      <td>${aitsmEscapeHtml(asset.installedRam || 'Unavailable')}</td>
+      <td>${aitsmEscapeHtml(asset.storageSummary || 'Unavailable')}</td>
+      <td>${aitsmEscapeHtml(asset.osSummary || 'Unavailable')}</td>
+      <td><span class='badge ${inventoryStatusBadge(asset.status)}'>${aitsmEscapeHtml(asset.status || 'unknown')}</span></td>
+      <td>${aitsmEscapeHtml(asset.lastSeenAt || 'Unavailable')}</td>
+      <td>${aitsmEscapeHtml(asset.assignedDepartment || 'Unavailable')}</td>
+      <td><div class='inline-actions'><button class='btn btn-ghost' type='button' onclick='openInventoryDetail(${Number(asset.id)})'>View</button><a class='btn btn-ghost' href='/monitoring.html?editDevice=${encodeURIComponent(asset.id)}'>Edit</a></div></td>
     </tr>
   `).join('');
 }
@@ -169,7 +170,7 @@ function renderInventorySummaryCards(asset) {
     ['RAM', asset.installedRam || 'Unavailable'],
     ['Storage Free', asset.storageFree || 'Unavailable'],
     ['GPU', asset.gpuName || 'Unavailable']
-  ].map(([label, value]) => `<article class='card metric-card'><div class='metric-label'>${label}</div><div class='metric-hint'>${value}</div></article>`).join('');
+  ].map(([label, value]) => `<article class='card metric-card'><div class='metric-label'>${aitsmEscapeHtml(label)}</div><div class='metric-hint'>${aitsmEscapeHtml(value)}</div></article>`).join('');
 }
 
 function renderInventoryDetailGroups(asset) {
@@ -183,7 +184,7 @@ function renderInventoryDetailGroups(asset) {
     inventoryField('Device Name', asset.deviceName),
     inventoryField('Hostname', asset.hostname),
     inventoryField('Full Device Name', asset.fullDeviceName),
-    inventoryField('Status', `<span class='badge ${inventoryStatusBadge(asset.status)}'>${asset.status || 'unknown'}</span>`),
+    inventoryField('Status', `<span class='badge ${inventoryStatusBadge(asset.status)}'>${aitsmEscapeHtml(asset.status || 'unknown')}</span>`, true),
     inventoryField('Last Seen', asset.lastSeenAt),
     inventoryField('Connection Source', asset.connectionSource)
   ]);

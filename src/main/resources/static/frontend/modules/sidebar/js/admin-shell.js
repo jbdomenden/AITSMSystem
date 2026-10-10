@@ -20,6 +20,12 @@ function adminIcon(name) {
   return `<span class='nav-icon svg-icon'>${icons[name] || ''}</span>`;
 }
 
+function adminShellEscape(value) {
+  return String(value ?? '').replace(/[&<>'"]/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+  }[char]));
+}
+
 function adminNavItems() {
   return [
     { section: 'Operations', items: [
@@ -85,11 +91,14 @@ async function loadHeaderNotifications(){
       <div style='display:flex;justify-content:flex-end;padding:8px;border-bottom:1px solid #1f325f'>
         <button class='btn btn-ghost' style='padding:4px 8px' onclick='markAllNotificationsRead()'>Mark all read</button>
       </div>
-      ${items.map(n=>`<button type='button' class='small' style='display:block;width:100%;text-align:left;padding:8px;border:none;border-bottom:1px solid #1f325f;background:${n.isRead ? 'transparent' : 'rgba(37,99,235,.12)'};color:inherit' onclick='openAdminNotification(${n.id}, "${String(n.type || '').replaceAll('"', '')}", ${Number(n.relatedUserId || 0)})'>
-        <strong style='display:block'>${n.title || 'Notification'}</strong>
-        <span>${n.message || 'Notification'}</span><br>
-        <span style='opacity:.7'>${n.createdAt || ''}</span>
-      </button>`).join('') || "<div class='small' style='padding:8px'>No notifications.</div>"}\n`;
+      ${items.map(n => {
+        const safeType = String(n.type || '').replace(/[^a-z0-9_-]/gi, '');
+        return `<button type='button' class='small' style='display:block;width:100%;text-align:left;padding:8px;border:none;border-bottom:1px solid #1f325f;background:${n.isRead ? 'transparent' : 'rgba(37,99,235,.12)'};color:inherit' onclick='openAdminNotification(${Number(n.id || 0)}, "${safeType}", ${Number(n.relatedUserId || 0)})'>
+          <strong style='display:block'>${adminShellEscape(n.title || 'Notification')}</strong>
+          <span>${adminShellEscape(n.message || 'Notification')}</span><br>
+          <span style='opacity:.7'>${adminShellEscape(n.createdAt || '')}</span>
+        </button>`;
+      }).join('') || "<div class='small' style='padding:8px'>No notifications.</div>"}\n`;
   } catch {
     list.innerHTML = "<div class='small'>Unable to load notifications.</div>";
   }
@@ -129,6 +138,7 @@ function renderUtilityHeader() {
         <a class='menu-action-btn' href='/profile.html'>${adminIcon('profile')}<span>Profile</span></a>
         <button type='button' class='menu-action-btn' onclick='openAdminHelp()'>${adminIcon('help')}<span>Help</span></button>
         <button type='button' class='menu-action-btn' onclick='openPasswordModal()'>${adminIcon('password')}<span>Change password</span></button>
+        <a class='menu-action-btn' href='/security.html'>${adminIcon('password')}<span>Security & sessions</span></a>
         <button type='button' class='menu-action-btn danger' onclick='logout()'>${adminIcon('logout')}<span>Logout</span></button>
       </div>
     </div>`;
@@ -151,8 +161,17 @@ function renderUtilityHeader() {
   loadHeaderNotifications();
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function initializeAdminShell() {
+  const sidebar = document.getElementById('adminSidebar');
+  const header = document.getElementById('utilityHeader');
+  if (!sidebar || !header) return false;
+  if (window.__aitsmAdminShellInitialized && sidebar.childElementCount && header.childElementCount) return true;
   renderAdminSidebar();
   renderUtilityHeader();
+  window.__aitsmAdminShellInitialized = true;
   if (window.matchMedia('(max-width: 980px)').matches) toggleAdminSidebar(true);
-});
+  return Boolean(sidebar.childElementCount && header.childElementCount);
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initializeAdminShell, { once: true });
+else initializeAdminShell();

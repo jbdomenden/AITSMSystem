@@ -1,2 +1,2 @@
-const headers = window.headers || (() => ({ 'Content-Type': 'application/json', 'X-User-Id': localStorage.getItem('userId') || '', 'X-User-Role': localStorage.getItem('role') || '' }));
+const headers = window.headers || authHeaders;
 async function loadNotifications(){ return fetch('/api/notifications',{headers:headers()}).then(r=>r.json()); }

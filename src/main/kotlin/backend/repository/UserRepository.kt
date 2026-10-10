@@ -1,12 +1,12 @@
 package backend.repository
 
-import backend.config.AuditLogsTable
 import backend.config.EulaAcceptanceTable
 import backend.config.UsersTable
 import backend.config.ProfilePhotoRequestsTable
 import backend.models.RegisterRequest
 import backend.models.User
 import backend.models.UserRole
+import backend.models.AccountState
 import backend.models.ProfilePhotoRequest
 import backend.models.ProfilePhotoStatus
 import org.jetbrains.exposed.sql.ResultRow
@@ -39,12 +39,19 @@ class UserRepository {
             it[UsersTable.passwordHash] = passwordHash
             it[UsersTable.role] = role.name
             it[UsersTable.emailVerified] = emailVerified
+            it[UsersTable.accountState] = if (emailVerified) AccountState.ACTIVE.name else AccountState.PENDING_VERIFICATION.name
             it[UsersTable.verificationCode] = null
             it[UsersTable.verificationExpiresAt] = null
             it[UsersTable.createdAt] = now
         }[UsersTable.id]
 
         UsersTable.selectAll().where { UsersTable.id eq id }.single().let(::toUser)
+    }
+
+    fun recordEulaAcceptance(userIdValue: Int, version: String) = transaction {
+        EulaAcceptanceTable.insert {
+            it[userId] = userIdValue; it[eulaVersion] = version; it[acceptedAt] = LocalDateTime.now()
+        }
     }
 
     fun create(
@@ -64,8 +71,11 @@ class UserRepository {
             it[UsersTable.passwordHash] = passwordHash
             it[UsersTable.role] = role.name
             it[UsersTable.emailVerified] = emailVerified
+            it[UsersTable.accountState] = if (emailVerified) AccountState.ACTIVE.name else AccountState.PENDING_VERIFICATION.name
             it[UsersTable.verificationCode] = verificationCode
             it[UsersTable.verificationExpiresAt] = verificationExpiry
+            it[UsersTable.verificationAttempts] = 0
+            it[UsersTable.verificationSentAt] = if (verificationCode == null) null else now
             it[createdAt] = now
         }[UsersTable.id]
 
@@ -97,6 +107,7 @@ class UserRepository {
                 it[UsersTable.passwordHash] = passwordHash
                 it[UsersTable.role] = UserRole.SUPERADMIN.name
                 it[UsersTable.emailVerified] = true
+                it[UsersTable.accountState] = AccountState.ACTIVE.name
                 it[UsersTable.verificationCode] = null
                 it[UsersTable.verificationExpiresAt] = null
                 it[UsersTable.createdAt] = now
@@ -104,15 +115,7 @@ class UserRepository {
             return@transaction UsersTable.selectAll().where { UsersTable.id eq id }.single().let(::toUser)
         }
 
-        val userId = existing[UsersTable.id]
-        UsersTable.update({ UsersTable.id eq userId }) {
-            it[UsersTable.passwordHash] = passwordHash
-            it[UsersTable.role] = UserRole.SUPERADMIN.name
-            it[UsersTable.emailVerified] = true
-            it[UsersTable.verificationCode] = null
-            it[UsersTable.verificationExpiresAt] = null
-        }
-        UsersTable.selectAll().where { UsersTable.id eq userId }.single().let(::toUser)
+        existing.let(::toUser)
     }
 
     fun findByEmail(email: String): Pair<User, String>? = transaction {
@@ -133,12 +136,17 @@ class UserRepository {
         val row = UsersTable.selectAll().where { UsersTable.email eq email.lowercase() }.singleOrNull() ?: return@transaction null
         val expectedCode = row[UsersTable.verificationCode]
         val expiry = row[UsersTable.verificationExpiresAt]
-        if (expectedCode != code || expiry == null || expiry.isBefore(LocalDateTime.now())) return@transaction null
+        if (row[UsersTable.verificationAttempts] >= 5 || expectedCode != code || expiry == null || expiry.isBefore(LocalDateTime.now())) {
+            UsersTable.update({ UsersTable.id eq row[UsersTable.id] }) { it[verificationAttempts] = row[UsersTable.verificationAttempts] + 1 }
+            return@transaction null
+        }
 
         UsersTable.update({ UsersTable.id eq row[UsersTable.id] }) {
             it[emailVerified] = true
+            it[accountState] = AccountState.ACTIVE.name
             it[verificationCode] = null
             it[verificationExpiresAt] = null
+            it[verificationAttempts] = 0
         }
         UsersTable.selectAll().where { UsersTable.id eq row[UsersTable.id] }.single().let(::toUser)
     }
@@ -146,10 +154,13 @@ class UserRepository {
     fun regenerateVerificationCode(email: String, code: String, expiresAt: LocalDateTime): Boolean = transaction {
         val row = UsersTable.selectAll().where { UsersTable.email eq email.lowercase() }.singleOrNull() ?: return@transaction false
         if (row[UsersTable.emailVerified]) return@transaction false
+        if (row[UsersTable.verificationSentAt]?.plusSeconds(60)?.isAfter(LocalDateTime.now()) == true) return@transaction false
 
         UsersTable.update({ UsersTable.id eq row[UsersTable.id] }) {
             it[verificationCode] = code
             it[verificationExpiresAt] = expiresAt
+            it[verificationAttempts] = 0
+            it[verificationSentAt] = LocalDateTime.now()
         }
         true
     }
@@ -174,6 +185,32 @@ class UserRepository {
         UsersTable.selectAll().where { UsersTable.id eq userId }.singleOrNull()?.let(::toUser)
     }
 
+    fun isLoginLocked(email: String): Boolean = transaction {
+        val row = UsersTable.selectAll().where { UsersTable.email eq email.lowercase() }.singleOrNull() ?: return@transaction false
+        row[UsersTable.lockedUntil]?.isAfter(LocalDateTime.now()) == true
+    }
+
+    fun recordLoginFailure(email: String): Int? = transaction {
+        val row = UsersTable.selectAll().where { UsersTable.email eq email.lowercase() }.singleOrNull() ?: return@transaction null
+        val attempts = row[UsersTable.failedLoginAttempts] + 1
+        UsersTable.update({ UsersTable.id eq row[UsersTable.id] }) {
+            it[failedLoginAttempts] = attempts
+            if (attempts >= 5) it[lockedUntil] = LocalDateTime.now().plusMinutes(15)
+        }
+        attempts
+    }
+
+    fun recordLoginSuccess(userId: Int) = transaction {
+        UsersTable.update({ UsersTable.id eq userId }) { it[failedLoginAttempts] = 0; it[lockedUntil] = null }
+    }
+
+    fun updateAccountState(userId: Int, state: AccountState): User? = transaction {
+        val row = UsersTable.selectAll().where { UsersTable.id eq userId }.singleOrNull() ?: return@transaction null
+        if (row[UsersTable.role] == UserRole.SUPERADMIN.name && state != AccountState.ACTIVE) return@transaction null
+        UsersTable.update({ UsersTable.id eq userId }) { it[accountState] = state.name }
+        UsersTable.selectAll().where { UsersTable.id eq userId }.single().let(::toUser)
+    }
+
 
     // Backward-compatible alias for older service callsites
     fun updateEmailVerification(userId: Int, approved: Boolean): User? =
@@ -185,6 +222,7 @@ class UserRepository {
 
         UsersTable.update({ UsersTable.id eq userId }) {
             it[UsersTable.emailVerified] = approved
+            it[UsersTable.accountState] = if (approved) AccountState.ACTIVE.name else AccountState.PENDING_VERIFICATION.name
             if (approved) {
                 it[UsersTable.verificationCode] = null
                 it[UsersTable.verificationExpiresAt] = null
@@ -200,6 +238,7 @@ class UserRepository {
             it[UsersTable.department] = department
             it[UsersTable.role] = role.name
             it[UsersTable.emailVerified] = true
+            it[UsersTable.accountState] = AccountState.ACTIVE.name
         }
         UsersTable.selectAll().where { UsersTable.id eq userId }.singleOrNull()?.let(::toUser)
     }
@@ -234,30 +273,12 @@ class UserRepository {
         val row = UsersTable.selectAll().where { UsersTable.id eq userId }.singleOrNull() ?: return@transaction null
         if (row[UsersTable.role] == UserRole.SUPERADMIN.name) return@transaction null
 
-        AuditLogsTable.update({ AuditLogsTable.userId eq userId }) { it[AuditLogsTable.userId] = null }
         UsersTable.deleteWhere { UsersTable.id eq userId }
         row.let(::toUser)
     }
 
     fun findById(id: Int): User? = transaction {
         UsersTable.selectAll().where { UsersTable.id eq id }.singleOrNull()?.let(::toUser)
-    }
-
-    fun createExternalUser(fullName: String, email: String, provider: String, passwordHash: String): User = transaction {
-        val now = LocalDateTime.now()
-        val id = UsersTable.insert {
-            it[UsersTable.fullName] = fullName
-            it[UsersTable.email] = email.lowercase()
-            it[UsersTable.company] = "$provider account"
-            it[UsersTable.department] = "Pending approval"
-            it[UsersTable.passwordHash] = passwordHash
-            it[UsersTable.role] = UserRole.END_USER.name
-            it[UsersTable.emailVerified] = false
-            it[UsersTable.verificationCode] = null
-            it[UsersTable.verificationExpiresAt] = null
-            it[UsersTable.createdAt] = now
-        }[UsersTable.id]
-        UsersTable.selectAll().where { UsersTable.id eq id }.single().let(::toUser)
     }
 
     fun hasPendingProfilePhoto(userId: Int): Boolean = transaction {
@@ -293,6 +314,13 @@ class UserRepository {
         }).singleOrNull()?.let(::toProfilePhotoRequest)
     }
 
+    fun profilePhotoRequestByUrl(photoUrl: String): ProfilePhotoRequest? = transaction {
+        ProfilePhotoRequestsTable.selectAll()
+            .where { ProfilePhotoRequestsTable.photoUrl eq photoUrl }
+            .singleOrNull()
+            ?.let(::toProfilePhotoRequest)
+    }
+
     fun reviewProfilePhotoRequest(requestId: Int, reviewerId: Int, approved: Boolean): ProfilePhotoRequest? = transaction {
         val row = ProfilePhotoRequestsTable.selectAll().where { ProfilePhotoRequestsTable.id eq requestId }.singleOrNull()
             ?: return@transaction null
@@ -320,6 +348,7 @@ class UserRepository {
         profilePhotoUrl = row[UsersTable.profilePhotoUrl],
         role = UserRole.from(row[UsersTable.role]),
         emailVerified = row[UsersTable.emailVerified],
+        accountState = AccountState.valueOf(row[UsersTable.accountState]),
         createdAt = row[UsersTable.createdAt].toString()
     )
 

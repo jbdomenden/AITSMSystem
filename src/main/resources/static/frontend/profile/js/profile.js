@@ -9,7 +9,7 @@ function viewedProfileId() {
 }
 
 function currentUserId() {
-  return Number(localStorage.getItem('userId') || 0);
+  return Number(window.currentUser?.id || 0);
 }
 
 function isOwnProfile() {
@@ -150,7 +150,7 @@ async function submitProfilePhoto(file) {
   try {
     const body = new FormData();
     body.append('photo', file);
-    const res = await fetch('/api/profile-photo-requests', { method: 'POST', headers: { 'X-User-Id': localStorage.getItem('userId') || '', 'X-User-Role': currentRole() }, body });
+    const res = await fetch('/api/profile-photo-requests', { method: 'POST', headers: { 'X-CSRF-Token': decodeURIComponent(readCookie('aitsm_csrf')) }, body });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || data.message || 'Unable to submit your photo.');
     setPhotoStatus('Photo submitted — waiting for admin approval.');
@@ -168,5 +168,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('profilePhotoInput')?.addEventListener('change', (event) => submitProfilePhoto(event.target.files?.[0]));
   document.getElementById('closeProfilePhotoSuccess')?.addEventListener('click', closeSuccessModal);
   document.getElementById('profilePhotoSuccessModal')?.addEventListener('click', (event) => { if (event.target.id === 'profilePhotoSuccessModal') closeSuccessModal(); });
-  try { await loadProfile(); } catch (error) { renderProfileError(error.message); }
+  try {
+    await window.aitsmReady;
+    if (!window.currentUser) return;
+    await loadProfile();
+  } catch (error) { renderProfileError(error.message); }
 });

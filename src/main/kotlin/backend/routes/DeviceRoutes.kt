@@ -8,6 +8,7 @@ import backend.models.UserRole
 import backend.repository.DeviceRepository
 import backend.repository.UserRepository
 import backend.security.requireRole
+import backend.security.userId
 import backend.services.AssetDetectionService
 import backend.services.InventoryService
 import backend.services.MonitoringService
@@ -84,7 +85,7 @@ fun Route.deviceRoutes(
                 .ifBlank { ip }
             val existing = deviceRepository.findByIp(ip)
 
-            val actorUserId = call.request.headers["X-User-Id"]?.toIntOrNull()
+            val actorUserId = call.userId()
             val actorUser = actorUserId?.let { userRepository.findById(it) }
             val actorRemoteIp = call.request.local.remoteHost
 

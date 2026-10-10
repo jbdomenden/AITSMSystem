@@ -31,15 +31,38 @@
       <span>Remember me</span>
     </label>
     <button class='btn btn-primary auth-login-btn' onclick='login()'>Login</button>
-    <div class='auth-divider' aria-hidden='true'><span>or continue with</span></div>
-    <div class='auth-social-actions'>
-      <button class='btn auth-provider-btn' type='button' onclick='signInWithGoogle()' aria-label='Sign in with Google'><span class='provider-mark provider-google'>G</span>Sign in with Google</button>
-      <button class='btn auth-provider-btn' type='button' onclick='showMicrosoftSignInMessage()' aria-label='Sign in with Microsoft'><span class='provider-mark provider-microsoft'>⊞</span>Sign in with Microsoft</button>
-    </div>
-    <p id='oauthLoginMessage' class='small auth-oauth-message' role='status' aria-live='polite'></p>
     <p class='small auth-links'>Need an account? <a href='/signup.html' class='text-primary'>sign up</a>.</p>
   </section>
-  <script src='/modules/common/js/app.js?v=oauth-session-v2'></script>
-  <script src='/login/js/auth.js?v=oauth-session-v2'></script>
+
+  <div id='mfaEnrollmentModal' class='modal-overlay hidden' role='dialog' aria-modal='true' aria-labelledby='mfaEnrollmentTitle'>
+    <section class='modal-card mfa-enrollment-card'>
+      <div id='mfaSetupStep'>
+        <p class='eyebrow'>Account security</p>
+        <h3 id='mfaEnrollmentTitle'>Set up your authenticator</h3>
+        <p class='small'>Scan this QR code once, then enter the current six-digit code from your authenticator app.</p>
+        <img id='mfaQrCode' class='mfa-qr-code' alt='Authenticator enrollment QR code'>
+        <p class='small'>Cannot scan it? Enter this time-based setup key manually:</p>
+        <code id='mfaManualKey' class='mfa-manual-key'></code>
+        <div class='form-group mfa-code-group'>
+          <label for='mfaEnrollmentCode'>Six-digit code</label>
+          <input id='mfaEnrollmentCode' type='text' inputmode='numeric' autocomplete='one-time-code' maxlength='6' pattern='[0-9]{6}' placeholder='000000'>
+        </div>
+        <p id='mfaEnrollmentError' class='small mfa-enrollment-error' role='alert'></p>
+        <div class='inline-actions mfa-enrollment-actions'>
+          <button class='btn btn-ghost' type='button' onclick='cancelMfaEnrollment()'>Cancel and sign out</button>
+          <button id='mfaConfirmButton' class='btn btn-primary' type='button' onclick='confirmMfaEnrollment()'>Verify and enable MFA</button>
+        </div>
+      </div>
+      <div id='mfaRecoveryStep' class='hidden'>
+        <p class='eyebrow'>MFA enabled</p>
+        <h3>Save your recovery codes</h3>
+        <p class='small'>Store these one-time codes securely. They will not be shown again.</p>
+        <pre id='mfaRecoveryCodes' class='mfa-recovery-codes'></pre>
+        <button class='btn btn-primary mfa-finish-button' type='button' onclick='finishMfaEnrollment()'>I saved the codes</button>
+      </div>
+    </section>
+  </div>
+  <script src='/modules/common/js/app.js?v=password-session-v3'></script>
+  <script src='/login/js/auth.js?v=mfa-enrollment-v4'></script>
 </body>
 </html>

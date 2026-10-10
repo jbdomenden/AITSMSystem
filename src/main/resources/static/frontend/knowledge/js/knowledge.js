@@ -80,13 +80,13 @@ function renderKnowledge(items) {
 
   host.innerHTML = items.map(a => `
     <tr>
-      <td><button type='button' class='btn btn-ghost' onclick='openKnowledgeModal(${a.id})'>${a.title || 'Untitled'}</button></td>
-      <td>${a.category || 'General'}</td>
-      <td>${formatKnowledgeDate(a.createdAt)}</td>
+      <td><button type='button' class='btn btn-ghost' onclick='openKnowledgeModal(${Number(a.id)})'>${aitsmEscapeHtml(a.title || 'Untitled')}</button></td>
+      <td>${aitsmEscapeHtml(a.category || 'General')}</td>
+      <td>${aitsmEscapeHtml(formatKnowledgeDate(a.createdAt))}</td>
       <td>
         <div class='table-actions'>
-          <button class='btn btn-ghost' type='button' onclick='startKnowledgeEdit(${a.id})'>Edit</button>
-          <button class='btn btn-ghost text-danger' type='button' onclick='deleteArticle(${a.id})'>Delete</button>
+          <button class='btn btn-ghost' type='button' onclick='startKnowledgeEdit(${Number(a.id)})'>Edit</button>
+          <button class='btn btn-ghost text-danger' type='button' onclick='deleteArticle(${Number(a.id)})'>Delete</button>
         </div>
       </td>
     </tr>

@@ -1,10 +1,8 @@
 function saveSession(data) {
-  localStorage.setItem('userId', data.user.id);
-  const normalizedRole = String(data.user.role || '').toLowerCase();
-  localStorage.setItem('role', normalizedRole);
-  localStorage.setItem('email', data.user.email || '');
-  localStorage.setItem('fullName', data.user.fullName || '');
+  window.currentUser = data.user;
 }
+
+let pendingMfaAuth = null;
 
 function toggleVerificationStep(email) {
   const registration = document.getElementById('registrationStep');
@@ -52,9 +50,13 @@ async function verifyEmailCode() {
   const data = await res.json();
   if (!res.ok) return alert(data.error || 'Verification failed');
 
+  if (data.mfaRequired || data.mfaEnrollmentRequired) {
+    alert('Email verified. Sign in to complete administrator MFA.');
+    location.href = '/login.html';
+    return;
+  }
   saveSession(data);
-  const role = String(data.user.role || '').toLowerCase();
-  location.href = ['admin', 'superadmin'].includes(role) ? '/dashboard-admin.html' : '/dashboard-user.html';
+  redirectForRole(data.user.role);
 }
 
 async function resendVerificationCode() {
@@ -68,63 +70,93 @@ async function resendVerificationCode() {
   const data = await res.json();
   if (!res.ok) return alert(data.error || 'Unable to resend code');
 
-  alert(`Verification code resent.${data.devVerificationCode ? `\nCode (dev mode): ${data.devVerificationCode}` : ''}`);
+  alert(`${data.message || 'Verification code resent.'}${data.devVerificationCode ? `\nCode (dev mode): ${data.devVerificationCode}` : ''}`);
 }
 
 async function login() {
+  const credentials = { email: email.value.trim(), password: password.value };
   const res = await fetch('/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: email.value.trim(), password: password.value })
+    body: JSON.stringify(credentials)
   });
   const data = await res.json();
-  if (!res.ok) return alert(data.error || 'Login failed');
+  if (!res.ok) return alert(data.error || data.message || 'Login failed');
 
-  saveSession(data);
-  const role = String(data.user.role || '').toLowerCase();
-  location.href = ['admin', 'superadmin'].includes(role) ? '/dashboard-admin.html' : '/dashboard-user.html';
-}
-
-function signInWithGoogle() {
-  window.location.assign('/api/auth/oauth/google');
-}
-
-function showMicrosoftSignInMessage() {
-  const message = document.getElementById('oauthLoginMessage');
-  if (message) message.textContent = 'Microsoft sign-in will be available once its Entra application is configured.';
-}
-
-async function completeGoogleLoginFromCallback() {
-  const params = new URLSearchParams(window.location.search);
-  const message = document.getElementById('oauthLoginMessage');
-  const error = params.get('oauth_error');
-  if (error) {
-    if (message) message.textContent = 'Google sign-in was cancelled or could not be completed. Please try again.';
-    history.replaceState({}, document.title, '/login.html');
+  if (data.mfaRequired) {
+    const code = window.prompt('Enter your 6-digit authenticator code (or a recovery code):') || '';
+    if (!code) return;
+    const second = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...credentials, ...(code.includes('-') || code.length > 6 ? { recoveryCode: code } : { mfaCode: code }) }) });
+    const completed = await second.json();
+    if (!second.ok || completed.mfaRequired) return alert(completed.error || 'MFA verification failed');
+    saveSession(completed); redirectForRole(completed.user.role); return;
+  }
+  if (data.mfaEnrollmentRequired) {
+    const enrollmentResponse = await fetch('/api/auth/mfa/enroll', { method: 'POST', headers: authHeaders() });
+    const enrollment = await enrollmentResponse.json();
+    if (!enrollmentResponse.ok) return alert(enrollment.error || enrollment.message || 'MFA enrollment failed');
+    pendingMfaAuth = data;
+    showMfaEnrollment(enrollment);
     return;
   }
-  const ticket = params.get('oauth_ticket');
-  if (!ticket) return;
-  if (message) message.textContent = 'Completing Google sign-in...';
+
+  saveSession(data);
+  redirectForRole(data.user.role);
+}
+
+function showMfaEnrollment(enrollment) {
+  const modal = document.getElementById('mfaEnrollmentModal');
+  document.getElementById('mfaQrCode').src = enrollment.qrCodeDataUrl;
+  document.getElementById('mfaManualKey').textContent = enrollment.manualKey;
+  document.getElementById('mfaEnrollmentCode').value = '';
+  document.getElementById('mfaEnrollmentError').textContent = '';
+  document.getElementById('mfaSetupStep').classList.remove('hidden');
+  document.getElementById('mfaRecoveryStep').classList.add('hidden');
+  modal.classList.remove('hidden');
+  document.getElementById('mfaEnrollmentCode').focus();
+}
+
+async function confirmMfaEnrollment() {
+  const codeInput = document.getElementById('mfaEnrollmentCode');
+  const error = document.getElementById('mfaEnrollmentError');
+  const button = document.getElementById('mfaConfirmButton');
+  const code = codeInput.value.trim();
+  if (!/^\d{6}$/.test(code)) {
+    error.textContent = 'Enter the current six-digit code from your authenticator app.';
+    codeInput.focus();
+    return;
+  }
+  error.textContent = '';
+  button.disabled = true;
   try {
-    const res = await fetch(`/api/auth/oauth/result?ticket=${encodeURIComponent(ticket)}`);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Google sign-in could not be completed.');
-    if (data.status === 'PENDING') {
-      if (message) message.textContent = data.message;
-      history.replaceState({}, document.title, '/login.html');
-      return;
-    }
-    const auth = data.auth || (data.user ? { token: data.token, user: data.user } : null);
-    if (!auth?.user) throw new Error(data.message || 'Google sign-in could not be completed.');
-    saveSession(auth);
-    redirectForRole(auth.user.role);
-  } catch (error) {
-    if (message) message.textContent = error.message || 'Google sign-in could not be completed.';
-    history.replaceState({}, document.title, '/login.html');
+    const confirmation = await fetch('/api/auth/mfa/confirm', {
+      method: 'POST', headers: authHeaders(), body: JSON.stringify({ code })
+    });
+    const recovery = await confirmation.json();
+    if (!confirmation.ok) throw new Error(recovery.error || recovery.message || 'MFA confirmation failed');
+    document.getElementById('mfaRecoveryCodes').textContent = recovery.recoveryCodes.join('\n');
+    document.getElementById('mfaSetupStep').classList.add('hidden');
+    document.getElementById('mfaRecoveryStep').classList.remove('hidden');
+  } catch (failure) {
+    error.textContent = failure.message || 'MFA confirmation failed. Try the newest code.';
+    codeInput.select();
+  } finally {
+    button.disabled = false;
   }
 }
 
+async function cancelMfaEnrollment() {
+  await fetch('/api/auth/logout', { method: 'POST', headers: authHeaders() }).catch(() => {});
+  pendingMfaAuth = null;
+  window.currentUser = null;
+  location.href = '/login.html';
+}
+
+function finishMfaEnrollment() {
+  if (!pendingMfaAuth?.user) return;
+  saveSession(pendingMfaAuth);
+  redirectForRole(pendingMfaAuth.user.role);
+}
 
 function openEulaModal() {
   const modal = document.getElementById('eulaModal');
@@ -179,5 +211,7 @@ function setPasswordVisibility(inputId, toggleId) {
 
 document.addEventListener('DOMContentLoaded', () => {
   setPasswordVisibility('password', 'loginPasswordToggle');
-  completeGoogleLoginFromCallback();
+  document.getElementById('mfaEnrollmentCode')?.addEventListener('keydown', event => {
+    if (event.key === 'Enter') confirmMfaEnrollment();
+  });
 });
