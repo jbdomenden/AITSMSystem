@@ -37,7 +37,7 @@ function closeAllRowMenus() {
 }
 
 function userTicketHref(ticketId) {
-  return `/tickets.html?ticketId=${encodeURIComponent(ticketId)}`;
+  return `/tickets?ticketId=${encodeURIComponent(ticketId)}`;
 }
 
 function getRequestedTicketId() {
@@ -113,7 +113,7 @@ async function createTicket() {
     return;
   }
   setCreateTicketMessage(`Ticket #${data.id} created successfully. Redirecting...`, 'success');
-  location.href = '/tickets.html';
+  location.href = '/tickets';
 }
 
 async function analyzeTicketWithAi() {
@@ -226,7 +226,7 @@ function renderTicketAiPreview(data) {
     const empty = document.createElement('p'); empty.className = 'small'; empty.textContent = 'No similar open tickets were found.'; duplicatesBlock.appendChild(empty);
   } else {
     duplicates.forEach((ticket) => {
-      const item = document.createElement('a'); item.className = 'ai-recommendation-item'; item.href = `/tickets.html?ticketId=${encodeURIComponent(ticket.id)}`;
+      const item = document.createElement('a'); item.className = 'ai-recommendation-item'; item.href = `/tickets?ticketId=${encodeURIComponent(ticket.id)}`;
       const itemTitle = document.createElement('strong'); itemTitle.textContent = `#${ticket.id} ${ticket.title}`;
       const meta = document.createElement('span'); meta.textContent = `${ticket.status} • ${ticket.priority} — ${ticket.reason}`;
       item.append(itemTitle, meta); duplicatesBlock.appendChild(item);

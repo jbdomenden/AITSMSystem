@@ -42,21 +42,8 @@ class MonitoringService(
     }
 
     fun lanDevices(): List<LanDeviceDto> {
-        val host = hostTelemetry()
         val reachabilityCache = mutableMapOf<String, Boolean>()
         fun isReachable(ip: String): Boolean = reachabilityCache.getOrPut(ip) { isDeviceReachable(ip) }
-
-        val hostDevice = LanDeviceDto(
-            id = "host-${host.ipAddress}",
-            hostname = host.hostname,
-            ipAddress = host.ipAddress,
-            reachable = true,
-            telemetryAvailable = true,
-            telemetrySourceType = "HOST",
-            cpuUsagePercent = host.cpuUsagePercent,
-            memoryUsagePercent = host.memoryUsagePercent,
-            lastSeen = host.timestamp
-        )
 
         val fromAgents = devices().map {
             val hasTelemetry = it.cpuUsage > 0 || it.memoryUsage > 0
@@ -89,7 +76,7 @@ class MonitoringService(
             )
         }
 
-        return (listOf(hostDevice) + fromAgents + discovered)
+        return (fromAgents + discovered)
             .distinctBy { it.ipAddress }
             .sortedBy { it.ipAddress }
     }
@@ -121,16 +108,15 @@ class MonitoringService(
     private data class Peer(val hostname: String, val ipAddress: String)
 
     private fun discoverLanPeers(): List<Peer> {
-        val ifacePeers = NetworkInterface.getNetworkInterfaces().toList()
+        val localAddresses = NetworkInterface.getNetworkInterfaces().toList()
             .filter { it.isUp && !it.isLoopback }
-            .flatMap { ni -> ni.inetAddresses.toList().mapNotNull { addr ->
-                val ip = addr.hostAddress.substringBefore('%')
-                if (!assetDetectionService.matches(ip)) null else Peer(ni.displayName.ifBlank { "LAN Host" }, ip)
-            }}
+            .flatMap { ni -> ni.inetAddresses.toList() }
+            .map { it.hostAddress.substringBefore('%') }
+            .toSet()
 
-        val arpPeers = discoverArpPeers()
-
-        return (ifacePeers + arpPeers).distinctBy { it.ipAddress }
+        return discoverArpPeers()
+            .filterNot { it.ipAddress in localAddresses || it.ipAddress.startsWith("127.") }
+            .distinctBy { it.ipAddress }
     }
 
     private fun discoverArpPeers(): List<Peer> {

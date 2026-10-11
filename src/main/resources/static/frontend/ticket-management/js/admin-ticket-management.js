@@ -77,7 +77,7 @@ function closeAdminRowMenus() {
 }
 
 function adminTicketHref(ticketId) {
-  return `/ticket-management.html?ticketId=${encodeURIComponent(ticketId)}`;
+  return `/ticket-management?ticketId=${encodeURIComponent(ticketId)}`;
 }
 
 function getRequestedAdminTicketId() {

@@ -37,7 +37,7 @@ function closeAllRowMenus() {
 }
 
 function userTicketHref(ticketId) {
-  return `/tickets.html?ticketId=${encodeURIComponent(ticketId)}`;
+  return `/tickets?ticketId=${encodeURIComponent(ticketId)}`;
 }
 
 function getRequestedTicketId() {
@@ -116,7 +116,7 @@ async function createTicket() {
     return;
   }
   setCreateTicketMessage(`Ticket #${data.id} created successfully. Redirecting...`, 'success');
-  location.href = '/tickets.html';
+  location.href = '/tickets';
 }
 
 async function updateMyTicketStatus(id, status){

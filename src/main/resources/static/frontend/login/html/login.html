@@ -10,29 +10,31 @@
   <section class='auth-panel'>
     <h2 class='auth-title'>AITSM Portal</h2>
     <p class='auth-subtitle'>Sign in to continue.</p>
-    <div class='form-grid' style='grid-template-columns:1fr'>
-      <div class='form-group'>
-        <label>Email</label>
-        <input id='email' type='email' placeholder='you@company.com'>
-      </div>
-      <div class='form-group'>
-        <label>Password</label>
-        <div class='password-field'>
-          <input id='password' type='password' placeholder='••••••••'>
-          <button id='loginPasswordToggle' class='password-toggle-btn' type='button' aria-label='Show password' aria-pressed='false' title='Show password'>
-            <span class='password-toggle-icon password-toggle-show' aria-hidden='true'>👁</span>
-            <span class='password-toggle-icon password-toggle-hide hidden' aria-hidden='true'>🙈</span>
-          </button>
+    <form id='loginForm'>
+      <div class='form-grid' style='grid-template-columns:1fr'>
+        <div class='form-group'>
+          <label for='email'>Email</label>
+          <input id='email' type='email' autocomplete='email' placeholder='you@company.com' required>
         </div>
-        <div class='auth-field-link'><button type='button' class='link-button text-primary' onclick='openForgotPasswordModal()'>Forgot password?</button></div>
+        <div class='form-group'>
+          <label for='password'>Password</label>
+          <div class='password-field'>
+            <input id='password' type='password' autocomplete='current-password' placeholder='••••••••' required>
+            <button id='loginPasswordToggle' class='password-toggle-btn' type='button' aria-label='Show password' aria-pressed='false' title='Show password'>
+              <span class='password-toggle-icon password-toggle-show' aria-hidden='true'>👁</span>
+              <span class='password-toggle-icon password-toggle-hide hidden' aria-hidden='true'>🙈</span>
+            </button>
+          </div>
+          <div class='auth-field-link'><button type='button' class='link-button text-primary' onclick='openForgotPasswordModal()'>Forgot password?</button></div>
+        </div>
       </div>
-    </div>
-    <label class="remember-row">
-      <input type="checkbox" id="rememberMe" />
-      <span>Remember me</span>
-    </label>
-    <button class='btn btn-primary auth-login-btn' onclick='login()'>Login</button>
-    <p class='small auth-links'>Need an account? <a href='/signup.html' class='text-primary'>sign up</a>.</p>
+      <label class="remember-row">
+        <input type="checkbox" id="rememberMe" />
+        <span>Remember me</span>
+      </label>
+      <button class='btn btn-primary auth-login-btn' type='submit'>Login</button>
+    </form>
+    <p class='small auth-links'>Need an account? <a href='/signup' class='text-primary'>sign up</a>.</p>
   </section>
 
   <div id='forgotPasswordModal' class='modal-overlay hidden' role='dialog' aria-modal='true' aria-labelledby='forgotPasswordTitle'>
@@ -60,11 +62,23 @@
         <p class='small'>Use at least 12 characters. Completing this reset signs out all existing sessions.</p>
         <div class='form-group'>
           <label for='resetNewPassword'>New password</label>
-          <input id='resetNewPassword' type='password' autocomplete='new-password' minlength='12' required>
+          <div class='password-field'>
+            <input id='resetNewPassword' type='password' autocomplete='new-password' minlength='12' required>
+            <button id='resetNewPasswordToggle' class='password-toggle-btn' type='button' aria-label='Show password' aria-pressed='false' title='Show password'>
+              <span class='password-toggle-icon password-toggle-show' aria-hidden='true'>👁</span>
+              <span class='password-toggle-icon password-toggle-hide hidden' aria-hidden='true'>🙈</span>
+            </button>
+          </div>
         </div>
         <div class='form-group'>
           <label for='resetConfirmPassword'>Confirm new password</label>
-          <input id='resetConfirmPassword' type='password' autocomplete='new-password' minlength='12' required>
+          <div class='password-field'>
+            <input id='resetConfirmPassword' type='password' autocomplete='new-password' minlength='12' required>
+            <button id='resetConfirmPasswordToggle' class='password-toggle-btn' type='button' aria-label='Show password' aria-pressed='false' title='Show password'>
+              <span class='password-toggle-icon password-toggle-show' aria-hidden='true'>👁</span>
+              <span class='password-toggle-icon password-toggle-hide hidden' aria-hidden='true'>🙈</span>
+            </button>
+          </div>
         </div>
         <p id='resetPasswordMessage' class='small hidden' role='status' aria-live='polite'></p>
         <div class='inline-actions' style='justify-content:flex-end'>
@@ -103,7 +117,7 @@
       </div>
     </section>
   </div>
-  <script src='/modules/common/js/app.js?v=password-session-v3'></script>
-  <script src='/login/js/auth.js?v=password-recovery-v1'></script>
+  <script src='/modules/common/js/app.js?v=canonical-routes-v2'></script>
+  <script src='/login/js/auth.js?v=login-enter-v2'></script>
 </body>
 </html>

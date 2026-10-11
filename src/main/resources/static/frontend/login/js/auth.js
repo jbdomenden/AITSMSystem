@@ -52,7 +52,7 @@ async function verifyEmailCode() {
 
   if (data.mfaRequired || data.mfaEnrollmentRequired) {
     alert('Email verified. Sign in to complete administrator MFA.');
-    location.href = '/login.html';
+    location.href = '/login';
     return;
   }
   saveSession(data);
@@ -173,7 +173,16 @@ function closeResetPasswordModal() {
   history.replaceState({}, document.title, location.pathname);
   ['resetNewPassword', 'resetConfirmPassword'].forEach(id => {
     const input = document.getElementById(id);
-    if (input) input.value = '';
+    if (input) {
+      input.value = '';
+      input.type = 'password';
+    }
+    const toggle = document.getElementById(`${id}Toggle`);
+    toggle?.setAttribute('aria-label', 'Show password');
+    toggle?.setAttribute('title', 'Show password');
+    toggle?.setAttribute('aria-pressed', 'false');
+    toggle?.querySelector('.password-toggle-show')?.classList.remove('hidden');
+    toggle?.querySelector('.password-toggle-hide')?.classList.add('hidden');
   });
   setRecoveryMessage('resetPasswordMessage');
 }
@@ -256,7 +265,7 @@ async function cancelMfaEnrollment() {
   await fetch('/api/auth/logout', { method: 'POST', headers: authHeaders() }).catch(() => {});
   pendingMfaAuth = null;
   window.currentUser = null;
-  location.href = '/login.html';
+  location.href = '/login';
 }
 
 function finishMfaEnrollment() {
@@ -317,7 +326,13 @@ function setPasswordVisibility(inputId, toggleId) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('loginForm')?.addEventListener('submit', event => {
+    event.preventDefault();
+    login();
+  });
   setPasswordVisibility('password', 'loginPasswordToggle');
+  setPasswordVisibility('resetNewPassword', 'resetNewPasswordToggle');
+  setPasswordVisibility('resetConfirmPassword', 'resetConfirmPasswordToggle');
   document.getElementById('forgotPasswordForm')?.addEventListener('submit', submitForgotPassword);
   document.getElementById('forgotPasswordCancel')?.addEventListener('click', closeForgotPasswordModal);
   document.getElementById('resetPasswordForm')?.addEventListener('submit', submitPasswordReset);

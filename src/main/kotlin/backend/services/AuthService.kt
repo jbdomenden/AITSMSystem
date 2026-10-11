@@ -246,7 +246,7 @@ class AuthService(
         val user = userRepository.findByEmailOnly(email.trim()) ?: return
         if (user.accountState != AccountState.ACTIVE) return
         val raw = passwordResets?.create(user.id) ?: return
-        val url = "${(Env.get("APP_BASE_URL") ?: "http://127.0.0.1:8070").removeSuffix("/")}/login.html?reset=$raw"
+        val url = "${(Env.get("APP_BASE_URL") ?: "http://127.0.0.1:8070").removeSuffix("/")}/login?reset=$raw"
         emailService?.sendPasswordReset(user.email, url)
         auditRepository.log(user.id, "Password reset requested", "auth")
     }

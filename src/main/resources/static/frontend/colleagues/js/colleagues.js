@@ -363,6 +363,11 @@
       searchTimer = window.setTimeout(loadSearch, 220);
     });
     document.getElementById('messageForm')?.addEventListener('submit', sendMessage);
+    document.getElementById('messageBody')?.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
+      event.preventDefault();
+      document.getElementById('messageForm')?.requestSubmit();
+    });
 
     document.addEventListener('aitsm:chat-conversations', (event) => {
       const items = Array.isArray(event.detail?.conversations) ? event.detail.conversations : [];

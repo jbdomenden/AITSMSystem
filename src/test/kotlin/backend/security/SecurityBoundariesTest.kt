@@ -53,6 +53,7 @@ class SecurityBoundariesTest {
     }
 
     @Test fun `incomplete MFA session can recover without reaching protected pages`() {
+        assertTrue(isMfaRecoveryPath("/login"))
         assertTrue(isMfaRecoveryPath("/login.html"))
         assertTrue(isMfaRecoveryPath("/login/html/login.html"))
         assertTrue(isMfaRecoveryPath("/shared/css/styles.css"))
@@ -76,6 +77,7 @@ class SecurityBoundariesTest {
     }
 
     @Test fun `server classifies protected application pages for both portals`() {
+        assertEquals(PageAudience.ADMIN, protectedPageAudience("/dashboard-admin"))
         assertEquals(PageAudience.ADMIN, protectedPageAudience("/dashboard-admin.html"))
         assertEquals(PageAudience.ADMIN, protectedPageAudience("/knowledge/html/knowledge.html"))
         assertEquals(PageAudience.END_USER, protectedPageAudience("/dashboard-user/html/dashboard-user.html"))
@@ -89,8 +91,17 @@ class SecurityBoundariesTest {
         assertTrue(isAdminPortalRole(UserRole.IT_ADMIN))
         assertTrue(isAdminPortalRole(UserRole.SUPERADMIN))
         assertFalse(isAdminPortalRole(UserRole.END_USER))
-        assertEquals("/dashboard-admin.html", portalHome(UserRole.IT_ADMIN))
-        assertEquals("/dashboard-user.html", portalHome(UserRole.END_USER))
+        assertEquals("/dashboard-admin", portalHome(UserRole.IT_ADMIN))
+        assertEquals("/dashboard-user", portalHome(UserRole.END_USER))
+    }
+
+    @Test fun `authentication pages redirect completed sessions instead of showing login again`() {
+        assertTrue(isAuthenticationPage("/"))
+        assertTrue(isAuthenticationPage("/login"))
+        assertTrue(isAuthenticationPage("/login.html"))
+        assertTrue(isAuthenticationPage("/login/html/login.html"))
+        assertFalse(isAuthenticationPage("/api/auth/login"))
+        assertFalse(isAuthenticationPage("/dashboard-user"))
     }
 
     @Test fun `reauthentication scopes are exact and cannot be widened by the client`() {

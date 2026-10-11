@@ -120,7 +120,7 @@ function renderInventoryRows(items) {
       <td><span class='badge ${inventoryStatusBadge(asset.status)}'>${aitsmEscapeHtml(asset.status || 'unknown')}</span></td>
       <td>${aitsmEscapeHtml(asset.lastSeenAt || 'Unavailable')}</td>
       <td>${aitsmEscapeHtml(asset.assignedDepartment || 'Unavailable')}</td>
-      <td><div class='inline-actions'><button class='btn btn-ghost' type='button' onclick='openInventoryDetail(${Number(asset.id)})'>View</button><a class='btn btn-ghost' href='/monitoring.html?editDevice=${encodeURIComponent(asset.id)}'>Edit</a></div></td>
+      <td><div class='inline-actions'><button class='btn btn-ghost' type='button' onclick='openInventoryDetail(${Number(asset.id)})'>View</button><a class='btn btn-ghost' href='/monitoring?editDevice=${encodeURIComponent(asset.id)}'>Edit</a></div></td>
     </tr>
   `).join('');
 }

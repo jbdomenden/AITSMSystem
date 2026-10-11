@@ -7,12 +7,10 @@ import backend.models.InventoryFilters
 import backend.models.InventoryUpsertDetectedRequest
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNotNull
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
@@ -63,16 +61,6 @@ class InventoryQueries {
     data class InventoryPagedResult(val items: List<InventoryAssetRecord>, val total: Long)
     data class InventoryStatsRaw(val total: Long, val online: Long, val offline: Long, val stale: Long, val bySource: Map<String, Long>)
 
-    private data class RegisteredDeviceRecord(
-        val id: Int,
-        val deviceName: String,
-        val ipAddress: String,
-        val department: String,
-        val assignedUser: String,
-        val status: String,
-        val lastSeen: LocalDateTime
-    )
-
     private fun rowToRecord(row: ResultRow): InventoryAssetRecord = InventoryAssetRecord(
         id = row[InventoryAssetsTable.id],
         assetTag = row[InventoryAssetsTable.assetTag],
@@ -114,77 +102,11 @@ class InventoryQueries {
         updatedAt = row[InventoryAssetsTable.updatedAt]
     )
 
-    private fun rowToRegisteredDevice(row: ResultRow): RegisteredDeviceRecord = RegisteredDeviceRecord(
-        id = row[DevicesTable.id],
-        deviceName = row[DevicesTable.deviceName],
-        ipAddress = row[DevicesTable.ipAddress],
-        department = row[DevicesTable.department],
-        assignedUser = row[DevicesTable.assignedUser],
-        status = row[DevicesTable.status],
-        lastSeen = row[DevicesTable.lastSeen]
-    )
-
-    private fun normalizeKey(value: String?): String? = value?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
     private fun getRawInventoryAssetById(id: Int): InventoryAssetRecord? =
         InventoryAssetsTable.selectAll().where { InventoryAssetsTable.id eq id }.singleOrNull()?.let(::rowToRecord)
 
-    private fun composeRegisteredInventoryRecord(
-        device: RegisteredDeviceRecord,
-        byIp: Map<String, InventoryAssetRecord>,
-        byHostname: Map<String, InventoryAssetRecord>
-    ): InventoryAssetRecord {
-        val enrichment = byIp[normalizeKey(device.ipAddress)] ?: byHostname[normalizeKey(device.deviceName)]
-        return InventoryAssetRecord(
-            id = device.id,
-            assetTag = enrichment?.assetTag,
-            deviceName = device.deviceName,
-            hostname = enrichment?.hostname ?: device.deviceName,
-            fullDeviceName = enrichment?.fullDeviceName ?: device.deviceName,
-            manufacturer = enrichment?.manufacturer,
-            model = enrichment?.model,
-            processorName = enrichment?.processorName,
-            processorSpeed = enrichment?.processorSpeed,
-            installedRam = enrichment?.installedRam,
-            usableRam = enrichment?.usableRam,
-            ramSpeed = enrichment?.ramSpeed,
-            gpuName = enrichment?.gpuName,
-            gpuMemory = enrichment?.gpuMemory,
-            storageTotal = enrichment?.storageTotal,
-            storageUsed = enrichment?.storageUsed,
-            storageFree = enrichment?.storageFree,
-            storageBreakdownJson = enrichment?.storageBreakdownJson,
-            systemType = enrichment?.systemType,
-            osName = enrichment?.osName,
-            osEdition = enrichment?.osEdition,
-            osVersion = enrichment?.osVersion,
-            osBuild = enrichment?.osBuild,
-            installedOn = enrichment?.installedOn,
-            domainOrWorkgroup = enrichment?.domainOrWorkgroup,
-            deviceUuid = enrichment?.deviceUuid,
-            productId = enrichment?.productId,
-            penTouchSupport = enrichment?.penTouchSupport,
-            ipAddress = device.ipAddress,
-            macAddress = enrichment?.macAddress,
-            connectionSource = enrichment?.connectionSource,
-            status = device.status,
-            assignedDepartment = device.department,
-            assignedUser = device.assignedUser,
-            notes = enrichment?.notes,
-            lastSeenAt = device.lastSeen,
-            createdAt = enrichment?.createdAt ?: device.lastSeen,
-            updatedAt = enrichment?.updatedAt ?: device.lastSeen
-        )
-    }
-
-    private fun getRegisteredInventoryRecords(): List<InventoryAssetRecord> {
-        val devices = DevicesTable.selectAll().map(::rowToRegisteredDevice)
-        val enrichment = InventoryAssetsTable.selectAll().map(::rowToRecord)
-        val byIp = enrichment.mapNotNull { record -> normalizeKey(record.ipAddress)?.let { it to record } }.toMap()
-        val byHostname = enrichment.mapNotNull { record ->
-            normalizeKey(record.hostname ?: record.fullDeviceName)?.let { it to record }
-        }.toMap()
-        return devices.map { device -> composeRegisteredInventoryRecord(device, byIp, byHostname) }
-    }
+    private fun getInventoryRecords(): List<InventoryAssetRecord> =
+        InventoryAssetsTable.selectAll().map(::rowToRecord)
 
     private fun filterInMemory(items: List<InventoryAssetRecord>, filters: InventoryFilters): List<InventoryAssetRecord> {
         return items.filter { row ->
@@ -226,7 +148,7 @@ class InventoryQueries {
     }
 
     fun getAll(filters: InventoryFilters): InventoryPagedResult = transaction {
-        val all = getRegisteredInventoryRecords()
+        val all = getInventoryRecords()
         val filtered = sortInMemory(filterInMemory(all, filters), filters)
         val page = filters.page.coerceAtLeast(1)
         val pageSize = filters.pageSize.coerceIn(1, 100)
@@ -236,7 +158,7 @@ class InventoryQueries {
     }
 
     fun getById(id: Int): InventoryAssetRecord? = transaction {
-        getRegisteredInventoryRecords().firstOrNull { it.id == id }
+        getInventoryRecords().firstOrNull { it.id == id }
     }
 
     fun getByHostname(hostname: String): InventoryAssetRecord? = transaction {
@@ -351,65 +273,47 @@ class InventoryQueries {
     }
 
     fun updateStatus(id: Int, status: String): InventoryAssetRecord? = transaction {
-        val registered = DevicesTable.selectAll().where { DevicesTable.id eq id }.singleOrNull() ?: return@transaction null
-        DevicesTable.update({ DevicesTable.id eq id }) {
-            it[DevicesTable.status] = status
-            it[DevicesTable.lastSeen] = LocalDateTime.now()
+        val asset = getRawInventoryAssetById(id) ?: return@transaction null
+        val now = LocalDateTime.now()
+        InventoryAssetsTable.update({ InventoryAssetsTable.id eq id }) {
+            it[InventoryAssetsTable.status] = status
+            it[InventoryAssetsTable.updatedAt] = now
         }
-        InventoryAssetsTable.selectAll().where { InventoryAssetsTable.ipAddress eq registered[DevicesTable.ipAddress] }.singleOrNull()?.let { row ->
-            InventoryAssetsTable.update({ InventoryAssetsTable.id eq row[InventoryAssetsTable.id] }) {
-                it[InventoryAssetsTable.status] = status
-                it[InventoryAssetsTable.updatedAt] = LocalDateTime.now()
+        asset.ipAddress?.let { ip ->
+            DevicesTable.update({ DevicesTable.ipAddress eq ip }) {
+                it[DevicesTable.status] = status
+                it[DevicesTable.lastSeen] = now
             }
         }
         getById(id)
     }
 
     fun updateAssignment(id: Int, department: String?, assignedUser: String?): InventoryAssetRecord? = transaction {
-        val registered = DevicesTable.selectAll().where { DevicesTable.id eq id }.singleOrNull() ?: return@transaction null
-        DevicesTable.update({ DevicesTable.id eq id }) {
-            it[DevicesTable.department] = department ?: registered[DevicesTable.department]
-            it[DevicesTable.assignedUser] = assignedUser ?: registered[DevicesTable.assignedUser]
-            it[DevicesTable.lastSeen] = LocalDateTime.now()
+        val asset = getRawInventoryAssetById(id) ?: return@transaction null
+        val now = LocalDateTime.now()
+        InventoryAssetsTable.update({ InventoryAssetsTable.id eq id }) {
+            it[InventoryAssetsTable.assignedDepartment] = department
+            it[InventoryAssetsTable.assignedUser] = assignedUser
+            it[InventoryAssetsTable.updatedAt] = now
         }
-        InventoryAssetsTable.selectAll().where { InventoryAssetsTable.ipAddress eq registered[DevicesTable.ipAddress] }.singleOrNull()?.let { row ->
-            InventoryAssetsTable.update({ InventoryAssetsTable.id eq row[InventoryAssetsTable.id] }) {
-                it[InventoryAssetsTable.assignedDepartment] = department
-                it[InventoryAssetsTable.assignedUser] = assignedUser
-                it[InventoryAssetsTable.updatedAt] = LocalDateTime.now()
+        asset.ipAddress?.let { ip ->
+            val registered = DevicesTable.selectAll().where { DevicesTable.ipAddress eq ip }.singleOrNull()
+            if (registered != null) {
+                DevicesTable.update({ DevicesTable.id eq registered[DevicesTable.id] }) {
+                    it[DevicesTable.department] = department ?: registered[DevicesTable.department]
+                    it[DevicesTable.assignedUser] = assignedUser ?: registered[DevicesTable.assignedUser]
+                    it[DevicesTable.lastSeen] = now
+                }
             }
         }
         getById(id)
     }
 
     fun updateNotes(id: Int, notes: String?): InventoryAssetRecord? = transaction {
-        val registered = DevicesTable.selectAll().where { DevicesTable.id eq id }.singleOrNull() ?: return@transaction null
-        val ip = registered[DevicesTable.ipAddress]
-        val hostname = registered[DevicesTable.deviceName]
-        val linkedAsset = InventoryAssetsTable.selectAll().where {
-            (InventoryAssetsTable.ipAddress eq ip) or (InventoryAssetsTable.hostname eq hostname)
-        }.singleOrNull()
-
-        if (linkedAsset == null) {
-            InventoryAssetsTable.insert {
-                it[assetTag] = null
-                it[InventoryAssetsTable.hostname] = hostname
-                it[fullDeviceName] = registered[DevicesTable.deviceName]
-                it[InventoryAssetsTable.ipAddress] = ip
-                it[InventoryAssetsTable.status] = registered[DevicesTable.status]
-                it[InventoryAssetsTable.assignedDepartment] = registered[DevicesTable.department]
-                it[InventoryAssetsTable.assignedUser] = registered[DevicesTable.assignedUser]
-                it[InventoryAssetsTable.notes] = notes
-                it[InventoryAssetsTable.connectionSource] = "manual"
-                it[InventoryAssetsTable.lastSeenAt] = registered[DevicesTable.lastSeen]
-                it[createdAt] = LocalDateTime.now()
-                it[updatedAt] = LocalDateTime.now()
-            }
-        } else {
-            InventoryAssetsTable.update({ InventoryAssetsTable.id eq linkedAsset[InventoryAssetsTable.id] }) {
-                it[InventoryAssetsTable.notes] = notes
-                it[InventoryAssetsTable.updatedAt] = LocalDateTime.now()
-            }
+        if (getRawInventoryAssetById(id) == null) return@transaction null
+        InventoryAssetsTable.update({ InventoryAssetsTable.id eq id }) {
+            it[InventoryAssetsTable.notes] = notes
+            it[InventoryAssetsTable.updatedAt] = LocalDateTime.now()
         }
         getById(id)
     }
@@ -426,21 +330,18 @@ class InventoryQueries {
     }
 
     fun markAssetsStale(before: LocalDateTime): Int = transaction {
-        InventoryAssetsTable.update({ (InventoryAssetsTable.lastSeenAt.isNotNull()) and (InventoryAssetsTable.lastSeenAt less before) }) {
+        InventoryAssetsTable.update({
+            (InventoryAssetsTable.lastSeenAt.isNotNull()) and
+                (InventoryAssetsTable.lastSeenAt less before) and
+                (InventoryAssetsTable.status eq "online")
+        }) {
             it[InventoryAssetsTable.status] = "stale"
             it[InventoryAssetsTable.updatedAt] = LocalDateTime.now()
         }
     }
 
-    fun markAssetsOnlineSince(since: LocalDateTime): Int = transaction {
-        InventoryAssetsTable.update({ (InventoryAssetsTable.lastSeenAt.isNotNull()) and (InventoryAssetsTable.lastSeenAt greaterEq since) }) {
-            it[InventoryAssetsTable.status] = "online"
-            it[InventoryAssetsTable.updatedAt] = LocalDateTime.now()
-        }
-    }
-
     fun getStats(): InventoryStatsRaw = transaction {
-        val rows = getRegisteredInventoryRecords()
+        val rows = getInventoryRecords()
         InventoryStatsRaw(
             total = rows.size.toLong(),
             online = rows.count { it.status.equals("online", ignoreCase = true) }.toLong(),
@@ -453,6 +354,6 @@ class InventoryQueries {
     fun searchAssets(query: String, filters: InventoryFilters): InventoryPagedResult = getAll(filters.copy(search = query))
 
     fun findAllForExport(filters: InventoryFilters): List<InventoryAssetRecord> = transaction {
-        sortInMemory(filterInMemory(getRegisteredInventoryRecords(), filters), filters)
+        sortInMemory(filterInMemory(getInventoryRecords(), filters), filters)
     }
 }

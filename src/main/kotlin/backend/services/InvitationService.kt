@@ -24,7 +24,7 @@ class InvitationService(
         require(users.findByEmailOnly(normalized) == null) { "Unable to create invitation" }
         require(role != UserRole.SUPERADMIN || actorRole == UserRole.SUPERADMIN) { "Only a system administrator can invite a system administrator" }
         val (view, raw) = invitations.create(normalized, role, actor, (Env.get("INVITATION_TTL_HOURS")?.toLongOrNull() ?: 24L))
-        val url = "${(Env.get("APP_BASE_URL") ?: "http://127.0.0.1:8070").removeSuffix("/")}/signup.html?invite=$raw"
+        val url = "${(Env.get("APP_BASE_URL") ?: "http://127.0.0.1:8070").removeSuffix("/")}/signup?invite=$raw"
         email?.sendInvitation(normalized, url)
         audit.log(actor, "Created invitation for $normalized as ${role.name}", "invitations")
         return view

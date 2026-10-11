@@ -9,7 +9,7 @@ This guide explains how to use the system as an end-user or admin.
 4. Administrators scan the MFA QR code (or use the manual key), confirm one code, and store recovery codes offline.
 5. Login with your credentials.
 
-Open `/security.html` to enroll or manage MFA, regenerate one-time recovery codes after reauthentication, review recent security activity, revoke another session, or sign out everywhere. Network information is deliberately approximate.
+Open `/security` to enroll or manage MFA, regenerate one-time recovery codes after reauthentication, review recent security activity, revoke another session, or sign out everywhere. Network information is deliberately approximate.
 
 ---
 

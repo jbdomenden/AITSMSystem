@@ -23,14 +23,19 @@ private val csrfExempt = setOf(
 internal enum class PageAudience { AUTHENTICATED, END_USER, ADMIN }
 
 private val endUserPages = setOf(
-    "dashboard-user.html", "create-ticket.html", "tickets.html",
-    "knowledge-library.html", "ai-assistant.html"
+    "dashboard-user", "dashboard-user.html", "create-ticket", "create-ticket.html", "tickets", "tickets.html",
+    "knowledge-library", "knowledge-library.html", "ai-assistant", "ai-assistant.html"
 )
 private val adminPages = setOf(
-    "dashboard-admin.html", "ticket-management.html", "monitoring.html", "inventory.html",
-    "assets.html", "settings.html", "user-management.html", "knowledge.html"
+    "dashboard-admin", "dashboard-admin.html", "ticket-management", "ticket-management.html",
+    "monitoring", "monitoring.html", "inventory", "inventory.html", "assets", "assets.html",
+    "settings", "settings.html", "user-management", "user-management.html", "knowledge", "knowledge.html"
 )
-private val authenticatedPages = setOf("profile.html", "security.html", "colleagues.html")
+private val authenticatedPages = setOf("profile", "profile.html", "security", "security.html", "colleagues", "colleagues.html")
+private val cleanPagePaths = (endUserPages + adminPages + authenticatedPages)
+    .filterNot { it.endsWith(".html") }
+    .mapTo(mutableSetOf()) { "/$it" }
+    .plus(setOf("/login", "/signup"))
 
 internal fun protectedPageAudience(path: String): PageAudience? {
     val page = path.substringAfterLast('/')
@@ -46,7 +51,7 @@ internal fun isAdminPortalRole(role: UserRole): Boolean =
     role in setOf(UserRole.ADMIN, UserRole.IT_ADMIN, UserRole.SUPERADMIN)
 
 internal fun portalHome(role: UserRole): String =
-    if (isAdminPortalRole(role)) "/dashboard-admin.html" else "/dashboard-user.html"
+    if (isAdminPortalRole(role)) "/dashboard-admin" else "/dashboard-user"
 
 fun Application.configureSecurityBoundary(sessions: SessionService) {
     val production = Env.get("APP_ENV").equals("production", true)
@@ -57,7 +62,7 @@ fun Application.configureSecurityBoundary(sessions: SessionService) {
     intercept(ApplicationCallPipeline.Plugins) {
         val path = call.request.path()
         when {
-            path.startsWith("/api/") || path.startsWith("/settings/") || path.endsWith(".html") -> {
+            path.startsWith("/api/") || path.startsWith("/settings/") || path.endsWith(".html") || path in cleanPagePaths -> {
                 call.response.headers.append("Cache-Control", "no-store, max-age=0")
                 call.response.headers.append("Pragma", "no-cache")
             }
@@ -85,9 +90,13 @@ fun Application.configureSecurityBoundary(sessions: SessionService) {
             call.response.headers.append(HttpHeaders.Pragma, "no-cache")
             call.respond(HttpStatusCode.Forbidden, ApiErrorResponse(403, "MFA completion is required")); finish(); return@intercept
         }
+        if (principal?.mfaComplete == true && isAuthenticationPage(path)) {
+            call.respondRedirect(portalHome(principal.user.role))
+            finish(); return@intercept
+        }
         protectedPageAudience(path)?.let { audience ->
             if (principal == null) {
-                call.respondRedirect("/login.html")
+                call.respondRedirect("/login")
                 finish(); return@intercept
             }
             val adminPortal = isAdminPortalRole(principal.user.role)
@@ -126,9 +135,12 @@ internal fun hasLegacyIdentityHeaders(headers: Headers): Boolean =
     headers["X-User-Id"] != null || headers["X-User-Role"] != null
 
 internal fun isMfaRecoveryPath(path: String): Boolean =
-    path in setOf("/", "/index.html", "/login.html", "/api/auth/login", "/api/auth/me", "/api/auth/logout") ||
+    path in setOf("/", "/index.html", "/login", "/login.html", "/api/auth/login", "/api/auth/me", "/api/auth/logout") ||
         path.startsWith("/index/") || path.startsWith("/login/") || path.startsWith("/shared/") ||
         path.startsWith("/modules/") || path.startsWith("/api/auth/mfa/")
+
+internal fun isAuthenticationPage(path: String): Boolean =
+    path in setOf("/", "/index.html", "/index/html/index.html", "/login", "/login.html", "/login/html/login.html")
 
 fun ApplicationCall.principal(): SessionPrincipal? = attributes.getOrNull(PrincipalKey)
 fun ApplicationCall.userId(): Int? = principal()?.user?.id

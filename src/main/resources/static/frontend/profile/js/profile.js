@@ -62,7 +62,7 @@ function setProfileAction(html) {
 
 function renderColleagueAction(result) {
   const colleague = result.colleague;
-  const back = '<a class="btn btn-ghost" href="/colleagues.html">Back to colleagues</a>';
+  const back = '<a class="btn btn-ghost" href="/colleagues">Back to colleagues</a>';
   if (result.relationship === 'ACCEPTED') {
     setProfileAction(`${back}<button class="btn btn-primary" type="button" id="profileMessageBtn">Open chat</button>`);
     document.getElementById('profileMessageBtn')?.addEventListener('click', () => {
@@ -133,7 +133,7 @@ function renderProfileError(message) {
   assignText('profileEmail', 'The requested colleague could not be displayed.');
   document.getElementById('changeProfilePhoto')?.setAttribute('hidden', '');
   document.getElementById('photoApprovalCard')?.setAttribute('hidden', '');
-  setProfileAction('<a class="btn btn-ghost" href="/colleagues.html">Back to colleagues</a>');
+  setProfileAction('<a class="btn btn-ghost" href="/colleagues">Back to colleagues</a>');
   setPhotoStatus(message || 'This profile is unavailable.', true);
 }
 

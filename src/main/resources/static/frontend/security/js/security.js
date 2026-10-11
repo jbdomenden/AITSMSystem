@@ -71,7 +71,7 @@ async function loadSecurityEvents() {
 }
 
 async function revokeSession(id) { await securityJson(`/api/auth/sessions/${id}`, { method: 'DELETE' }); await loadSessions(); }
-async function logoutEverywhere() { await securityJson('/api/auth/logout-all', { method: 'POST' }); location.href = '/login.html'; }
+async function logoutEverywhere() { await securityJson('/api/auth/logout-all', { method: 'POST' }); location.href = '/login'; }
 document.addEventListener('DOMContentLoaded', async () => {
   await window.aitsmReady;
   await Promise.all([loadSessions(), loadMfa(), loadSecurityEvents()]).catch(error => alert(error.message));

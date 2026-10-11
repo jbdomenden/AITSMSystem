@@ -99,7 +99,7 @@
         </header>
         <div class="chat-drawer-body">
           <section class="chat-conversation-view" data-chat-view="list" aria-label="Conversations">
-            <div class="chat-drawer-section-head"><strong>Conversations</strong><a href="/colleagues.html">Manage colleagues</a></div>
+            <div class="chat-drawer-section-head"><strong>Conversations</strong><a href="/colleagues">Manage colleagues</a></div>
             <div class="chat-drawer-list" data-chat-list></div>
           </section>
           <section class="chat-conversation-view hidden" data-chat-view="conversation" aria-label="Active conversation">
@@ -127,6 +127,7 @@
     root.querySelector('[data-chat-profile]')?.addEventListener('click', openSelectedProfile);
     root.querySelector('[data-chat-form]')?.addEventListener('submit', sendMessage);
     root.querySelector('#chatDrawerMessage')?.addEventListener('input', saveDraft);
+    root.querySelector('#chatDrawerMessage')?.addEventListener('keydown', submitMessageOnEnter);
     root.querySelector('[data-chat-messages]')?.addEventListener('scroll', saveScrollPosition);
     document.addEventListener('keydown', handleKeydown);
     applyDisplayState();
@@ -482,6 +483,12 @@
       if (submit) submit.disabled = false;
       composer?.focus();
     }
+  }
+
+  function submitMessageOnEnter(event) {
+    if (event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
+    event.preventDefault();
+    root?.querySelector('[data-chat-form]')?.requestSubmit();
   }
 
   function schedulePoll() {

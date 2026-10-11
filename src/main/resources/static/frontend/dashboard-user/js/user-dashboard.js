@@ -14,7 +14,7 @@ function formatDateTime(value) {
 }
 
 function userTicketHref(ticketId) {
-  return `/tickets.html?ticketId=${encodeURIComponent(ticketId)}`;
+  return `/tickets?ticketId=${encodeURIComponent(ticketId)}`;
 }
 
 function renderUserSummary(tickets) {

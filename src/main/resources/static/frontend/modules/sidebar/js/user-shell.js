@@ -26,12 +26,12 @@ function userShellEscape(value) {
 function userNavItems() {
   return [
     { section: 'Workspace', items: [
-      { page: 'dashboard-user.html', href: '/dashboard-user.html', icon: 'overview', label: 'Overview' },
-      { page: 'create-ticket.html', href: '/create-ticket.html', icon: 'create', label: 'Create Ticket' },
-      { page: 'tickets.html', href: '/tickets.html', icon: 'tickets', label: 'My Tickets' },
-      { page: 'knowledge-library.html', href: '/knowledge-library.html', icon: 'knowledge', label: 'Knowledge Base' },
-      { page: 'ai-assistant.html', href: '/ai-assistant.html', icon: 'assistant', label: 'AI Assistant' },
-      { page: 'colleagues.html', href: '/colleagues.html', icon: 'profile', label: 'Colleagues & Chat' }
+      { page: 'dashboard-user', href: '/dashboard-user', icon: 'overview', label: 'Overview' },
+      { page: 'create-ticket', href: '/create-ticket', icon: 'create', label: 'Create Ticket' },
+      { page: 'tickets', href: '/tickets', icon: 'tickets', label: 'My Tickets' },
+      { page: 'knowledge-library', href: '/knowledge-library', icon: 'knowledge', label: 'Knowledge Base' },
+      { page: 'ai-assistant', href: '/ai-assistant', icon: 'assistant', label: 'AI Assistant' },
+      { page: 'colleagues', href: '/colleagues', icon: 'profile', label: 'Colleagues & Chat' }
     ] }
   ];
 }
@@ -118,7 +118,7 @@ function renderUserUtilityHeader() {
   host.innerHTML = `
     <div class='utility-left'>
       <button id='userSidebarToggle' class='btn btn-ghost icon-btn header-icon-btn' type='button' aria-label='Toggle sidebar' title='Toggle sidebar' aria-expanded='true'>${userIcon('menu')}</button>
-      <a class='utility-brand' href='/dashboard-user.html' aria-label='Go to user dashboard overview'>AITSM Portal</a>
+      <a class='utility-brand' href='/dashboard-user' aria-label='Go to user dashboard overview'>AITSM Portal</a>
     </div>
     <div class='utility-right'>
       <button class='btn btn-ghost icon-btn header-icon-btn' type='button' onclick='openGlobalSearch()' aria-label='Search AITSM' title='Search AITSM (Ctrl+K)'>⌕</button>
@@ -127,10 +127,10 @@ function renderUserUtilityHeader() {
       <div id='userNotifMenu' class='admin-header-menu hidden'><div id='userNotifList' class='small'>Loading...</div></div>
       <button id='userMenuTrigger' class='btn btn-ghost icon-btn header-icon-btn' type='button' onclick='toggleUserHeaderMenu()' aria-label='Open account menu' title='Account menu'>${userIcon('more')}</button>
       <div id='userHeaderMenu' class='admin-header-menu hidden'>
-        <a class='menu-action-btn' href='/profile.html'>${userIcon('profile')}<span>Profile</span></a>
+        <a class='menu-action-btn' href='/profile'>${userIcon('profile')}<span>Profile</span></a>
         <button type='button' class='menu-action-btn' onclick='openUserHelp()'>${userIcon('help')}<span>Help</span></button>
         <button type='button' class='menu-action-btn' onclick='openPasswordModal()'>${userIcon('password')}<span>Change password</span></button>
-        <a class='menu-action-btn' href='/security.html'>${userIcon('password')}<span>Security & sessions</span></a>
+        <a class='menu-action-btn' href='/security'>${userIcon('password')}<span>Security & sessions</span></a>
         <button type='button' class='menu-action-btn danger' onclick='logout()'>${userIcon('logout')}<span>Logout</span></button>
       </div>
     </div>`;

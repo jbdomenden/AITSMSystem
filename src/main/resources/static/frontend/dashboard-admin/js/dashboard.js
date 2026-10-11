@@ -12,6 +12,10 @@ const dashboardState = {
   }
 };
 
+const DASHBOARD_TELEMETRY_REFRESH_MS = 5 * 1000;
+let dashboardTelemetryRefreshTimer = null;
+let dashboardTelemetryRefreshInFlight = false;
+
 function parseDate(value) {
   const date = new Date(value || '');
   return Number.isNaN(date.getTime()) ? null : date;
@@ -410,8 +414,8 @@ function renderSystemPerformance() {
   const ticketLoad = Math.min(100, (activeTickets / totalTickets) * 100);
 
   const metrics = [
-    { label: 'Host CPU', value: Number(host.cpuUsagePercent || 0), target: 'Below 75%' },
-    { label: 'Host Memory', value: Number(host.memoryUsagePercent || 0), target: 'Below 80%' },
+    { label: 'Server CPU', value: Number(host.cpuUsagePercent || 0), target: 'Below 75%' },
+    { label: 'Server Memory', value: Number(host.memoryUsagePercent || 0), target: 'Below 80%' },
     { label: 'Telemetry Coverage', value: telemetryCoverage, target: 'Above 70%' },
     { label: 'Active Ticket Load', value: ticketLoad, target: 'Lower is better' }
   ].map((metric) => ({ ...metric, value: Math.max(0, Math.min(100, Number(metric.value.toFixed(1)))) }));
@@ -443,7 +447,7 @@ function renderSystemPerformance() {
 }
 
 function adminTicketHref(ticketId) {
-  return `/ticket-management.html?ticketId=${encodeURIComponent(ticketId)}`;
+  return `/ticket-management?ticketId=${encodeURIComponent(ticketId)}`;
 }
 
 function renderRecentAdminTickets(tickets) {
@@ -659,7 +663,41 @@ async function loadAdminDashboard() {
   }
 }
 
+async function refreshDashboardTelemetry() {
+  if (dashboardTelemetryRefreshInFlight || document.hidden) return;
+  dashboardTelemetryRefreshInFlight = true;
+  try {
+    const [monitorSummary, lanDevices] = await Promise.all([
+      fetchJsonOrThrow('/api/monitoring/summary'),
+      fetchJsonOrThrow('/api/monitoring/lan-devices')
+    ]);
+    dashboardState.monitoringSummary = monitorSummary || null;
+    dashboardState.lanDevices = Array.isArray(lanDevices) ? lanDevices : [];
+    renderMetricCards();
+    renderSystemPerformance();
+    renderAdminOpsFeed(dashboardState.lanDevices, dashboardState.notifications);
+  } catch {
+    // Keep the last successful snapshot visible during a temporary refresh failure.
+  } finally {
+    dashboardTelemetryRefreshInFlight = false;
+  }
+}
+
+function startDashboardTelemetryRefresh() {
+  if (dashboardTelemetryRefreshTimer) window.clearInterval(dashboardTelemetryRefreshTimer);
+  dashboardTelemetryRefreshTimer = window.setInterval(refreshDashboardTelemetry, DASHBOARD_TELEMETRY_REFRESH_MS);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   wireTrendControls();
   loadAdminDashboard();
+  startDashboardTelemetryRefresh();
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) refreshDashboardTelemetry();
+});
+
+window.addEventListener('beforeunload', () => {
+  if (dashboardTelemetryRefreshTimer) window.clearInterval(dashboardTelemetryRefreshTimer);
 });

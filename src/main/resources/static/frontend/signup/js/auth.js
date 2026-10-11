@@ -36,7 +36,7 @@ async function signup() {
   if (!data.user) return alert('Invitation could not be accepted.');
   if (data.mfaEnrollmentRequired) {
     alert('Your administrator account is ready. Sign in to complete mandatory MFA setup.');
-    location.href = '/login.html';
+    location.href = '/login';
     return;
   }
   saveSession(data);
@@ -56,7 +56,7 @@ async function verifyEmailCode() {
 
   if (data.mfaRequired || data.mfaEnrollmentRequired) {
     alert('Email verified. Sign in to complete administrator MFA.');
-    location.href = '/login.html';
+    location.href = '/login';
     return;
   }
   saveSession(data);

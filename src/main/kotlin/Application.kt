@@ -153,31 +153,44 @@ fun Application.module() {
     }
 
     routing {
-        suspend fun ApplicationCall.redirectKeepingQuery(target: String) {
+        suspend fun ApplicationCall.redirectKeepingQuery(target: String, permanent: Boolean = false) {
             val query = request.queryString().takeIf { it.isNotBlank() }
-            respondRedirect(if (query == null) target else "$target?$query")
+            respondRedirect(if (query == null) target else "$target?$query", permanent = permanent)
         }
 
-        get("/") { call.respondRedirect("/index/html/index.html") }
-        get("/index.html") { call.respondRedirect("/index/html/index.html") }
-        get("/login.html") { call.redirectKeepingQuery("/login/html/login.html") }
-        get("/signup.html") { call.respondRedirect("/signup/html/signup.html") }
-        get("/dashboard-admin.html") { call.respondRedirect("/dashboard-admin/html/dashboard-admin.html") }
-        get("/dashboard-user.html") { call.respondRedirect("/dashboard-user/html/dashboard-user.html") }
-        get("/ticket-management.html") { call.respondRedirect("/ticket-management/html/ticket-management.html") }
-        get("/tickets.html") { call.respondRedirect("/tickets/html/tickets.html") }
-        get("/create-ticket.html") { call.respondRedirect("/create-ticket/html/create-ticket.html") }
-        get("/assets.html") { call.respondRedirect("/assets/html/assets.html") }
-        get("/monitoring.html") { call.respondRedirect("/monitoring/html/monitoring.html") }
-        get("/inventory.html") { call.respondRedirect("/inventory/html/inventory.html") }
-        get("/knowledge.html") { call.respondRedirect("/knowledge/html/knowledge.html") }
-        get("/knowledge-library.html") { call.redirectKeepingQuery("/knowledge-library/html/knowledge-library.html") }
-        get("/settings.html") { call.respondRedirect("/settings/html/settings.html") }
-        get("/profile.html") { call.redirectKeepingQuery("/profile/html/profile.html") }
-        get("/security.html") { call.respondRedirect("/security/html/security.html") }
-        get("/user-management.html") { call.respondRedirect("/user-management/html/user-management.html") }
-        get("/ai-assistant.html") { call.respondRedirect("/ai-assistant/html/ai-assistant.html") }
-        get("/colleagues.html") { call.redirectKeepingQuery("/colleagues/html/colleagues.html") }
+        val pageResources = mapOf(
+            "/login" to "login/html/login.html",
+            "/signup" to "signup/html/signup.html",
+            "/dashboard-admin" to "dashboard-admin/html/dashboard-admin.html",
+            "/dashboard-user" to "dashboard-user/html/dashboard-user.html",
+            "/ticket-management" to "ticket-management/html/ticket-management.html",
+            "/tickets" to "tickets/html/tickets.html",
+            "/create-ticket" to "create-ticket/html/create-ticket.html",
+            "/assets" to "assets/html/assets.html",
+            "/monitoring" to "monitoring/html/monitoring.html",
+            "/inventory" to "inventory/html/inventory.html",
+            "/knowledge" to "knowledge/html/knowledge.html",
+            "/knowledge-library" to "knowledge-library/html/knowledge-library.html",
+            "/settings" to "settings/html/settings.html",
+            "/profile" to "profile/html/profile.html",
+            "/security" to "security/html/security.html",
+            "/user-management" to "user-management/html/user-management.html",
+            "/ai-assistant" to "ai-assistant/html/ai-assistant.html",
+            "/colleagues" to "colleagues/html/colleagues.html"
+        )
+
+        get("/") { call.respondRedirect("/login") }
+        get("/index.html") { call.respondRedirect("/login", permanent = true) }
+        get("/index/html/index.html") { call.respondRedirect("/login", permanent = true) }
+        pageResources.forEach { (cleanPath, resourcePath) ->
+            val resourceDirectory = resourcePath.substringBeforeLast('/')
+            val resourceFile = resourcePath.substringAfterLast('/')
+            staticResources(cleanPath, "static/frontend/$resourceDirectory") {
+                default(resourceFile)
+            }
+            get("$cleanPath.html") { call.redirectKeepingQuery(cleanPath, permanent = true) }
+            get("/${resourcePath}") { call.redirectKeepingQuery(cleanPath, permanent = true) }
+        }
         get("/api/health") {
             call.respond(mapOf("status" to "ok"))
         }

@@ -132,7 +132,6 @@ class InventoryService(
 
     fun refreshAssetStatus() {
         val threshold = LocalDateTime.now().minusMinutes(staleMinutes)
-        inventoryQueries.markAssetsOnlineSince(threshold)
         inventoryQueries.markAssetsStale(threshold)
     }
 

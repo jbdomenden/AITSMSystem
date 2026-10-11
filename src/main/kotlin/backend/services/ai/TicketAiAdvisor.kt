@@ -178,7 +178,7 @@ $historyText
         val byId = candidates.associateBy { it.id }
         return choices.distinctBy { it.id }.mapNotNull { choice ->
             val article = byId[choice.id] ?: return@mapNotNull null
-            KnowledgeRecommendation(article.id, article.title, article.category, choice.relevance.trim().ifBlank { "Relevant troubleshooting guidance" }.take(300), "/knowledge-library.html?articleId=${article.id}")
+            KnowledgeRecommendation(article.id, article.title, article.category, choice.relevance.trim().ifBlank { "Relevant troubleshooting guidance" }.take(300), "/knowledge-library?articleId=${article.id}")
         }.take(3)
     }
 
@@ -186,7 +186,7 @@ $historyText
         val inputTokens = tokens("${input.title} ${input.description}")
         return candidates.mapNotNull { article ->
             val overlap = inputTokens.intersect(tokens("${article.title} ${article.content}")).size
-            if (overlap < 2) null else KnowledgeRecommendation(article.id, article.title, article.category, "Matches $overlap keywords from the reported issue.", "/knowledge-library.html?articleId=${article.id}")
+            if (overlap < 2) null else KnowledgeRecommendation(article.id, article.title, article.category, "Matches $overlap keywords from the reported issue.", "/knowledge-library?articleId=${article.id}")
         }.take(3)
     }
 

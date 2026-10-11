@@ -29,17 +29,17 @@ function adminShellEscape(value) {
 function adminNavItems() {
   return [
     { section: 'Operations', items: [
-      { page: 'dashboard-admin.html', href: '/dashboard-admin.html', icon: 'overview', label: 'Overview' },
-      { page: 'ticket-management.html', href: '/ticket-management.html', icon: 'tickets', label: 'Ticket Management' },
-      { page: 'monitoring.html', href: '/monitoring.html', icon: 'monitoring', label: 'LAN Monitoring' },
-      { page: 'inventory.html', href: '/inventory.html', icon: 'inventory', label: 'Inventory' },
-      { page: 'knowledge.html', href: '/knowledge.html', icon: 'knowledge', label: 'Knowledge Base' }
+      { page: 'dashboard-admin', href: '/dashboard-admin', icon: 'overview', label: 'Overview' },
+      { page: 'ticket-management', href: '/ticket-management', icon: 'tickets', label: 'Ticket Management' },
+      { page: 'monitoring', href: '/monitoring', icon: 'monitoring', label: 'LAN Monitoring' },
+      { page: 'inventory', href: '/inventory', icon: 'inventory', label: 'Inventory' },
+      { page: 'knowledge', href: '/knowledge', icon: 'knowledge', label: 'Knowledge Base' }
     ]},
     { section: 'System', items: [
-      { page: 'settings.html', href: '/settings.html', icon: 'settings', label: 'Settings' },
-      { page: 'assets.html', href: '/assets.html', icon: 'assets', label: 'Asset Management' },
-      { page: 'user-management.html', href: '/user-management.html', icon: 'users', label: 'User Management' },
-      { page: 'colleagues.html', href: '/colleagues.html', icon: 'users', label: 'Colleagues & Chat' }
+      { page: 'settings', href: '/settings', icon: 'settings', label: 'Settings' },
+      { page: 'assets', href: '/assets', icon: 'assets', label: 'Asset Management' },
+      { page: 'user-management', href: '/user-management', icon: 'users', label: 'User Management' },
+      { page: 'colleagues', href: '/colleagues', icon: 'users', label: 'Colleagues & Chat' }
     ]}
   ];
 }
@@ -126,7 +126,7 @@ function renderUtilityHeader() {
   host.innerHTML = `
     <div class='utility-left'>
       <button id='adminSidebarToggle' class='btn btn-ghost icon-btn header-icon-btn' type='button' aria-label='Toggle sidebar' title='Toggle sidebar' aria-expanded='true'>${adminIcon('menu')}</button>
-      <a class='utility-brand' href='/dashboard-admin.html' aria-label='Go to dashboard overview'>AITSM Control</a>
+      <a class='utility-brand' href='/dashboard-admin' aria-label='Go to dashboard overview'>AITSM Control</a>
     </div>
     <div class='utility-right'>
       <button class='btn btn-ghost icon-btn header-icon-btn' type='button' onclick='openGlobalSearch()' aria-label='Search AITSM' title='Search AITSM (Ctrl+K)'>⌕</button>
@@ -135,10 +135,10 @@ function renderUtilityHeader() {
       <div id='adminNotifMenu' class='admin-header-menu hidden'><div id='adminNotifList' class='small'>Loading...</div></div>
       <button id='adminMenuTrigger' class='btn btn-ghost icon-btn header-icon-btn' type='button' onclick='toggleAdminHeaderMenu()' aria-label='Open account menu' title='Account menu'>${adminIcon('more')}</button>
       <div id='adminHeaderMenu' class='admin-header-menu hidden'>
-        <a class='menu-action-btn' href='/profile.html'>${adminIcon('profile')}<span>Profile</span></a>
+        <a class='menu-action-btn' href='/profile'>${adminIcon('profile')}<span>Profile</span></a>
         <button type='button' class='menu-action-btn' onclick='openAdminHelp()'>${adminIcon('help')}<span>Help</span></button>
         <button type='button' class='menu-action-btn' onclick='openPasswordModal()'>${adminIcon('password')}<span>Change password</span></button>
-        <a class='menu-action-btn' href='/security.html'>${adminIcon('password')}<span>Security & sessions</span></a>
+        <a class='menu-action-btn' href='/security'>${adminIcon('password')}<span>Security & sessions</span></a>
         <button type='button' class='menu-action-btn danger' onclick='logout()'>${adminIcon('logout')}<span>Logout</span></button>
       </div>
     </div>`;

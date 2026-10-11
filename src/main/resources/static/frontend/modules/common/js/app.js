@@ -1,5 +1,24 @@
 const apiBase = '';
 
+function useCanonicalPageUrl() {
+  const legacyPageMatch = location.pathname.match(/^\/([a-z-]+)(?:\/html\/\1)?\.html\/?$/);
+  const knownPages = new Set([
+    'login', 'signup', 'dashboard-admin', 'dashboard-user', 'ticket-management', 'tickets',
+    'create-ticket', 'assets', 'monitoring', 'inventory', 'knowledge', 'knowledge-library',
+    'settings', 'profile', 'security', 'user-management', 'ai-assistant', 'colleagues'
+  ]);
+  const page = legacyPageMatch?.[1];
+  if (page && knownPages.has(page)) {
+    history.replaceState(history.state, document.title, `/${page}${location.search}${location.hash}`);
+    return;
+  }
+  if (location.pathname === '/index.html' || location.pathname === '/index/html/index.html') {
+    history.replaceState(history.state, document.title, `/login${location.search}${location.hash}`);
+  }
+}
+
+useCanonicalPageUrl();
+
 function aitsmEscapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
@@ -160,36 +179,36 @@ async function logout() {
   await fetch('/api/auth/logout', { method: 'POST', headers: authHeaders(), credentials: 'same-origin' }).catch(() => {});
   sessionStorage.removeItem('aitsm.chat.drawer.v1');
   window.currentUser = null;
-  location.href = '/login.html';
+  location.href = '/login';
 }
 
 function redirectForRole(role) {
-  location.href = isAdminPortalRole(role) ? '/dashboard-admin.html' : '/dashboard-user.html';
+  location.href = isAdminPortalRole(role) ? '/dashboard-admin' : '/dashboard-user';
 }
 
 function enforcePageAccess() {
   const role = currentRole();
-  const page = location.pathname.split('/').pop() || 'index.html';
-  const adminOnlyPages = ['dashboard-admin.html', 'ticket-management.html', 'monitoring.html', 'inventory.html', 'assets.html', 'settings.html', 'user-management.html', 'knowledge.html'];
-  const endUserOnlyPages = ['dashboard-user.html', 'create-ticket.html', 'tickets.html', 'knowledge-library.html', 'ai-assistant.html', 'signup.html'];
+  const page = location.pathname.split('/').filter(Boolean).pop() || 'index';
+  const adminOnlyPages = ['dashboard-admin', 'ticket-management', 'monitoring', 'inventory', 'assets', 'settings', 'user-management', 'knowledge'];
+  const endUserOnlyPages = ['dashboard-user', 'create-ticket', 'tickets', 'knowledge-library', 'ai-assistant', 'signup'];
 
   if (!role && window.__aitsmBootstrapFailed) {
     showAppAlert('The server could not finish loading your session. Check the connection and refresh this page.');
     return;
   }
 
-  if (!role && page !== 'login.html' && page !== 'index.html' && page !== 'signup.html') {
-    location.href = '/login.html';
+  if (!role && page !== 'login' && page !== 'index' && page !== 'signup') {
+    location.href = '/login';
     return;
   }
 
   if (isAdminPortalRole(role) && endUserOnlyPages.includes(page)) {
-    location.href = '/dashboard-admin.html';
+    location.href = '/dashboard-admin';
     return;
   }
 
   if (!isAdminPortalRole(role) && adminOnlyPages.includes(page)) {
-    location.href = '/dashboard-user.html';
+    location.href = '/dashboard-user';
   }
 }
 
@@ -489,17 +508,17 @@ function closeGlobalSearch() {
 }
 
 function colleagueProfileUrl(id) {
-  return `/profile.html?id=${encodeURIComponent(id)}`;
+  return `/profile?id=${encodeURIComponent(id)}`;
 }
 
 function colleagueChatUrl(id) {
-  return `/colleagues.html?chat=${encodeURIComponent(id)}`;
+  return `/colleagues?chat=${encodeURIComponent(id)}`;
 }
 
 function ensureChatDrawer() {
   if (!currentRole() || window.AITSMChat || document.querySelector('script[data-aitsm-chat]')) return;
   const script = document.createElement('script');
-  script.src = '/modules/common/js/chat-drawer.js';
+  script.src = '/modules/common/js/chat-drawer.js?v=chat-enter-v1';
   script.dataset.aitsmChat = 'true';
   script.addEventListener('load', () => window.AITSMChat?.mount());
   document.body.appendChild(script);
@@ -518,8 +537,8 @@ function openAitsmChat(colleagueId = null) {
 function globalNavigationItems() {
   const admin = isAdminPortalRole();
   return admin
-    ? [{ label: 'Dashboard', href: '/dashboard-admin.html' }, { label: 'Ticket management', href: '/ticket-management.html' }, { label: 'User management', href: '/user-management.html' }, { label: 'Settings', href: '/settings.html' }, { label: 'Colleagues & Chat', href: '/colleagues.html' }, { label: 'Profile', href: '/profile.html' }]
-    : [{ label: 'Dashboard', href: '/dashboard-user.html' }, { label: 'Create ticket', href: '/create-ticket.html' }, { label: 'My tickets', href: '/tickets.html' }, { label: 'Knowledge base', href: '/knowledge-library.html' }, { label: 'AI assistant', href: '/ai-assistant.html' }, { label: 'Colleagues & Chat', href: '/colleagues.html' }, { label: 'Profile', href: '/profile.html' }];
+    ? [{ label: 'Dashboard', href: '/dashboard-admin' }, { label: 'Ticket management', href: '/ticket-management' }, { label: 'User management', href: '/user-management' }, { label: 'Settings', href: '/settings' }, { label: 'Colleagues & Chat', href: '/colleagues' }, { label: 'Profile', href: '/profile' }]
+    : [{ label: 'Dashboard', href: '/dashboard-user' }, { label: 'Create ticket', href: '/create-ticket' }, { label: 'My tickets', href: '/tickets' }, { label: 'Knowledge base', href: '/knowledge-library' }, { label: 'AI assistant', href: '/ai-assistant' }, { label: 'Colleagues & Chat', href: '/colleagues' }, { label: 'Profile', href: '/profile' }];
 }
 
 let globalSearchRequest = 0;
