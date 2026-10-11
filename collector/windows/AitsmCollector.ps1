@@ -42,8 +42,9 @@ function Get-DiscoveryCommand {
 function Get-CollectorDevices($Cidrs, [bool]$IncludePeers) {
   $now = [DateTime]::UtcNow.ToString('o')
   $primary = Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
+    $candidateIp = $_.IPAddress
     $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' -and
-    ($Cidrs | Where-Object { Test-IpInCidr $_.IPAddress $_ })
+    [bool]($Cidrs | Where-Object { Test-IpInCidr $candidateIp $_ } | Select-Object -First 1)
   } | Select-Object -First 1
   if (-not $primary) { throw 'No local IPv4 address matches the configured private CIDR ranges.' }
   $adapter = Get-NetAdapter -InterfaceIndex $primary.InterfaceIndex -ErrorAction SilentlyContinue
@@ -59,11 +60,12 @@ function Get-CollectorDevices($Cidrs, [bool]$IncludePeers) {
     ipAddress = $primary.IPAddress; macAddress = $adapter.MacAddress; osDetails = "$($os.Caption) $($os.Version)"
     reachable = $true; telemetryAvailable = $true; cpuUsagePercent = [Math]::Round([double]$cpu, 2)
     memoryUsagePercent = [Math]::Round($memoryPct, 2); storageTotalBytes = $storageTotal
-    storageUsedBytes = [Math]::Max(0, $storageTotal - $storageFree); measurementAt = $now
+    storageUsedBytes = [Math]::Max([long]0, [long]($storageTotal - $storageFree)); measurementAt = $now
   }
   $peers = if ($IncludePeers) { Get-NetNeighbor -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object {
+    $candidateIp = $_.IPAddress
     $_.State -notin @('Unreachable', 'Incomplete') -and $_.IPAddress -ne $primary.IPAddress -and
-    ($Cidrs | Where-Object { Test-IpInCidr $_.IPAddress $_ })
+    [bool]($Cidrs | Where-Object { Test-IpInCidr $candidateIp $_ } | Select-Object -First 1)
   } | Sort-Object IPAddress -Unique | ForEach-Object {
     $peerName = try { [Net.Dns]::GetHostEntry($_.IPAddress).HostName } catch { 'LAN peer' }
     [ordered]@{
@@ -88,7 +90,16 @@ do {
     $result = Invoke-RestMethod -Uri "$baseUrl/api/monitoring/collector/reports" -Headers $headers -Method Post -ContentType 'application/json' -Body $payload
     Write-Host "Report accepted at $($result.receivedAt); devices: $($result.devicesAccepted)."
   } catch {
-    Write-Error "Collector cycle failed: $($_.Exception.Message)"
+    $serverDetails = $_.ErrorDetails.Message
+    if ([string]::IsNullOrWhiteSpace($serverDetails) -and $_.Exception.Response) {
+      try {
+        $reader = [IO.StreamReader]::new($_.Exception.Response.GetResponseStream())
+        $serverDetails = $reader.ReadToEnd()
+        $reader.Dispose()
+      } catch { $serverDetails = $null }
+    }
+    $detailSuffix = if ([string]::IsNullOrWhiteSpace($serverDetails)) { '' } else { " Server response: $serverDetails" }
+    Write-Error "Collector cycle failed: $($_.Exception.Message)$detailSuffix"
   }
   if (-not $Once) { Start-Sleep -Seconds $interval }
 } while (-not $Once)
