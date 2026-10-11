@@ -120,14 +120,20 @@ fun Application.configureSecurityBoundary(sessions: SessionService) {
             }
             call.principal()?.let { principal ->
                 val header = call.request.headers["X-CSRF-Token"]
-                val cookie = call.request.cookies[SessionService.CSRF_COOKIE_NAME]
-                if (header == null || header != cookie || !sessions.validateCsrf(principal.sessionId, header)) {
+                // The header token is already bound to the authenticated server-side session.
+                // Do not compare it with the parsed cookie value: browsers can retain duplicate
+                // host/domain cookies with the same name, and cookie parsing may select the stale
+                // value even after /api/auth/csrf-token has rotated and returned a valid token.
+                if (!csrfHeaderIsValid(header) { sessions.validateCsrf(principal.sessionId, it) }) {
                     call.respond(HttpStatusCode.Forbidden, ApiErrorResponse(403, "CSRF validation failed")); finish(); return@intercept
                 }
             }
         }
     }
 }
+
+internal fun csrfHeaderIsValid(header: String?, validateSessionToken: (String) -> Boolean): Boolean =
+    !header.isNullOrBlank() && validateSessionToken(header)
 
 internal fun isPublicStaticAsset(path: String, method: HttpMethod): Boolean =
     method == HttpMethod.Get &&

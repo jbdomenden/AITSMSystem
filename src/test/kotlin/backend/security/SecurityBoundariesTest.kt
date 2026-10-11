@@ -43,6 +43,13 @@ class SecurityBoundariesTest {
         assertEquals("Lax", cookie.extensions["SameSite"])
     }
 
+    @Test fun `csrf validation trusts only a session-bound header token`() {
+        assertTrue(csrfHeaderIsValid("rotated-token") { it == "rotated-token" })
+        assertFalse(csrfHeaderIsValid("stale-token") { it == "rotated-token" })
+        assertFalse(csrfHeaderIsValid(null) { true })
+        assertFalse(csrfHeaderIsValid("") { true })
+    }
+
     @Test fun `permission matrix enforces least privilege`() {
         assertTrue(Permission.TICKET_CREATE in PermissionMatrix.permissions(UserRole.END_USER))
         assertFalse(Permission.USER_INVITE in PermissionMatrix.permissions(UserRole.END_USER))
