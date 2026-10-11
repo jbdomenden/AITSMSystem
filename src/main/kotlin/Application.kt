@@ -153,6 +153,8 @@ fun Application.module() {
     }
 
     routing {
+        val frontendClassLoader = this@module.environment.classLoader
+
         suspend fun ApplicationCall.redirectKeepingQuery(target: String, permanent: Boolean = false) {
             val query = request.queryString().takeIf { it.isNotBlank() }
             respondRedirect(if (query == null) target else "$target?$query", permanent = permanent)
@@ -183,10 +185,10 @@ fun Application.module() {
         get("/index.html") { call.respondRedirect("/login", permanent = true) }
         get("/index/html/index.html") { call.respondRedirect("/login", permanent = true) }
         pageResources.forEach { (cleanPath, resourcePath) ->
-            val resourceDirectory = resourcePath.substringBeforeLast('/')
-            val resourceFile = resourcePath.substringAfterLast('/')
-            staticResources(cleanPath, "static/frontend/$resourceDirectory") {
-                default(resourceFile)
+            get(cleanPath) {
+                val resource = frontendClassLoader.getResourceAsStream("static/frontend/$resourcePath")
+                    ?: return@get call.respond(HttpStatusCode.NotFound)
+                call.respondBytes(resource.use { it.readBytes() }, ContentType.Text.Html)
             }
             get("$cleanPath.html") { call.redirectKeepingQuery(cleanPath, permanent = true) }
             get("/${resourcePath}") { call.redirectKeepingQuery(cleanPath, permanent = true) }
