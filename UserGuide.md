@@ -52,7 +52,7 @@ Open `/security` to enroll or manage MFA, regenerate one-time recovery codes aft
 ## 3. Admin Features
 
 ### 3.1 User Management
-- List users, adjust supported role state, reset passwords, approve email status, create internal accounts, delete users.
+- List users, adjust supported role state, reset passwords, approve email status, invite new users, and delete users.
 - Send, resend, list, and revoke single-use invitations. Resending invalidates the old link.
 - Sensitive actions prompt for recent password or MFA verification. Grants are short-lived, scoped, server-side, and single-use for mutations.
 - Only a superadmin can perform the audited MFA reset for another administrator; this revokes all target sessions.

@@ -7,7 +7,6 @@ import backend.models.EmailApprovalRequest
 import backend.models.ExternalAccountApprovalRequest
 import backend.models.ChangeOwnPasswordRequest
 import backend.models.LoginRequest
-import backend.models.InternalUserCreateRequest
 import backend.models.PasswordResetRequest
 import backend.models.ProfileUpdateRequest
 import backend.models.RegisterRequest
@@ -269,14 +268,6 @@ fun Route.authRoutes(authService: AuthService, sessions: SessionService, invitat
             val deleted = authService.deleteUserAccount(id, call.userId())
             call.respond(UserActionResponse("User deleted", deleted))
         }
-        post {
-            if (!call.requireRole(UserRole.ADMIN)) return@post
-            if (!call.requireReauthentication(reauthentication, ReauthScope.ADMIN_ACCESS)) return@post
-            val req = call.receive<InternalUserCreateRequest>()
-            val created = authService.createUserInternally(req, call.userId())
-            call.respond(HttpStatusCode.Created, UserActionResponse("User account created", created))
-        }
-
         route("/admin") {
             post("/eligibility") {
                 if (!call.requireRole(UserRole.ADMIN)) return@post

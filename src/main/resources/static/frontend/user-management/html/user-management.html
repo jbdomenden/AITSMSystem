@@ -10,10 +10,7 @@
     <div class='topbar'>
       <div>
         <h1 class='page-title'>User Management</h1>
-        <p class='page-subtitle'>Manage roles, reset passwords, delete user accounts, and create internal accounts from one dedicated page.</p>
-      </div>
-      <div class='inline-actions'>
-        <button id='openCreateUserBtn' class='btn btn-primary'>Create User Account</button>
+        <p class='page-subtitle'>Manage user access, roles, and invitation-based account onboarding.</p>
       </div>
     </div>
 
@@ -81,67 +78,6 @@
       <div class='table-wrap'><table><thead><tr><th>User</th><th>Photo</th><th>Submitted</th><th>Actions</th></tr></thead><tbody id='profilePhotoApprovalRows'></tbody></table></div>
     </section>
 
-    <div id='createUserModal' class='modal-overlay hidden'>
-      <div class='modal-card'>
-        <div class='card-head'>
-          <div>
-            <h3 class='section-title'>Create Internal User</h3>
-            <p class='section-subtitle'>Provision an account without self-signup.</p>
-          </div>
-        </div>
-        <form id='createUserForm' class='form-grid signup-grid'>
-          <div class='form-group'>
-            <label for='internalFullName'>Full name</label>
-            <input id='internalFullName' type='text' required>
-          </div>
-          <div class='form-group'>
-            <label for='internalEmail'>Email</label>
-            <input id='internalEmail' type='email' required>
-          </div>
-          <div class='form-group'>
-            <label for='internalCompany'>Company</label>
-            <input id='internalCompany' type='text' required>
-          </div>
-          <div class='form-group'>
-            <label for='internalDepartment'>Department</label>
-            <select id='internalDepartment' required>
-              <option value=''>Select department</option>
-              <option value='Finance'>Finance</option>
-              <option value='HR'>HR</option>
-              <option value='IT'>IT</option>
-              <option value='Operations'>Operations</option>
-              <option value='Sales'>Sales</option>
-              <option value='Support'>Support</option>
-              <option value='Security'>Security</option>
-              <option value='Management'>Management</option>
-            </select>
-          </div>
-          <div class='form-group'>
-            <label for='internalPassword'>Temporary password</label>
-            <input id='internalPassword' type='password' minlength='8' required>
-          </div>
-          <div class='form-group'>
-            <label for='internalConfirmPassword'>Confirm password</label>
-            <input id='internalConfirmPassword' type='password' minlength='8' required>
-          </div>
-          <div class='form-group'>
-            <label for='internalRole'>Role</label>
-            <select id='internalRole'>
-              <option value='END_USER'>End-user</option>
-              <option value='ADMIN'>Admin</option>
-            </select>
-          </div>
-          <div class='form-group'>
-            <label><input id='internalEmailVerified' type='checkbox' checked> Mark email as verified</label>
-          </div>
-          <div class='inline-actions' style='grid-column: 1 / -1;'>
-            <button type='button' class='btn btn-ghost' onclick='closeCreateUserModal()'>Cancel</button>
-            <button type='submit' class='btn btn-primary'>Create account</button>
-          </div>
-        </form>
-        <p id='createUserMessage' class='small' style='margin-top:12px'></p>
-      </div>
-    </div>
     <div id='accessApprovalModal' class='modal-overlay hidden'><div class='modal-card'><div class='card-head'><div><h3 class='section-title'>Grant Account Access</h3><p id='accessApprovalTarget' class='section-subtitle'></p></div></div><div class='form-grid single-col'><div class='form-group'><label for='accessApprovalDepartment'>Department</label><select id='accessApprovalDepartment'><option value=''>Select department</option><option>Finance</option><option>HR</option><option>IT</option><option>Operations</option><option>Sales</option><option>Support</option><option>Security</option><option>Management</option></select></div><div class='form-group'><label for='accessApprovalRole'>Access level</label><select id='accessApprovalRole'><option value='END_USER'>End-user</option><option value='ADMIN'>Admin</option></select></div></div><div class='inline-actions' style='justify-content:flex-end'><button class='btn btn-ghost' type='button' onclick='closeAccessApprovalModal()'>Cancel</button><button class='btn btn-primary' type='button' onclick='submitAccessApproval()'>Grant access</button></div></div></div>
   </main>
 </div>

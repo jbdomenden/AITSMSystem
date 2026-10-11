@@ -107,22 +107,6 @@ This file lists backend endpoints, what they do, and POST payload examples for q
 ### GET `/api/users`
 - Lists users (admin+).
 
-### POST `/api/users`
-- Creates an internal user (admin+) and requires an `admin-access` reauthentication grant.
-- Example input:
-```json
-{
-  "fullName": "Internal User",
-  "email": "internal@company.com",
-  "company": "Company",
-  "department": "Ops",
-  "password": "TempPass123!",
-  "confirmPassword": "TempPass123!",
-  "role": "END_USER",
-  "emailVerified": true
-}
-```
-
 ### PUT `/api/users/{id}/role`
 - Updates user role (admin flow constraints apply).
 - Example input:

@@ -339,83 +339,6 @@ function wireUserManagementFilters() {
   bindSelect('userMgmtSort', 'sort');
 }
 
-function setCreateUserMessage(message, tone = 'info') {
-  const el = document.getElementById('createUserMessage');
-  if (!el) return;
-  el.textContent = message || '';
-  el.classList.remove('text-success', 'text-danger');
-  if (tone === 'success') el.classList.add('text-success');
-  if (tone === 'danger') el.classList.add('text-danger');
-}
-
-function openCreateUserModal() {
-  const modal = document.getElementById('createUserModal');
-  if (!modal) return;
-  modal.classList.remove('hidden');
-  modal.classList.add('show');
-  setCreateUserMessage('');
-  document.getElementById('internalFullName')?.focus();
-}
-
-function closeCreateUserModal() {
-  const modal = document.getElementById('createUserModal');
-  if (!modal) return;
-  modal.classList.remove('show');
-  modal.classList.add('hidden');
-  document.getElementById('createUserForm')?.reset();
-  const verified = document.getElementById('internalEmailVerified');
-  if (verified) verified.checked = true;
-  setCreateUserMessage('');
-}
-
-function validateCreateUserPayload(payload) {
-  if (!payload.fullName) return 'Full name is required.';
-  if (!payload.email) return 'Email is required.';
-  if (!payload.company) return 'Company is required.';
-  if (!payload.department) return 'Department is required.';
-  if (payload.password.length < 8) return 'Temporary password must be at least 8 characters.';
-  if (payload.password !== payload.confirmPassword) return 'Password and confirmation do not match.';
-  return null;
-}
-
-async function submitCreateUser(event) {
-  event.preventDefault();
-  const payload = {
-    fullName: document.getElementById('internalFullName')?.value?.trim() || '',
-    email: document.getElementById('internalEmail')?.value?.trim() || '',
-    company: document.getElementById('internalCompany')?.value?.trim() || '',
-    department: document.getElementById('internalDepartment')?.value?.trim() || '',
-    password: document.getElementById('internalPassword')?.value || '',
-    confirmPassword: document.getElementById('internalConfirmPassword')?.value || '',
-    role: document.getElementById('internalRole')?.value || 'END_USER',
-    emailVerified: Boolean(document.getElementById('internalEmailVerified')?.checked)
-  };
-
-  const validationError = validateCreateUserPayload(payload);
-  if (validationError) {
-    setCreateUserMessage(validationError, 'danger');
-    return;
-  }
-
-  setCreateUserMessage('Creating account...');
-  const reauthToken = await obtainReauthToken('admin-access');
-  const res = await fetch('/api/users', {
-    method: 'POST',
-    headers: { ...authHeaders(), 'X-Reauth-Token': reauthToken },
-    body: JSON.stringify(payload)
-  });
-  const data = await res.json();
-  consumeCachedReauth('admin-access');
-  if (!res.ok) {
-    setCreateUserMessage(data.error || 'Unable to create account', 'danger');
-    return;
-  }
-
-  setCreateUserMessage(data.message || 'User account created', 'success');
-  await loadUserManagement();
-  setTimeout(() => closeCreateUserModal(), 900);
-}
-
 async function loadInvitations() {
   const rows = document.getElementById('invitationRows');
   if (!rows) return;
@@ -481,12 +404,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   loadUserManagement();
   loadProfilePhotoApprovals();
   loadInvitations();
-  document.getElementById('openCreateUserBtn')?.addEventListener('click', openCreateUserModal);
-  document.getElementById('createUserForm')?.addEventListener('submit', submitCreateUser);
   document.getElementById('invitationForm')?.addEventListener('submit', createInvitation);
-  document.getElementById('createUserModal')?.addEventListener('click', (e) => {
-    if (e.target.id === 'createUserModal') closeCreateUserModal();
-  });
   document.getElementById('accessApprovalModal')?.addEventListener('click', (e) => {
     if (e.target.id === 'accessApprovalModal') closeAccessApprovalModal();
   });
