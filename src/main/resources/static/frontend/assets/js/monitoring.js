@@ -238,7 +238,7 @@ async function loadAssetFormOptions() {
 }
 
 function isValidLanIpAddress(ipAddress) {
-  const pattern = /^(\\d{1,3}\\.){3}\\d{1,3}$/;
+  const pattern = /^(\d{1,3}\.){3}\d{1,3}$/;
   if (!pattern.test(ipAddress)) return false;
   return ipAddress.split('.').every((part) => Number(part) >= 0 && Number(part) <= 255);
 }

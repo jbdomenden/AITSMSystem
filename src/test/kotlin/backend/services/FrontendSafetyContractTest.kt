@@ -36,4 +36,10 @@ class FrontendSafetyContractTest {
         assertTrue(frontend.contains("Last data received"))
         assertFalse(frontend.contains("Host CPU"))
     }
+
+    @Test fun `asset registration accepts normal IPv4 addresses in the browser`() {
+        val frontend = Files.readString(Path.of("src/main/resources/static/frontend/assets/js/monitoring.js"))
+        assertTrue(frontend.contains("/^(\\d{1,3}\\.){3}\\d{1,3}$/"))
+        assertFalse(frontend.contains("/^(\\\\d{1,3}\\\\.){3}\\\\d{1,3}$/"))
+    }
 }
