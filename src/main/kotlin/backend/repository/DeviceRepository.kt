@@ -13,7 +13,6 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
-import java.net.InetAddress
 import java.time.LocalDateTime
 
 class DeviceRepository(private val assetDetectionService: AssetDetectionService) {
@@ -44,15 +43,6 @@ class DeviceRepository(private val assetDetectionService: AssetDetectionService)
         }
     }
 
-    private fun detectReachabilityStatus(ipAddress: String): String {
-        val normalizedIp = ipAddress.trim()
-        if (normalizedIp.isBlank()) return "Unreachable"
-        return runCatching {
-            val address = InetAddress.getByName(normalizedIp)
-            if (address.isReachable(1500)) "Online" else "Offline"
-        }.getOrElse { "Unreachable" }
-    }
-
     private fun deriveStatus(fallbackStatus: String = "Online", cpuUsage: Int? = null, memoryUsage: Int? = null): String {
         val cpu = cpuUsage ?: 0
         val memory = memoryUsage ?: 0
@@ -73,15 +63,14 @@ class DeviceRepository(private val assetDetectionService: AssetDetectionService)
         )
         validateDeviceRequest(normalized)
         require(assetDetectionService.matches(normalized.ipAddress)) { "Only LAN devices are monitorable." }
-        val derivedStatus = detectReachabilityStatus(normalized.ipAddress)
         val id = DevicesTable.insert {
             it[deviceName] = normalized.deviceName
             it[ipAddress] = normalized.ipAddress
             it[department] = normalized.department
             it[assignedUser] = normalized.assignedUser
-            it[cpuUsage] = (15..70).random()
-            it[memoryUsage] = (20..80).random()
-            it[status] = derivedStatus
+            it[cpuUsage] = 0
+            it[memoryUsage] = 0
+            it[status] = "Pending"
             it[lastSeen] = LocalDateTime.now()
         }[DevicesTable.id]
         list().first { it.id == id }
@@ -100,9 +89,9 @@ class DeviceRepository(private val assetDetectionService: AssetDetectionService)
                 current
             } else {
                 current.copy(
-                    cpuUsage = live.cpuUsagePercent?.toInt()?.coerceIn(0, 100) ?: current.cpuUsage,
-                    memoryUsage = live.memoryUsagePercent?.toInt()?.coerceIn(0, 100) ?: current.memoryUsage,
-                    status = deriveLiveStatus(live),
+                    cpuUsage = if (live.telemetryAvailable) live.cpuUsagePercent?.toInt()?.coerceIn(0, 100) else null,
+                    memoryUsage = if (live.telemetryAvailable) live.memoryUsagePercent?.toInt()?.coerceIn(0, 100) else null,
+                    status = deriveLiveDeviceStatus(live),
                     lastSeen = if (live.reachable) live.lastSeen.ifBlank { current.lastSeen } else current.lastSeen
                 )
             }
@@ -181,7 +170,7 @@ class DeviceRepository(private val assetDetectionService: AssetDetectionService)
         require(assetDetectionService.matches(normalized.ipAddress)) { "Only LAN devices are monitorable." }
         val existing = DevicesTable.selectAll().where { DevicesTable.id eq id }.singleOrNull()
         val derivedStatus = deriveStatus(
-            fallbackStatus = detectReachabilityStatus(normalized.ipAddress),
+            fallbackStatus = existing?.get(DevicesTable.status) ?: "Pending",
             cpuUsage = existing?.get(DevicesTable.cpuUsage),
             memoryUsage = existing?.get(DevicesTable.memoryUsage)
         )
@@ -201,18 +190,6 @@ class DeviceRepository(private val assetDetectionService: AssetDetectionService)
     }
 
 
-    private fun deriveLiveStatus(live: LanDeviceDto): String {
-        if (!live.reachable) return "Unreachable"
-
-        val cpu = live.cpuUsagePercent ?: 0.0
-        val memory = live.memoryUsagePercent ?: 0.0
-        return when {
-            cpu >= 90.0 || memory >= 90.0 -> "Critical"
-            live.telemetryAvailable -> "Online"
-            else -> "Offline"
-        }
-    }
-
     private fun toDevice(row: ResultRow) = Device(
         id = row[DevicesTable.id],
         deviceName = row[DevicesTable.deviceName],
@@ -224,4 +201,12 @@ class DeviceRepository(private val assetDetectionService: AssetDetectionService)
         status = row[DevicesTable.status],
         lastSeen = row[DevicesTable.lastSeen].toString()
     )
+}
+
+internal fun deriveLiveDeviceStatus(live: LanDeviceDto): String {
+    if (!live.reachable) return "Unreachable"
+    if (live.telemetryAvailable && ((live.cpuUsagePercent ?: 0.0) >= 90.0 || (live.memoryUsagePercent ?: 0.0) >= 90.0)) {
+        return "Critical"
+    }
+    return "Online"
 }

@@ -84,7 +84,7 @@ do {
     $cidrs = if ($command) { @($command.privateCidrs) } else { @($config.PrivateCidrs) }
     if (-not $cidrs -or $cidrs.Count -eq 0) { throw 'No private CIDR ranges are configured.' }
     $payload = @{
-      measuredAt = [DateTime]::UtcNow.ToString('o'); devices = @(Get-CollectorDevices $cidrs ([bool]$command))
+      measuredAt = [DateTime]::UtcNow.ToString('o'); devices = @(Get-CollectorDevices $cidrs $true)
       discoveryRequestId = if ($command) { $command.requestId } else { $null }; discoveryError = $null
     } | ConvertTo-Json -Depth 8
     $result = Invoke-RestMethod -Uri "$baseUrl/api/monitoring/collector/reports" -Headers $headers -Method Post -ContentType 'application/json' -Body $payload

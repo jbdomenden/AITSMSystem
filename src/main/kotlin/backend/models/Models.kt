@@ -171,8 +171,8 @@ data class Device(
     val ipAddress: String,
     val department: String,
     val assignedUser: String,
-    val cpuUsage: Int,
-    val memoryUsage: Int,
+    val cpuUsage: Int?,
+    val memoryUsage: Int?,
     val status: String,
     val lastSeen: String
 )
