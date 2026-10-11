@@ -73,44 +73,30 @@ function toggleUserSidebar(forceHidden) {
 }
 
 async function loadUserHeaderNotifications() {
-  const list = document.getElementById('userNotifList');
-  const count = document.getElementById('userNotifCount');
-  if (!list || !count) return;
-  try {
-    const [res, unreadRes] = await Promise.all([
-      fetch('/api/notifications', { headers: authHeaders() }),
-      fetch('/api/notifications/unread-count', { headers: authHeaders() })
-    ]);
-    const data = await res.json();
-    const unreadPayload = await unreadRes.json();
-    if (!res.ok) throw new Error(data.error || 'Unable to load notifications');
-    const items = (Array.isArray(data) ? data : []).slice(0, 8);
-    const unread = Number(unreadPayload?.unreadCount || 0);
-    count.textContent = String(unread);
-    count.classList.toggle('hidden', unread === 0);
-    list.innerHTML = `<div style='display:flex;justify-content:flex-end;padding:8px;border-bottom:1px solid #1f325f'><button class='btn btn-ghost' style='padding:4px 8px' onclick='markAllUserNotificationsRead()'>Mark all read</button></div>${items.map((n) => {
-      const safeType = String(n.type || '').replace(/[^a-z0-9_-]/gi, '');
-      return `<button type='button' class='small' style='display:block;width:100%;text-align:left;padding:8px;border:none;border-bottom:1px solid #1f325f;background:${n.isRead ? 'transparent' : 'rgba(37,99,235,.12)'};color:inherit' onclick='openUserNotification(${Number(n.id || 0)}, "${safeType}", ${Number(n.relatedTicketId || 0)}, ${Number(n.relatedUserId || 0)})'><strong style='display:block'>${userShellEscape(n.title || 'Notification')}</strong><span>${userShellEscape(n.message || 'Notification')}</span><br><span style='opacity:.7'>${userShellEscape(n.createdAt || '')}</span></button>`;
-    }).join('') || "<div class='small' style='padding:8px'>No notifications.</div>"}`;
-  } catch {
-    list.innerHTML = "<div class='small'>Unable to load notifications.</div>";
-  }
+  return window.AITSMNotifications?.refresh('user');
 }
 
 async function markUserNotificationRead(id) {
-  await fetch(`/api/notifications/${id}/read`, { method: 'PATCH', headers: authHeaders() });
-  await loadUserHeaderNotifications();
+  return window.AITSMNotifications?.refresh('user');
 }
 async function markAllUserNotificationsRead() {
-  await fetch('/api/notifications/read-all', { method: 'PATCH', headers: authHeaders() });
-  await loadUserHeaderNotifications();
+  return window.AITSMNotifications?.markAll('user');
 }
 async function openUserNotification(id, type, relatedTicketId = 0, relatedUserId = 0) {
-  await markUserNotificationRead(id);
-  document.getElementById('userNotifMenu')?.classList.add('hidden');
-  if (relatedTicketId) location.href = `/tickets?ticketId=${encodeURIComponent(relatedTicketId)}`;
-  else if (type.startsWith('profile_photo_')) location.href = '/profile#photoApprovalCard';
-  else if (relatedUserId) location.href = `/profile?id=${encodeURIComponent(relatedUserId)}`;
+  return loadUserHeaderNotifications();
+}
+
+function mountUserNotifications() {
+  const options = { portal: 'user', listId: 'userNotifList', countId: 'userNotifCount', menuId: 'userNotifMenu', triggerId: 'userNotifTrigger' };
+  if (window.AITSMNotifications) return window.AITSMNotifications.mount(options);
+  let script = document.querySelector('script[data-aitsm-notifications]');
+  if (!script) {
+    script = document.createElement('script');
+    script.src = '/modules/common/js/notification-center.js';
+    script.dataset.aitsmNotifications = 'true';
+    document.body.appendChild(script);
+  }
+  script.addEventListener('load', () => window.AITSMNotifications?.mount(options), { once: true });
 }
 
 function renderUserUtilityHeader() {
@@ -152,8 +138,7 @@ function renderUserUtilityHeader() {
     if (notifMenu && notifBtn && !(notifMenu.contains(event.target) || notifBtn.contains(event.target))) notifMenu.classList.add('hidden');
   });
 
-  loadUserHeaderNotifications();
-  window.setInterval(loadUserHeaderNotifications, 30000);
+  mountUserNotifications();
 }
 
 function initializeUserShell() {

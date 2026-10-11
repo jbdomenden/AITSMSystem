@@ -1,10 +1,12 @@
 package backend.services
 
 import backend.config.NotificationsTable
+import backend.config.UsersTable
 import backend.models.Notification
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insertIgnore
+import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
@@ -12,7 +14,11 @@ import java.time.LocalDateTime
 
 class NotificationService {
     fun list(userId: Int): List<Notification> = transaction {
-        NotificationsTable.selectAll()
+        NotificationsTable.join(
+            UsersTable,
+            JoinType.LEFT,
+            additionalConstraint = { NotificationsTable.relatedUserId eq UsersTable.id }
+        ).selectAll()
             .where { (NotificationsTable.userId eq userId) and (NotificationsTable.type neq "direct_message") }
             .orderBy(NotificationsTable.createdAt, org.jetbrains.exposed.sql.SortOrder.DESC)
             .map {
@@ -24,6 +30,13 @@ class NotificationService {
                     type = it[NotificationsTable.type],
                     relatedTicketId = it[NotificationsTable.relatedTicketId],
                     relatedUserId = it[NotificationsTable.relatedUserId],
+                    relatedUserDisplayName = it.getOrNull(UsersTable.fullName),
+                    relatedUserProfileImageUrl = it.getOrNull(UsersTable.profilePhotoUrl),
+                    destination = destinationFor(
+                        it[NotificationsTable.type],
+                        it[NotificationsTable.relatedTicketId],
+                        it[NotificationsTable.relatedUserId]
+                    ),
                     isRead = it[NotificationsTable.isRead],
                     createdAt = it[NotificationsTable.createdAt].toString(),
                     readAt = it[NotificationsTable.readAt]?.toString()
@@ -58,6 +71,14 @@ class NotificationService {
             it[isRead] = true
             it[readAt] = LocalDateTime.now()
         }
+    }
+
+    fun belongsToUser(userId: Int, notificationId: Int): Boolean = transaction {
+        NotificationsTable.selectAll().where {
+            (NotificationsTable.id eq notificationId) and
+                (NotificationsTable.userId eq userId) and
+                (NotificationsTable.type neq "direct_message")
+        }.any()
     }
 
     fun push(
@@ -103,5 +124,18 @@ class NotificationService {
             it[NotificationsTable.createdAt] = LocalDateTime.now()
             it[NotificationsTable.readAt] = null
         }
+    }
+
+
+    private fun destinationFor(type: String, ticketId: Int?, relatedUserId: Int?): String? = when {
+        type in setOf("colleague_added", "colleague_accepted", "colleague_request") && relatedUserId != null ->
+            "/profile?id=$relatedUserId"
+        type.startsWith("profile_photo_") -> "/profile#photoApprovalCard"
+        type in setOf("account_approved", "account_rejected", "account_created", "role_changed", "account_state_changed") ->
+            "/profile"
+        type.startsWith("security_") -> "/security"
+        type.startsWith("ticket_") && ticketId != null -> null // Portal-specific route is selected by the client.
+        type.startsWith("knowledge_") -> null // Portal-specific route is selected by the client.
+        else -> null
     }
 }

@@ -21,6 +21,10 @@ import org.jetbrains.exposed.sql.update
 import java.time.LocalDateTime
 
 class ColleagueRepository {
+    fun user(userId: Int): Colleague? = transaction {
+        UsersTable.selectAll().where { UsersTable.id eq userId }.singleOrNull()?.let(::toColleague)
+    }
+
     fun searchableUsers(actorId: Int, query: String): List<Colleague> = transaction {
         UsersTable.selectAll().where(Op.build { (UsersTable.id neq actorId) and (UsersTable.emailVerified eq true) })
             .map(::toColleague).filter { user ->

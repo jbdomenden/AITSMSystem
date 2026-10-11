@@ -258,6 +258,9 @@ data class Notification(
     val type: String,
     val relatedTicketId: Int? = null,
     val relatedUserId: Int? = null,
+    val relatedUserDisplayName: String? = null,
+    val relatedUserProfileImageUrl: String? = null,
+    val destination: String? = null,
     val isRead: Boolean = false,
     val createdAt: String,
     val readAt: String? = null

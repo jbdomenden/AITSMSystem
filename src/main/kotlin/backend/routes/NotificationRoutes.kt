@@ -34,6 +34,9 @@ fun Route.notificationRoutes(service: NotificationService) {
             val userId = call.userId() ?: return@patch call.respond(HttpStatusCode.Unauthorized, ApiErrorResponse(401, "Authentication required"))
             val id = call.parameters["id"]?.toIntOrNull() ?: return@patch call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid notification id"))
             val updated = service.markAsRead(userId, id)
+            if (!updated && !service.belongsToUser(userId, id)) {
+                return@patch call.respond(HttpStatusCode.NotFound, ApiErrorResponse(404, "Notification not found"))
+            }
             call.respond(NotificationReadResponse(updated, service.unreadCount(userId)))
         }
 
@@ -41,6 +44,9 @@ fun Route.notificationRoutes(service: NotificationService) {
             val userId = call.userId() ?: return@post call.respond(HttpStatusCode.Unauthorized, ApiErrorResponse(401, "Authentication required"))
             val body = call.receive<MarkReadRequest>()
             val updated = service.markAsRead(userId, body.notificationId)
+            if (!updated && !service.belongsToUser(userId, body.notificationId)) {
+                return@post call.respond(HttpStatusCode.NotFound, ApiErrorResponse(404, "Notification not found"))
+            }
             call.respond(NotificationReadResponse(updated, service.unreadCount(userId)))
         }
 

@@ -142,7 +142,7 @@ function closeSuccessModal() { document.getElementById('profilePhotoSuccessModal
 
 async function submitProfilePhoto(file) {
   if (!file || !isOwnProfile()) return;
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) return setPhotoStatus('Choose a JPG, PNG, or WEBP image.', true);
+  if (!['image/jpeg', 'image/png'].includes(file.type)) return setPhotoStatus('Choose a JPG or PNG image.', true);
   if (file.size > maxUploadBytes) return setPhotoStatus('Image must be 5 MB or smaller.', true);
   const button = document.getElementById('changeProfilePhoto');
   button.disabled = true;

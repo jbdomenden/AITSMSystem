@@ -1,0 +1,70 @@
+package backend.services
+
+import backend.models.Notification
+import kotlinx.serialization.json.Json
+import java.nio.file.Files
+import java.nio.file.Path
+import kotlin.test.Test
+import kotlin.test.assertContains
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+class NotificationContractTest {
+    private val root = Path.of("src/main")
+
+    @Test fun `notification response includes related employee and safe destination metadata`() {
+        val encoded = Json.encodeToString(
+            Notification(
+                id = 9,
+                userId = 2,
+                title = "New colleague",
+                message = "You were added by: Juan Dela Cruz",
+                type = "colleague_added",
+                relatedUserId = 7,
+                relatedUserDisplayName = "Juan Dela Cruz",
+                relatedUserProfileImageUrl = "/uploads/profile-photos/00000000-0000-0000-0000-000000000000.jpg",
+                destination = "/profile?id=7",
+                createdAt = "2026-10-11T09:49:20.450079"
+            )
+        )
+        assertContains(encoded, "\"relatedUserId\":7")
+        assertContains(encoded, "\"relatedUserDisplayName\":\"Juan Dela Cruz\"")
+        assertContains(encoded, "\"relatedUserProfileImageUrl\"")
+        assertContains(encoded, "\"destination\":\"/profile?id=7\"")
+    }
+
+    @Test fun `colleague events identify and link the responsible employee and remain idempotent`() {
+        val source = Files.readString(root.resolve("kotlin/backend/services/ColleagueService.kt"))
+        assertContains(source, "You were added by: \${actor.fullName}")
+        assertContains(source, "\${actor.fullName} accepted your colleague request.")
+        assertContains(source, "relatedUserId = actorId")
+        assertContains(source, "eventKey = \"colleague:\${it.id}:added:\$recipientId\"")
+        assertContains(source, "eventKey = \"colleague:\${result.id}:accepted:\${result.senderId}\"")
+    }
+
+    @Test fun `read operations are scoped to their owner and direct messages stay separate`() {
+        val service = Files.readString(root.resolve("kotlin/backend/services/NotificationService.kt"))
+        val routes = Files.readString(root.resolve("kotlin/backend/routes/NotificationRoutes.kt"))
+        assertContains(service, "NotificationsTable.userId eq userId")
+        assertContains(service, "NotificationsTable.type neq \"direct_message\"")
+        assertContains(service, "NotificationsTable.isRead eq false")
+        assertContains(routes, "service.belongsToUser(userId, id)")
+        assertContains(routes, "HttpStatusCode.NotFound")
+    }
+
+    @Test fun `both shells use one accessible persistent notification client`() {
+        val client = Files.readString(root.resolve("resources/static/frontend/modules/common/js/notification-center.js"))
+        val admin = Files.readString(root.resolve("resources/static/frontend/modules/sidebar/js/admin-shell.js"))
+        val user = Files.readString(root.resolve("resources/static/frontend/modules/sidebar/js/user-shell.js"))
+        assertContains(admin, "/modules/common/js/notification-center.js")
+        assertContains(user, "/modules/common/js/notification-center.js")
+        assertContains(client, "request('/api/notifications/read-all', { method: 'PATCH' })")
+        assertContains(client, "notification.relatedUserId")
+        assertContains(client, "relatedUserProfileImageUrl")
+        assertContains(client, "new Intl.DateTimeFormat")
+        assertContains(client, "replaceChildren")
+        assertFalse(client.contains("innerHTML"))
+        assertTrue(client.contains("if (center.opening.has(notification.id)) return"))
+        assertTrue(client.contains("if (center.markingAll) return"))
+    }
+}

@@ -72,54 +72,32 @@ function openAdminHelp() {
 }
 
 async function loadHeaderNotifications(){
-  const list = document.getElementById('adminNotifList');
-  const count = document.getElementById('adminNotifCount');
-  if(!list || !count) return;
-  try {
-    const [res, unreadRes] = await Promise.all([
-      fetch('/api/notifications', { headers: authHeaders() }),
-      fetch('/api/notifications/unread-count', { headers: authHeaders() })
-    ]);
-    const data = await res.json();
-    const unreadPayload = await unreadRes.json();
-    if(!res.ok) throw new Error(data.error || 'Unable to load notifications');
-    const items = (Array.isArray(data)?data:[]).slice(0,8);
-    const unread = Number(unreadPayload?.unreadCount || 0);
-    count.textContent = String(unread);
-    count.classList.toggle('hidden', unread === 0);
-    list.innerHTML = `
-      <div style='display:flex;justify-content:flex-end;padding:8px;border-bottom:1px solid #1f325f'>
-        <button class='btn btn-ghost' style='padding:4px 8px' onclick='markAllNotificationsRead()'>Mark all read</button>
-      </div>
-      ${items.map(n => {
-        const safeType = String(n.type || '').replace(/[^a-z0-9_-]/gi, '');
-        return `<button type='button' class='small' style='display:block;width:100%;text-align:left;padding:8px;border:none;border-bottom:1px solid #1f325f;background:${n.isRead ? 'transparent' : 'rgba(37,99,235,.12)'};color:inherit' onclick='openAdminNotification(${Number(n.id || 0)}, "${safeType}", ${Number(n.relatedTicketId || 0)}, ${Number(n.relatedUserId || 0)})'>
-          <strong style='display:block'>${adminShellEscape(n.title || 'Notification')}</strong>
-          <span>${adminShellEscape(n.message || 'Notification')}</span><br>
-          <span style='opacity:.7'>${adminShellEscape(n.createdAt || '')}</span>
-        </button>`;
-      }).join('') || "<div class='small' style='padding:8px'>No notifications.</div>"}\n`;
-  } catch {
-    list.innerHTML = "<div class='small'>Unable to load notifications.</div>";
-  }
+  return window.AITSMNotifications?.refresh('admin');
 }
 
 async function markNotificationRead(notificationId) {
-  await fetch(`/api/notifications/${notificationId}/read`, { method: 'PATCH', headers: authHeaders() });
-  await loadHeaderNotifications();
+  return window.AITSMNotifications?.refresh('admin');
 }
 
 async function openAdminNotification(notificationId, type, relatedTicketId = 0, relatedUserId = 0) {
-  await markNotificationRead(notificationId);
-  document.getElementById('adminNotifMenu')?.classList.add('hidden');
-  if (relatedTicketId) location.href = `/ticket-management?ticketId=${encodeURIComponent(relatedTicketId)}`;
-  else if (type.startsWith('profile_photo_')) location.href = '/profile#photoApprovalCard';
-  else if (relatedUserId) location.href = `/user-management?userId=${encodeURIComponent(relatedUserId)}`;
+  return loadHeaderNotifications();
 }
 
 async function markAllNotificationsRead() {
-  await fetch('/api/notifications/read-all', { method: 'PATCH', headers: authHeaders() });
-  await loadHeaderNotifications();
+  return window.AITSMNotifications?.markAll('admin');
+}
+
+function mountAdminNotifications() {
+  const options = { portal: 'admin', listId: 'adminNotifList', countId: 'adminNotifCount', menuId: 'adminNotifMenu', triggerId: 'adminNotifTrigger' };
+  if (window.AITSMNotifications) return window.AITSMNotifications.mount(options);
+  let script = document.querySelector('script[data-aitsm-notifications]');
+  if (!script) {
+    script = document.createElement('script');
+    script.src = '/modules/common/js/notification-center.js';
+    script.dataset.aitsmNotifications = 'true';
+    document.body.appendChild(script);
+  }
+  script.addEventListener('load', () => window.AITSMNotifications?.mount(options), { once: true });
 }
 
 function renderUtilityHeader() {
@@ -133,7 +111,7 @@ function renderUtilityHeader() {
     <div class='utility-right'>
       <button class='btn btn-ghost icon-btn header-icon-btn' type='button' onclick='openGlobalSearch()' aria-label='Search AITSM' title='Search AITSM (Ctrl+K)'>⌕</button>
       <button id='adminChatTrigger' class='btn btn-ghost icon-btn header-icon-btn notif-trigger-btn' type='button' onclick='openAitsmChat()' aria-label='Open chat' title='Messages' aria-expanded='false'>${adminIcon('chat')}<span id='adminChatCount' class='notif-count hidden'>0</span></button>
-      <button id='adminNotifTrigger' class='btn btn-ghost icon-btn header-icon-btn notif-trigger-btn' type='button' onclick='toggleAdminNotifMenu()' aria-label='Notifications' title='Notifications'>${adminIcon('bell')}<span id='adminNotifCount' class='notif-count'>0</span></button>
+      <button id='adminNotifTrigger' class='btn btn-ghost icon-btn header-icon-btn notif-trigger-btn' type='button' onclick='toggleAdminNotifMenu()' aria-label='Notifications' title='Notifications'>${adminIcon('bell')}<span id='adminNotifCount' class='notif-count hidden'>0</span></button>
       <div id='adminNotifMenu' class='admin-header-menu hidden'><div id='adminNotifList' class='small'>Loading...</div></div>
       <button id='adminMenuTrigger' class='btn btn-ghost icon-btn header-icon-btn' type='button' onclick='toggleAdminHeaderMenu()' aria-label='Open account menu' title='Account menu'>${adminIcon('more')}</button>
       <div id='adminHeaderMenu' class='admin-header-menu hidden'>
@@ -160,8 +138,7 @@ function renderUtilityHeader() {
     if (notifMenu && notifBtn && !(notifMenu.contains(event.target) || notifBtn.contains(event.target))) notifMenu.classList.add('hidden');
   });
 
-  loadHeaderNotifications();
-  window.setInterval(loadHeaderNotifications, 30000);
+  mountAdminNotifications();
 }
 
 function initializeAdminShell() {
