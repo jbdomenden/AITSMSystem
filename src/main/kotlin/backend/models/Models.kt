@@ -204,7 +204,33 @@ data class HostTelemetryDto(
     val osDetails: String? = null, val reachable: Boolean = true, val telemetryAvailable: Boolean = false,
     val cpuUsagePercent: Double? = null, val memoryUsagePercent: Double? = null,
     val storageTotalBytes: Long? = null, val storageUsedBytes: Long? = null,
-    val measurementAt: String? = null
+    val measurementAt: String? = null, val inventory: CollectorInventoryReport? = null
+)
+@Serializable data class CollectorInventoryReport(
+    val fullDeviceName: String? = null,
+    val manufacturer: String? = null,
+    val model: String? = null,
+    val processorName: String? = null,
+    val processorSpeed: String? = null,
+    val installedRam: String? = null,
+    val usableRam: String? = null,
+    val ramSpeed: String? = null,
+    val gpuName: String? = null,
+    val gpuMemory: String? = null,
+    val storageTotal: String? = null,
+    val storageUsed: String? = null,
+    val storageFree: String? = null,
+    val storageBreakdownJson: String? = null,
+    val systemType: String? = null,
+    val osName: String? = null,
+    val osEdition: String? = null,
+    val osVersion: String? = null,
+    val osBuild: String? = null,
+    val installedOn: String? = null,
+    val domainOrWorkgroup: String? = null,
+    val deviceUuid: String? = null,
+    val productId: String? = null,
+    val penTouchSupport: String? = null
 )
 @Serializable data class CollectorReportRequest(
     val measuredAt: String, val devices: List<CollectorDeviceReport>,

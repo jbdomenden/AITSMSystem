@@ -39,6 +39,73 @@ function Get-DiscoveryCommand {
   }
 }
 
+function Format-InventoryBytes([long]$Value) {
+  if ($Value -lt 0) { return $null }
+  if ($Value -ge 1TB) { return "$([Math]::Round($Value / 1TB, 2)) TB" }
+  if ($Value -ge 1GB) { return "$([Math]::Round($Value / 1GB, 2)) GB" }
+  if ($Value -ge 1MB) { return "$([Math]::Round($Value / 1MB, 2)) MB" }
+  return "$Value bytes"
+}
+
+function Get-HostInventory($Os, $Disks) {
+  $computer = Get-CimInstance Win32_ComputerSystem
+  $product = Get-CimInstance Win32_ComputerSystemProduct
+  $processors = @(Get-CimInstance Win32_Processor)
+  $memoryModules = @(Get-CimInstance Win32_PhysicalMemory -ErrorAction SilentlyContinue)
+  $videoControllers = @(Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue)
+
+  $processorNames = @($processors | ForEach-Object { ([string]$_.Name).Trim() } | Where-Object { $_ } | Sort-Object -Unique)
+  $maxClockMhz = ($processors | Measure-Object -Property MaxClockSpeed -Maximum).Maximum
+  $processorSpeed = if ($maxClockMhz) { "$([Math]::Round([double]$maxClockMhz / 1000, 2)) GHz" } else { $null }
+  $ramSpeeds = @($memoryModules | ForEach-Object { if ($_.ConfiguredClockSpeed) { "$($_.ConfiguredClockSpeed) MHz" } } | Where-Object { $_ } | Sort-Object -Unique)
+  $gpuNames = @($videoControllers | ForEach-Object { $_.Name } | Where-Object { $_ } | Sort-Object -Unique)
+  $gpuBytes = [long](($videoControllers | Where-Object { $_.AdapterRAM -gt 0 } | Measure-Object -Property AdapterRAM -Sum).Sum)
+  $storageBreakdown = @($Disks | ForEach-Object {
+    $total = [long]$_.Size
+    $free = [long]$_.FreeSpace
+    [ordered]@{
+      drive = $_.DeviceID
+      total = Format-InventoryBytes $total
+      used = Format-InventoryBytes ([Math]::Max([long]0, $total - $free))
+      free = Format-InventoryBytes $free
+    }
+  }) | ConvertTo-Json -Compress -Depth 4
+
+  $deviceUuid = [string]$product.UUID
+  if ([string]::IsNullOrWhiteSpace($deviceUuid) -or $deviceUuid -match '^0{8}-0{4}-0{4}-0{4}-0{12}$') { $deviceUuid = $null }
+  $fullDeviceName = if ($computer.PartOfDomain -and -not [string]::IsNullOrWhiteSpace([string]$computer.Domain)) {
+    "$($computer.DNSHostName).$($computer.Domain)"
+  } else { [string]$computer.DNSHostName }
+  $installedOn = if ($os.InstallDate) { ([DateTime]$os.InstallDate).ToString('o') } else { $null }
+
+  return [ordered]@{
+    fullDeviceName = $fullDeviceName
+    manufacturer = [string]$computer.Manufacturer
+    model = [string]$computer.Model
+    processorName = ($processorNames -join '; ')
+    processorSpeed = $processorSpeed
+    installedRam = Format-InventoryBytes ([long]$computer.TotalPhysicalMemory)
+    usableRam = Format-InventoryBytes ([long]$os.TotalVisibleMemorySize * 1KB)
+    ramSpeed = ($ramSpeeds -join '; ')
+    gpuName = ($gpuNames -join '; ')
+    gpuMemory = if ($gpuBytes -gt 0) { Format-InventoryBytes $gpuBytes } else { $null }
+    storageTotal = $null
+    storageUsed = $null
+    storageFree = $null
+    storageBreakdownJson = $storageBreakdown
+    systemType = [string]$computer.SystemType
+    osName = [string]$os.Caption
+    osEdition = $null
+    osVersion = [string]$os.Version
+    osBuild = [string]$os.BuildNumber
+    installedOn = $installedOn
+    domainOrWorkgroup = [string]$computer.Domain
+    deviceUuid = $deviceUuid
+    productId = [string]$os.SerialNumber
+    penTouchSupport = $null
+  }
+}
+
 function Get-CollectorDevices($Cidrs, [bool]$IncludePeers) {
   $now = [DateTime]::UtcNow.ToString('o')
   $primary = Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
@@ -55,12 +122,17 @@ function Get-CollectorDevices($Cidrs, [bool]$IncludePeers) {
   $disks = Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3"
   $storageTotal = [long](($disks | Measure-Object -Property Size -Sum).Sum)
   $storageFree = [long](($disks | Measure-Object -Property FreeSpace -Sum).Sum)
+  $hostInventory = Get-HostInventory $os $disks
+  $hostInventory.storageTotal = Format-InventoryBytes $storageTotal
+  $hostInventory.storageUsed = Format-InventoryBytes ([Math]::Max([long]0, [long]($storageTotal - $storageFree)))
+  $hostInventory.storageFree = Format-InventoryBytes $storageFree
   $hostDevice = [ordered]@{
     deviceKey = "host:$($env:COMPUTERNAME.ToLowerInvariant())"; hostname = $env:COMPUTERNAME
     ipAddress = $primary.IPAddress; macAddress = $adapter.MacAddress; osDetails = "$($os.Caption) $($os.Version)"
     reachable = $true; telemetryAvailable = $true; cpuUsagePercent = [Math]::Round([double]$cpu, 2)
     memoryUsagePercent = [Math]::Round($memoryPct, 2); storageTotalBytes = $storageTotal
     storageUsedBytes = [Math]::Max([long]0, [long]($storageTotal - $storageFree)); measurementAt = $now
+    inventory = $hostInventory
   }
   $peers = if ($IncludePeers) { Get-NetNeighbor -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object {
     $candidateIp = $_.IPAddress
@@ -73,6 +145,7 @@ function Get-CollectorDevices($Cidrs, [bool]$IncludePeers) {
       ipAddress = $_.IPAddress; macAddress = $_.LinkLayerAddress; osDetails = $null
       reachable = $true; telemetryAvailable = $false; cpuUsagePercent = $null; memoryUsagePercent = $null
       storageTotalBytes = $null; storageUsedBytes = $null; measurementAt = $now
+      inventory = $null
     }
   } } else { @() }
   return @($hostDevice) + @($peers)

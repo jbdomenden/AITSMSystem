@@ -101,7 +101,7 @@ class InventoryService(
         )
     }
 
-    fun upsertDetectedAsset(payload: InventoryUpsertDetectedRequest): InventoryUpsertResponse {
+    fun upsertDetectedAsset(payload: InventoryUpsertDetectedRequest, saveSnapshot: Boolean = true): InventoryUpsertResponse {
         val normalized = normalizePayload(payload)
         validatePayload(normalized)
 
@@ -114,7 +114,9 @@ class InventoryService(
             normalizedStorageFree = computedStorageFree
         )
 
-        inventoryQueries.saveSnapshot(record.id, json.encodeToString(normalized), normalized.connectionSource ?: "unknown")
+        if (saveSnapshot) {
+            inventoryQueries.saveSnapshot(record.id, json.encodeToString(normalized), normalized.connectionSource ?: "unknown")
+        }
 
         return InventoryUpsertResponse(
             id = record.id,
@@ -195,35 +197,35 @@ class InventoryService(
 
     private fun normalizePayload(input: InventoryUpsertDetectedRequest): InventoryUpsertDetectedRequest {
         return input.copy(
-            assetTag = input.assetTag?.trim(),
-            deviceName = input.deviceName?.trim(),
-            hostname = input.hostname?.trim(),
-            fullDeviceName = input.fullDeviceName?.trim(),
-            manufacturer = input.manufacturer?.trim(),
-            model = input.model?.trim(),
-            processorName = input.processorName?.trim(),
-            processorSpeed = input.processorSpeed?.trim(),
-            installedRam = input.installedRam?.trim(),
-            usableRam = input.usableRam?.trim(),
-            ramSpeed = input.ramSpeed?.trim(),
-            gpuName = input.gpuName?.trim(),
-            gpuMemory = input.gpuMemory?.trim(),
-            storageTotal = input.storageTotal?.trim(),
-            storageUsed = input.storageUsed?.trim(),
-            storageFree = input.storageFree?.trim(),
-            storageBreakdownJson = input.storageBreakdownJson?.trim(),
-            systemType = input.systemType?.trim(),
-            osName = input.osName?.trim(),
-            osEdition = input.osEdition?.trim(),
-            osVersion = input.osVersion?.trim(),
-            osBuild = input.osBuild?.trim(),
-            installedOn = input.installedOn?.trim(),
-            domainOrWorkgroup = input.domainOrWorkgroup?.trim(),
-            deviceUuid = input.deviceUuid?.trim(),
-            productId = input.productId?.trim(),
-            penTouchSupport = input.penTouchSupport?.trim(),
-            ipAddress = input.ipAddress?.trim(),
-            macAddress = input.macAddress?.trim(),
+            assetTag = input.assetTag.normalizedOrNull(),
+            deviceName = input.deviceName.normalizedOrNull(),
+            hostname = input.hostname.normalizedOrNull(),
+            fullDeviceName = input.fullDeviceName.normalizedOrNull(),
+            manufacturer = input.manufacturer.normalizedOrNull(),
+            model = input.model.normalizedOrNull(),
+            processorName = input.processorName.normalizedOrNull(),
+            processorSpeed = input.processorSpeed.normalizedOrNull(),
+            installedRam = input.installedRam.normalizedOrNull(),
+            usableRam = input.usableRam.normalizedOrNull(),
+            ramSpeed = input.ramSpeed.normalizedOrNull(),
+            gpuName = input.gpuName.normalizedOrNull(),
+            gpuMemory = input.gpuMemory.normalizedOrNull(),
+            storageTotal = input.storageTotal.normalizedOrNull(),
+            storageUsed = input.storageUsed.normalizedOrNull(),
+            storageFree = input.storageFree.normalizedOrNull(),
+            storageBreakdownJson = input.storageBreakdownJson.normalizedOrNull(),
+            systemType = input.systemType.normalizedOrNull(),
+            osName = input.osName.normalizedOrNull(),
+            osEdition = input.osEdition.normalizedOrNull(),
+            osVersion = input.osVersion.normalizedOrNull(),
+            osBuild = input.osBuild.normalizedOrNull(),
+            installedOn = input.installedOn.normalizedOrNull(),
+            domainOrWorkgroup = input.domainOrWorkgroup.normalizedOrNull(),
+            deviceUuid = input.deviceUuid.normalizedOrNull(),
+            productId = input.productId.normalizedOrNull(),
+            penTouchSupport = input.penTouchSupport.normalizedOrNull(),
+            ipAddress = input.ipAddress.normalizedOrNull(),
+            macAddress = input.macAddress.normalizedOrNull(),
             connectionSource = normalizeSource(input.connectionSource),
             status = input.status?.trim(),
             assignedDepartment = input.assignedDepartment?.trim(),
@@ -309,4 +311,6 @@ class InventoryService(
         }
         return value
     }
+
+    private fun String?.normalizedOrNull(): String? = this?.trim()?.ifBlank { null }
 }

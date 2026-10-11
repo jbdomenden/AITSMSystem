@@ -5,6 +5,7 @@ import backend.models.CollectorEnrollmentRequest
 import backend.models.CollectorReportRequest
 import backend.models.CollectorReportResponse
 import backend.models.DiscoveryRefreshResponse
+import backend.models.InventoryUpsertDetectedRequest
 import backend.models.MonitoringSummaryDto
 import backend.repository.MonitoringRepository
 import backend.security.RateLimiter
@@ -16,6 +17,7 @@ import java.util.UUID
 class MonitoringService(
     private val repository: MonitoringRepository,
     private val assetDetectionService: AssetDetectionService,
+    private val inventoryService: InventoryService,
     private val clock: Clock = Clock.systemUTC()
 ) {
     private val ingestionLimiter = RateLimiter(120, 60_000L, clock)
@@ -65,6 +67,9 @@ class MonitoringService(
         report.discoveryError?.let { require(it.length <= 500) { "Discovery error is too long." } }
         report.devices.forEach(::validateDevice)
         val (receivedAt, count) = repository.saveReport(collectorId, report, measuredAt)
+        report.devices.forEach { device ->
+            inventoryService.upsertDetectedAsset(device.toInventoryUpsert(), saveSnapshot = false)
+        }
         return CollectorReportResponse(true, receivedAt.toString(), count)
     }
 
@@ -75,13 +80,28 @@ class MonitoringService(
             "Device IP must be inside an explicitly configured private CIDR range."
         }
         require((device.macAddress?.length ?: 0) <= 32 && (device.osDetails?.length ?: 0) <= 300) { "Device metadata is too long." }
+        device.inventory?.let(::validateInventory)
         require(device.cpuUsagePercent == null || device.cpuUsagePercent in 0.0..100.0) { "CPU usage must be between 0 and 100." }
         require(device.memoryUsagePercent == null || device.memoryUsagePercent in 0.0..100.0) { "Memory usage must be between 0 and 100." }
         require((device.storageTotalBytes ?: 0) >= 0 && (device.storageUsedBytes ?: 0) >= 0) { "Storage values cannot be negative." }
-        if (!device.telemetryAvailable) require(device.cpuUsagePercent == null && device.memoryUsagePercent == null && device.storageTotalBytes == null && device.storageUsedBytes == null) {
+        if (!device.telemetryAvailable) require(device.cpuUsagePercent == null && device.memoryUsagePercent == null && device.storageTotalBytes == null && device.storageUsedBytes == null && device.inventory == null) {
             "Uninstrumented peers cannot report detailed telemetry."
         }
         device.measurementAt?.let(::parseMeasurement)
+    }
+    private fun validateInventory(inventory: backend.models.CollectorInventoryReport) {
+        val fields = listOf(
+            inventory.fullDeviceName to 255, inventory.manufacturer to 150, inventory.model to 180,
+            inventory.processorName to 255, inventory.processorSpeed to 100, inventory.installedRam to 100,
+            inventory.usableRam to 100, inventory.ramSpeed to 100, inventory.gpuName to 255,
+            inventory.gpuMemory to 100, inventory.storageTotal to 100, inventory.storageUsed to 100,
+            inventory.storageFree to 100, inventory.systemType to 180, inventory.osName to 180,
+            inventory.osEdition to 180, inventory.osVersion to 120, inventory.osBuild to 120,
+            inventory.installedOn to 120, inventory.domainOrWorkgroup to 160, inventory.deviceUuid to 160,
+            inventory.productId to 160, inventory.penTouchSupport to 120
+        )
+        require(fields.all { (value, maxLength) -> (value?.length ?: 0) <= maxLength }) { "Inventory metadata is too long." }
+        require((inventory.storageBreakdownJson?.length ?: 0) <= 8_000) { "Storage inventory is too long." }
     }
     private fun parseMeasurement(value: String): Instant {
         val parsed = runCatching { Instant.parse(value) }.getOrElse { throw IllegalArgumentException("Measurement timestamp must be ISO-8601 UTC.") }
@@ -92,6 +112,43 @@ class MonitoringService(
         val parsed = InetAddress.getByName(value)
         !value.any(Char::isLetter) && (parsed.hostAddress == value || value.contains(':'))
     }.getOrDefault(false)
+}
+
+internal fun CollectorDeviceReport.toInventoryUpsert(): InventoryUpsertDetectedRequest {
+    val details = inventory
+    return InventoryUpsertDetectedRequest(
+        deviceName = hostname,
+        hostname = hostname,
+        fullDeviceName = details?.fullDeviceName,
+        manufacturer = details?.manufacturer,
+        model = details?.model,
+        processorName = details?.processorName,
+        processorSpeed = details?.processorSpeed,
+        installedRam = details?.installedRam,
+        usableRam = details?.usableRam,
+        ramSpeed = details?.ramSpeed,
+        gpuName = details?.gpuName,
+        gpuMemory = details?.gpuMemory,
+        storageTotal = details?.storageTotal,
+        storageUsed = details?.storageUsed,
+        storageFree = details?.storageFree,
+        storageBreakdownJson = details?.storageBreakdownJson,
+        systemType = details?.systemType,
+        osName = details?.osName ?: osDetails,
+        osEdition = details?.osEdition,
+        osVersion = details?.osVersion,
+        osBuild = details?.osBuild,
+        installedOn = details?.installedOn,
+        domainOrWorkgroup = details?.domainOrWorkgroup,
+        deviceUuid = details?.deviceUuid,
+        productId = details?.productId,
+        penTouchSupport = details?.penTouchSupport,
+        ipAddress = ipAddress,
+        macAddress = macAddress,
+        connectionSource = if (inventory != null) "agent" else "lan-detected",
+        status = if (reachable) "online" else "offline",
+        lastSeenAt = measurementAt
+    )
 }
 
 class CollectorRateLimitException : RuntimeException("Collector report rate limit exceeded.")

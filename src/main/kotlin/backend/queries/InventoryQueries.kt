@@ -251,7 +251,7 @@ class InventoryQueries {
             it[InventoryAssetsTable.penTouchSupport] = payload.penTouchSupport ?: existing.penTouchSupport
             it[InventoryAssetsTable.ipAddress] = payload.ipAddress ?: existing.ipAddress
             it[InventoryAssetsTable.macAddress] = payload.macAddress ?: existing.macAddress
-            it[InventoryAssetsTable.connectionSource] = payload.connectionSource ?: existing.connectionSource
+            it[InventoryAssetsTable.connectionSource] = preferredInventorySource(existing.connectionSource, payload.connectionSource)
             it[InventoryAssetsTable.status] = status
             it[InventoryAssetsTable.assignedDepartment] = payload.assignedDepartment ?: existing.assignedDepartment
             it[InventoryAssetsTable.assignedUser] = payload.assignedUser ?: existing.assignedUser
@@ -286,6 +286,13 @@ class InventoryQueries {
             }
         }
         getById(id)
+    }
+
+    private fun preferredInventorySource(existing: String?, incoming: String?): String? {
+        val priority = mapOf("lan-detected" to 1, "manual" to 2, "agent" to 3)
+        if (incoming == null) return existing
+        if (existing == null) return incoming
+        return if ((priority[incoming] ?: 0) >= (priority[existing] ?: 0)) incoming else existing
     }
 
     fun updateAssignment(id: Int, department: String?, assignedUser: String?): InventoryAssetRecord? = transaction {

@@ -59,7 +59,8 @@ class ServiceContainer(application: Application) {
     val invitationService = InvitationService(invitationRepo, userRepo, auditRepo, emailService, notificationService)
     val profilePhotoService = ProfilePhotoService(userRepo, auditRepo, notificationService)
     val ticketService = TicketService(ticketRepo, auditRepo, notificationService, userRepo)
-    val monitoringService = MonitoringService(monitoringRepository, assetDetectionService)
+    val inventoryService = InventoryService(inventoryQueries, assetDetectionService)
+    val monitoringService = MonitoringService(monitoringRepository, assetDetectionService, inventoryService)
     val aiService = AIService()
     val aiConfigService = AIConfigService(application.environment.config)
     private val aiProvider = GeminiProvider()
@@ -67,5 +68,4 @@ class ServiceContainer(application: Application) {
     val ticketAiAdvisor = TicketAiAdvisor(ticketService, knowledgeRepo, aiProvider, aiConfigService)
     val slaService = SLAService()
     val knowledgeService = KnowledgeService(knowledgeRepo, auditRepo)
-    val inventoryService = InventoryService(inventoryQueries, assetDetectionService)
 }

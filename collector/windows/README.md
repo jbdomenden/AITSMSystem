@@ -1,6 +1,6 @@
 # AITSM Windows LAN collector
 
-The collector runs inside the target LAN and sends data outbound over HTTPS. The Cloud Run service never scans the private network. LAN peers report only observable address, MAC, hostname, and reachability data; detailed CPU, memory, storage, and OS telemetry is reported only for the Windows computer running the collector.
+The collector runs inside the target LAN and sends data outbound over HTTPS. The Cloud Run service never scans the private network. LAN peers report only observable address, MAC, hostname, and reachability data. The Windows computer running the collector also reports authenticated hardware inventory (manufacturer, model, CPU, RAM, GPU, storage, OS, domain, and device UUID) and live resource telemetry. AITSM automatically merges that data into its inventory record while preserving administrator-managed ownership, department, and notes.
 
 ## Enroll and configure
 
