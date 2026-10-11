@@ -360,18 +360,61 @@ async function loadInvitations() {
 
 async function createInvitation(event) {
   event.preventDefault();
-  const email = document.getElementById('invitationEmail').value.trim();
-  const role = document.getElementById('invitationRole').value;
+  const form = event.currentTarget;
+  const emailInput = document.getElementById('invitationEmail');
+  const email = emailInput?.value.trim() || '';
+  const role = document.getElementById('invitationRole')?.value || 'END_USER';
+  const submit = document.getElementById('sendInvitationBtn');
+  const message = document.getElementById('invitationMessage');
+  const showMessage = (text, tone = 'info') => {
+    if (!message) return;
+    message.textContent = text;
+    message.classList.toggle('hidden', !text);
+    message.classList.toggle('text-danger', tone === 'danger');
+    message.classList.toggle('text-success', tone === 'success');
+  };
+
+  if (!email || !emailInput?.checkValidity()) {
+    emailInput?.reportValidity();
+    showMessage('Enter a valid email address.', 'danger');
+    return;
+  }
+
+  if (submit) {
+    submit.disabled = true;
+    submit.textContent = 'Sending…';
+  }
+  showMessage('Creating and sending the invitation…');
   try {
     const reauthToken = await obtainReauthToken('admin-access');
     await fetchJsonOrThrow('/api/auth/invitations', {
       method: 'POST', headers: { ...authHeaders(), 'X-Reauth-Token': reauthToken }, body: JSON.stringify({ email, role })
     });
     consumeCachedReauth('admin-access');
-    event.target.reset();
+    form.reset();
     await loadInvitations();
-    alert('Invitation created. Email delivery depends on the configured mail provider.');
-  } catch (error) { alert(error.message || 'Unable to create invitation.'); }
+    showMessage(`Invitation sent to ${email}.`, 'success');
+  } catch (error) {
+    showMessage(error.message || 'Unable to create or send the invitation.', 'danger');
+  } finally {
+    if (submit) {
+      submit.disabled = false;
+      submit.textContent = 'Send invitation';
+    }
+  }
+}
+
+function wireInvitationForm() {
+  const form = document.getElementById('invitationForm');
+  if (!form || form.dataset.submitBound === 'true') return;
+  form.dataset.submitBound = 'true';
+  form.addEventListener('submit', createInvitation);
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', wireInvitationForm, { once: true });
+} else {
+  wireInvitationForm();
 }
 
 async function revokeInvitation(id, skipConfirmation = false) {
@@ -404,7 +447,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   loadUserManagement();
   loadProfilePhotoApprovals();
   loadInvitations();
-  document.getElementById('invitationForm')?.addEventListener('submit', createInvitation);
   document.getElementById('accessApprovalModal')?.addEventListener('click', (e) => {
     if (e.target.id === 'accessApprovalModal') closeAccessApprovalModal();
   });

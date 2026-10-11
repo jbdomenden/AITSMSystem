@@ -68,8 +68,9 @@
       <form id='invitationForm' class='form-grid' style='margin-bottom:16px'>
         <div class='form-group'><label for='invitationEmail'>Email</label><input id='invitationEmail' type='email' required></div>
         <div class='form-group'><label for='invitationRole'>Role</label><select id='invitationRole'><option value='END_USER'>End-user</option><option value='ADMIN'>Administrator</option></select></div>
-        <div class='form-group' style='justify-content:flex-end'><label>&nbsp;</label><button class='btn btn-primary' type='submit'>Send invitation</button></div>
+        <div class='form-group' style='justify-content:flex-end'><label>&nbsp;</label><button id='sendInvitationBtn' class='btn btn-primary' type='submit'>Send invitation</button></div>
       </form>
+      <p id='invitationMessage' class='small hidden' role='status' aria-live='polite'></p>
       <div class='table-wrap'><table><thead><tr><th>Email</th><th>Role</th><th>Expires</th><th>Status</th><th>Actions</th></tr></thead><tbody id='invitationRows'></tbody></table></div>
     </section>
 
@@ -81,5 +82,5 @@
     <div id='accessApprovalModal' class='modal-overlay hidden'><div class='modal-card'><div class='card-head'><div><h3 class='section-title'>Grant Account Access</h3><p id='accessApprovalTarget' class='section-subtitle'></p></div></div><div class='form-grid single-col'><div class='form-group'><label for='accessApprovalDepartment'>Department</label><select id='accessApprovalDepartment'><option value=''>Select department</option><option>Finance</option><option>HR</option><option>IT</option><option>Operations</option><option>Sales</option><option>Support</option><option>Security</option><option>Management</option></select></div><div class='form-group'><label for='accessApprovalRole'>Access level</label><select id='accessApprovalRole'><option value='END_USER'>End-user</option><option value='ADMIN'>Admin</option></select></div></div><div class='inline-actions' style='justify-content:flex-end'><button class='btn btn-ghost' type='button' onclick='closeAccessApprovalModal()'>Cancel</button><button class='btn btn-primary' type='button' onclick='submitAccessApproval()'>Grant access</button></div></div></div>
   </main>
 </div>
-<script src='/modules/sidebar/js/admin-shell.js'></script><script src='/modules/common/js/app.js'></script><script src='/modules/common/js/table-skeleton.js'></script><script src='/user-management/js/user-management.js'></script>
+<script src='/modules/sidebar/js/admin-shell.js'></script><script src='/modules/common/js/app.js'></script><script src='/modules/common/js/table-skeleton.js'></script><script src='/user-management/js/user-management.js?v=invitation-submit-v2'></script>
 </body></html>

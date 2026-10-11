@@ -25,7 +25,12 @@ class InvitationService(
         require(role != UserRole.SUPERADMIN || actorRole == UserRole.SUPERADMIN) { "Only a system administrator can invite a system administrator" }
         val (view, raw) = invitations.create(normalized, role, actor, (Env.get("INVITATION_TTL_HOURS")?.toLongOrNull() ?: 24L))
         val url = "${(Env.get("APP_BASE_URL") ?: "http://127.0.0.1:8070").removeSuffix("/")}/signup?invite=$raw"
-        email?.sendInvitation(normalized, url)
+        val delivered = email?.sendInvitation(normalized, url) == true
+        if (!delivered) {
+            invitations.revoke(UUID.fromString(view.id))
+            audit.log(actor, "Invitation email delivery failed for $normalized", "invitations", "FAILURE")
+            error("Invitation email could not be sent. Verify the email delivery configuration and try again.")
+        }
         audit.log(actor, "Created invitation for $normalized as ${role.name}", "invitations")
         return view
     }
