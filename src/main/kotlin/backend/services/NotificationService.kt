@@ -4,7 +4,7 @@ import backend.config.NotificationsTable
 import backend.models.Notification
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.insertIgnore
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
@@ -13,7 +13,7 @@ import java.time.LocalDateTime
 class NotificationService {
     fun list(userId: Int): List<Notification> = transaction {
         NotificationsTable.selectAll()
-            .where { NotificationsTable.userId eq userId }
+            .where { (NotificationsTable.userId eq userId) and (NotificationsTable.type neq "direct_message") }
             .orderBy(NotificationsTable.createdAt, org.jetbrains.exposed.sql.SortOrder.DESC)
             .map {
                 Notification(
@@ -33,14 +33,15 @@ class NotificationService {
 
     fun unreadCount(userId: Int): Long = transaction {
         NotificationsTable.selectAll()
-            .where { (NotificationsTable.userId eq userId) and (NotificationsTable.isRead eq false) }
+            .where { (NotificationsTable.userId eq userId) and (NotificationsTable.isRead eq false) and (NotificationsTable.type neq "direct_message") }
             .count()
     }
 
     fun markAsRead(userId: Int, notificationId: Int): Boolean = transaction {
         NotificationsTable.update({
-            (NotificationsTable.id eq notificationId) and
+                (NotificationsTable.id eq notificationId) and
                 (NotificationsTable.userId eq userId) and
+                (NotificationsTable.type neq "direct_message") and
                 (NotificationsTable.isRead eq false)
         }) {
             it[isRead] = true
@@ -51,18 +52,7 @@ class NotificationService {
     fun markAllAsRead(userId: Int): Int = transaction {
         NotificationsTable.update({
             (NotificationsTable.userId eq userId) and
-                (NotificationsTable.isRead eq false)
-        }) {
-            it[isRead] = true
-            it[readAt] = LocalDateTime.now()
-        }
-    }
-
-    fun markDirectMessagesFromAsRead(userId: Int, senderId: Int): Int = transaction {
-        NotificationsTable.update({
-            (NotificationsTable.userId eq userId) and
-                (NotificationsTable.type eq "direct_message") and
-                (NotificationsTable.relatedUserId eq senderId) and
+                (NotificationsTable.type neq "direct_message") and
                 (NotificationsTable.isRead eq false)
         }) {
             it[isRead] = true
@@ -76,15 +66,17 @@ class NotificationService {
         message: String,
         type: String = "info",
         relatedTicketId: Int? = null,
-        relatedUserId: Int? = null
+        relatedUserId: Int? = null,
+        eventKey: String? = null
     ) = transaction {
-        NotificationsTable.insert {
+        NotificationsTable.insertIgnore {
             it[NotificationsTable.userId] = userId
             it[NotificationsTable.title] = title
             it[NotificationsTable.message] = message
             it[NotificationsTable.type] = type
             it[NotificationsTable.relatedTicketId] = relatedTicketId
             it[NotificationsTable.relatedUserId] = relatedUserId
+            it[NotificationsTable.eventKey] = eventKey?.trim()?.takeIf(String::isNotBlank)?.take(180)
             it[NotificationsTable.isRead] = false
             it[NotificationsTable.createdAt] = LocalDateTime.now()
             it[NotificationsTable.readAt] = null
@@ -96,26 +88,20 @@ class NotificationService {
         eventType: String,
         ticketId: Int,
         title: String,
-        message: String
+        message: String,
+        occurrenceKey: String = eventType
     ) = transaction {
-        val exists = NotificationsTable.selectAll().where {
-            (NotificationsTable.userId eq userId) and
-                (NotificationsTable.type eq eventType) and
-                (NotificationsTable.relatedTicketId eq ticketId)
-        }.any()
-
-        if (!exists) {
-            NotificationsTable.insert {
-                it[NotificationsTable.userId] = userId
-                it[NotificationsTable.title] = title
-                it[NotificationsTable.message] = message
-                it[NotificationsTable.type] = eventType
-                it[NotificationsTable.relatedTicketId] = ticketId
-                it[NotificationsTable.relatedUserId] = null
-                it[NotificationsTable.isRead] = false
-                it[NotificationsTable.createdAt] = LocalDateTime.now()
-                it[NotificationsTable.readAt] = null
-            }
+        NotificationsTable.insertIgnore {
+            it[NotificationsTable.userId] = userId
+            it[NotificationsTable.title] = title
+            it[NotificationsTable.message] = message
+            it[NotificationsTable.type] = eventType
+            it[NotificationsTable.relatedTicketId] = ticketId
+            it[NotificationsTable.relatedUserId] = null
+            it[NotificationsTable.eventKey] = "ticket:$ticketId:$eventType:$occurrenceKey:$userId".take(180)
+            it[NotificationsTable.isRead] = false
+            it[NotificationsTable.createdAt] = LocalDateTime.now()
+            it[NotificationsTable.readAt] = null
         }
     }
 }

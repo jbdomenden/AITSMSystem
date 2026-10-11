@@ -321,6 +321,10 @@ class UserRepository {
             ?.let(::toProfilePhotoRequest)
     }
 
+    fun profilePhotoRequestById(requestId: Int): ProfilePhotoRequest? = transaction {
+        ProfilePhotoRequestsTable.selectAll().where { ProfilePhotoRequestsTable.id eq requestId }.singleOrNull()?.let(::toProfilePhotoRequest)
+    }
+
     fun reviewProfilePhotoRequest(requestId: Int, reviewerId: Int, approved: Boolean): ProfilePhotoRequest? = transaction {
         val row = ProfilePhotoRequestsTable.selectAll().where { ProfilePhotoRequestsTable.id eq requestId }.singleOrNull()
             ?: return@transaction null

@@ -99,6 +99,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   type VARCHAR(40) NOT NULL,
   related_ticket_id INT REFERENCES tickets(id),
   related_user_id INT REFERENCES users(id) ON DELETE SET NULL,
+  event_key VARCHAR(180) UNIQUE,
   is_read BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMP NOT NULL,
   read_at TIMESTAMP
@@ -110,7 +111,47 @@ CREATE TABLE IF NOT EXISTS sla_policies (
   response_time INT NOT NULL,
   resolution_time INT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS monitoring_collectors (
+  id UUID PRIMARY KEY,
+  site_id VARCHAR(100) NOT NULL,
+  name VARCHAR(150) NOT NULL,
+  token_hash VARCHAR(64) NOT NULL UNIQUE,
+  enrolled_at TIMESTAMP NOT NULL,
+  last_seen_at TIMESTAMP,
+  revoked_at TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS monitoring_devices (
+  id SERIAL PRIMARY KEY,
+  collector_id UUID NOT NULL REFERENCES monitoring_collectors(id) ON DELETE CASCADE,
+  device_key VARCHAR(200) NOT NULL,
+  hostname VARCHAR(200) NOT NULL,
+  ip_address VARCHAR(45) NOT NULL,
+  mac_address VARCHAR(32),
+  os_details VARCHAR(300),
+  reachable BOOLEAN NOT NULL,
+  telemetry_available BOOLEAN NOT NULL,
+  cpu_usage_percent NUMERIC(5,2),
+  memory_usage_percent NUMERIC(5,2),
+  storage_total_bytes BIGINT,
+  storage_used_bytes BIGINT,
+  measurement_at TIMESTAMP,
+  received_at TIMESTAMP NOT NULL,
+  last_seen_at TIMESTAMP NOT NULL,
+  UNIQUE(collector_id, device_key)
+);
+
+CREATE TABLE IF NOT EXISTS monitoring_discovery_requests (
+  id UUID PRIMARY KEY,
+  collector_id UUID NOT NULL REFERENCES monitoring_collectors(id) ON DELETE CASCADE,
+  status VARCHAR(20) NOT NULL,
+  requested_at TIMESTAMP NOT NULL,
+  completed_at TIMESTAMP,
+  error_message VARCHAR(500)
+);
 CREATE INDEX IF NOT EXISTS notifications_related_user_idx ON notifications(related_user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS notifications_event_key_uidx ON notifications(event_key) WHERE event_key IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS system_settings (
   id SERIAL PRIMARY KEY,

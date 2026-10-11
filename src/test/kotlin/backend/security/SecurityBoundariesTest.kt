@@ -84,6 +84,9 @@ class SecurityBoundariesTest {
         assertEquals(PageAudience.AUTHENTICATED, protectedPageAudience("/profile/html/profile.html"))
         assertEquals(null, protectedPageAudience("/login/html/login.html"))
         assertEquals(null, protectedPageAudience("/modules/sidebar/html/sidebar.html"))
+        assertEquals(null, protectedPageAudience("/api/tickets"))
+        assertEquals(null, protectedPageAudience("/api/knowledge"))
+        assertEquals(null, protectedPageAudience("/dashboard-admin/js/dashboard.js"))
     }
 
     @Test fun `admin portal role and landing page include IT administrators`() {

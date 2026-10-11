@@ -83,7 +83,7 @@ data class ProfilePhotoRequest(
     val reviewedBy: Int? = null
 )
 
-@Serializable data class ProfilePhotoReviewRequest(val approved: Boolean)
+@Serializable data class ProfilePhotoReviewRequest(val approved: Boolean, val reason: String? = null)
 
 @Serializable
 data class RegisterRequest(
@@ -181,7 +181,7 @@ data class Device(
 @Serializable data class ClientMetricsRequest(val deviceName: String, val ipAddress: String, val department: String, val assignedUser: String, val cpuUsage: Int, val memoryUsage: Int, val status: String)
 
 @Serializable
- data class HostTelemetryDto(
+data class HostTelemetryDto(
     val cpuUsagePercent: Double,
     val memoryUsagePercent: Double,
     val totalMemoryBytes: Long,
@@ -190,6 +190,29 @@ data class Device(
     val ipAddress: String,
     val timestamp: String
 )
+
+@Serializable data class CollectorEnrollmentRequest(val siteId: String, val name: String)
+@Serializable data class CollectorEnrollmentResponse(
+    val collectorId: String, val siteId: String, val name: String, val token: String, val enrolledAt: String
+)
+@Serializable data class CollectorView(
+    val collectorId: String, val siteId: String, val name: String, val state: String,
+    val enrolledAt: String, val lastSeenAt: String? = null, val revokedAt: String? = null
+)
+@Serializable data class CollectorDeviceReport(
+    val deviceKey: String, val hostname: String, val ipAddress: String, val macAddress: String? = null,
+    val osDetails: String? = null, val reachable: Boolean = true, val telemetryAvailable: Boolean = false,
+    val cpuUsagePercent: Double? = null, val memoryUsagePercent: Double? = null,
+    val storageTotalBytes: Long? = null, val storageUsedBytes: Long? = null,
+    val measurementAt: String? = null
+)
+@Serializable data class CollectorReportRequest(
+    val measuredAt: String, val devices: List<CollectorDeviceReport>,
+    val discoveryRequestId: String? = null, val discoveryError: String? = null
+)
+@Serializable data class CollectorReportResponse(val accepted: Boolean, val receivedAt: String, val devicesAccepted: Int)
+@Serializable data class DiscoveryCommand(val requestId: String, val privateCidrs: List<String>, val requestedAt: String)
+@Serializable data class DiscoveryRefreshResponse(val requestId: String, val status: String, val message: String)
 
 @Serializable
  data class LanDeviceDto(
@@ -201,7 +224,15 @@ data class Device(
     val telemetrySourceType: String,
     val cpuUsagePercent: Double? = null,
     val memoryUsagePercent: Double? = null,
-    val lastSeen: String
+    val lastSeen: String,
+    val measurementAt: String? = null,
+    val receivedAt: String? = null,
+    val stale: Boolean = false,
+    val collectorId: String? = null,
+    val macAddress: String? = null,
+    val osDetails: String? = null,
+    val storageTotalBytes: Long? = null,
+    val storageUsedBytes: Long? = null
 )
 
 @Serializable
@@ -209,8 +240,13 @@ data class Device(
     val totalDiscovered: Int,
     val monitoredDevices: Int,
     val telemetryAvailableDevices: Int,
-    val hostTelemetry: HostTelemetryDto,
-    val timestamp: String
+    val hostTelemetry: HostTelemetryDto? = null,
+    val timestamp: String? = null,
+    val collectorState: String = "NOT_ENROLLED",
+    val collectorLastSeenAt: String? = null,
+    val discoveryState: String = "NEVER",
+    val discoveryCompletedAt: String? = null,
+    val serviceHealthCheckedAt: String
 )
 
 @Serializable

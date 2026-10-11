@@ -165,6 +165,48 @@ object DevicesTable : Table("devices") {
     override val primaryKey = PrimaryKey(id)
 }
 
+object MonitoringCollectorsTable : Table("monitoring_collectors") {
+    val id = uuid("id")
+    val siteId = varchar("site_id", 100).index()
+    val name = varchar("name", 150)
+    val tokenHash = varchar("token_hash", 64).uniqueIndex()
+    val enrolledAt = datetime("enrolled_at")
+    val lastSeenAt = datetime("last_seen_at").nullable().index()
+    val revokedAt = datetime("revoked_at").nullable().index()
+    override val primaryKey = PrimaryKey(id)
+}
+
+object MonitoringDevicesTable : Table("monitoring_devices") {
+    val id = integer("id").autoIncrement()
+    val collectorId = uuid("collector_id").references(MonitoringCollectorsTable.id, onDelete = ReferenceOption.CASCADE).index()
+    val deviceKey = varchar("device_key", 200)
+    val hostname = varchar("hostname", 200)
+    val ipAddress = varchar("ip_address", 45).index()
+    val macAddress = varchar("mac_address", 32).nullable()
+    val osDetails = varchar("os_details", 300).nullable()
+    val reachable = bool("reachable")
+    val telemetryAvailable = bool("telemetry_available")
+    val cpuUsagePercent = decimal("cpu_usage_percent", 5, 2).nullable()
+    val memoryUsagePercent = decimal("memory_usage_percent", 5, 2).nullable()
+    val storageTotalBytes = long("storage_total_bytes").nullable()
+    val storageUsedBytes = long("storage_used_bytes").nullable()
+    val measurementAt = datetime("measurement_at").nullable()
+    val receivedAt = datetime("received_at").index()
+    val lastSeenAt = datetime("last_seen_at").index()
+    init { uniqueIndex(collectorId, deviceKey) }
+    override val primaryKey = PrimaryKey(id)
+}
+
+object DiscoveryRequestsTable : Table("monitoring_discovery_requests") {
+    val id = uuid("id")
+    val collectorId = uuid("collector_id").references(MonitoringCollectorsTable.id, onDelete = ReferenceOption.CASCADE).index()
+    val status = varchar("status", 20).index()
+    val requestedAt = datetime("requested_at")
+    val completedAt = datetime("completed_at").nullable()
+    val errorMessage = varchar("error_message", 500).nullable()
+    override val primaryKey = PrimaryKey(id)
+}
+
 object TicketsTable : Table("tickets") {
     val id = integer("id").autoIncrement()
     val userId = integer("user_id").references(UsersTable.id, onDelete = ReferenceOption.CASCADE).index()
@@ -197,6 +239,7 @@ object NotificationsTable : Table("notifications") {
     val type = varchar("type", 40)
     val relatedTicketId = integer("related_ticket_id").nullable().index()
     val relatedUserId = integer("related_user_id").references(UsersTable.id, onDelete = ReferenceOption.SET_NULL).nullable().index()
+    val eventKey = varchar("event_key", 180).nullable().uniqueIndex()
     val isRead = bool("is_read").default(false).index()
     val createdAt = datetime("created_at").index()
     val readAt = datetime("read_at").nullable().index()
@@ -359,6 +402,9 @@ object DatabaseFactory {
                 DirectMessagesTable,
                 EulaAcceptanceTable,
                 DevicesTable,
+                MonitoringCollectorsTable,
+                MonitoringDevicesTable,
+                DiscoveryRequestsTable,
                 TicketsTable,
                 TicketHistoryTable,
                 NotificationsTable,

@@ -1,0 +1,39 @@
+package backend.services
+
+import java.nio.file.Files
+import java.nio.file.Path
+import kotlin.test.Test
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+class FrontendSafetyContractTest {
+    @Test fun `ai interfaces share safe dom renderer`() {
+        val renderer = Files.readString(Path.of("src/main/resources/static/frontend/modules/common/js/ai-renderer.js"))
+        val standalone = Files.readString(Path.of("src/main/resources/static/frontend/ai-assistant/html/ai-assistant.html"))
+        val createTicket = Files.readString(Path.of("src/main/resources/static/frontend/create-ticket/html/create-ticket.html"))
+        assertTrue(renderer.contains("replaceChildren"))
+        assertTrue(renderer.contains("noopener noreferrer"))
+        assertFalse(renderer.contains("container.innerHTML"))
+        assertTrue(standalone.contains("/modules/common/js/ai-renderer.js"))
+        assertTrue(createTicket.contains("/modules/common/js/ai-renderer.js"))
+        assertTrue(createTicket.contains("/ai-assistant/js/ai-assistant.js"))
+        assertFalse(createTicket.contains("/create-ticket/js/ai-assistant.js"))
+    }
+
+    @Test fun `direct messages do not create or acknowledge bell notifications`() {
+        val service = Files.readString(Path.of("src/main/kotlin/backend/services/ColleagueService.kt"))
+        val drawer = Files.readString(Path.of("src/main/resources/static/frontend/modules/common/js/chat-drawer.js"))
+        assertFalse(service.contains("type = \"direct_message\""))
+        assertFalse(drawer.contains("notifications/direct-messages"))
+        assertTrue(service.contains("repository.markRead(actorId, colleagueId)"))
+    }
+
+    @Test fun `monitoring never labels cloud host metrics as lan telemetry`() {
+        val monitoring = Files.readString(Path.of("src/main/kotlin/backend/services/MonitoringService.kt"))
+        val frontend = Files.readString(Path.of("src/main/resources/static/frontend/monitoring/js/monitoring.js"))
+        assertFalse(monitoring.contains("ManagementFactory"))
+        assertFalse(monitoring.contains("discoverArpPeers"))
+        assertTrue(frontend.contains("Last data received"))
+        assertFalse(frontend.contains("Host CPU"))
+    }
+}

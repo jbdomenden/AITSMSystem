@@ -63,7 +63,7 @@ fun Route.profilePhotoRoutes(service: ProfilePhotoService) {
             val actor = call.userId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             val id = call.parameters["id"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
             val review = call.receive<ProfilePhotoReviewRequest>()
-            call.respond(service.review(id, actor, review.approved))
+            call.respond(service.review(id, actor, review.approved, review.reason))
         }
     }
 }

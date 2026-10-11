@@ -93,7 +93,7 @@ async function loadHeaderNotifications(){
       </div>
       ${items.map(n => {
         const safeType = String(n.type || '').replace(/[^a-z0-9_-]/gi, '');
-        return `<button type='button' class='small' style='display:block;width:100%;text-align:left;padding:8px;border:none;border-bottom:1px solid #1f325f;background:${n.isRead ? 'transparent' : 'rgba(37,99,235,.12)'};color:inherit' onclick='openAdminNotification(${Number(n.id || 0)}, "${safeType}", ${Number(n.relatedUserId || 0)})'>
+        return `<button type='button' class='small' style='display:block;width:100%;text-align:left;padding:8px;border:none;border-bottom:1px solid #1f325f;background:${n.isRead ? 'transparent' : 'rgba(37,99,235,.12)'};color:inherit' onclick='openAdminNotification(${Number(n.id || 0)}, "${safeType}", ${Number(n.relatedTicketId || 0)}, ${Number(n.relatedUserId || 0)})'>
           <strong style='display:block'>${adminShellEscape(n.title || 'Notification')}</strong>
           <span>${adminShellEscape(n.message || 'Notification')}</span><br>
           <span style='opacity:.7'>${adminShellEscape(n.createdAt || '')}</span>
@@ -109,10 +109,12 @@ async function markNotificationRead(notificationId) {
   await loadHeaderNotifications();
 }
 
-async function openAdminNotification(notificationId, type, relatedUserId = 0) {
+async function openAdminNotification(notificationId, type, relatedTicketId = 0, relatedUserId = 0) {
   await markNotificationRead(notificationId);
   document.getElementById('adminNotifMenu')?.classList.add('hidden');
-  if (type === 'direct_message') openAitsmChat(relatedUserId || null);
+  if (relatedTicketId) location.href = `/ticket-management?ticketId=${encodeURIComponent(relatedTicketId)}`;
+  else if (type.startsWith('profile_photo_')) location.href = '/profile#photoApprovalCard';
+  else if (relatedUserId) location.href = `/user-management?userId=${encodeURIComponent(relatedUserId)}`;
 }
 
 async function markAllNotificationsRead() {
@@ -159,6 +161,7 @@ function renderUtilityHeader() {
   });
 
   loadHeaderNotifications();
+  window.setInterval(loadHeaderNotifications, 30000);
 }
 
 function initializeAdminShell() {

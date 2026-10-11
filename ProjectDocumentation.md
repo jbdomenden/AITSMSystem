@@ -98,8 +98,8 @@ Errors are normalized through status pages and `ApiErrorResponse` (status code +
 ## 6. Monitoring Domain
 
 Features include:
-- Host telemetry capture from server host
-- LAN peer discovery and merge with registered devices
+- Outbound authenticated LAN collector with hashed revocable enrollment tokens
+- Queued private-CIDR discovery and persisted server-received telemetry timestamps
 - CPU/alerts summary endpoints for dashboards
 - Device sync utilities
 

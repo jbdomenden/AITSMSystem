@@ -1,0 +1,6 @@
+{
+  "BaseUrl": "https://aitsmportal.example.com",
+  "Token": "paste-the-one-time-enrollment-token-here",
+  "IntervalSeconds": 60,
+  "PrivateCidrs": ["192.168.1.0/24"]
+}

@@ -63,8 +63,8 @@ Open `/security` to enroll or manage MFA, regenerate one-time recovery codes aft
 - Use IP lookup and sync-from-monitoring tools.
 
 ### 3.3 Monitoring
-- Check host telemetry, LAN devices, summaries, CPU, and alerts.
-- Refresh discovery when needed.
+- Check collector health, LAN discovery, genuine device telemetry, and alerts.
+- Queue discovery when needed; the enrolled LAN collector performs it on its next poll.
 
 ### 3.4 Knowledge Base
 - Create/edit/delete knowledge articles.
@@ -103,7 +103,8 @@ Open `/security` to enroll or manage MFA, regenerate one-time recovery codes aft
 - You can still create a ticket draft from fallback guidance.
 
 ### No monitoring data
-- Confirm monitored devices are in LAN range and client metrics are being posted.
+- Confirm a collector is enrolled, running inside the target LAN, and allowed outbound HTTPS access.
+- Confirm its configured private CIDRs match the approved ranges and review the collector troubleshooting guide.
 
 ---
 

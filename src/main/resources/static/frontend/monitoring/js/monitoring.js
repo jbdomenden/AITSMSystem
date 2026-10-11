@@ -31,12 +31,16 @@ function setStatusField(status) {
 
 function formatLastSeen(value) {
   const date = new Date(value || '');
-  return Number.isNaN(date.getTime()) ? (value || '-') : date.toLocaleString();
+  if (Number.isNaN(date.getTime())) return value || 'Never';
+  const zone = new Intl.DateTimeFormat(undefined, { timeZoneName: 'short' }).formatToParts(date).find((part) => part.type === 'timeZoneName')?.value || '';
+  return `${new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'medium' }).format(date)} ${zone}`.trim();
 }
 
 function formatRelativeTime(value) {
   if (!value) return 'Waiting for update…';
-  const diffMs = Date.now() - value.getTime();
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Never updated';
+  const diffMs = Math.max(0, Date.now() - date.getTime());
   if (diffMs < 5000) return 'Updated just now';
   const seconds = Math.round(diffMs / 1000);
   if (seconds < 60) return `Updated ${seconds}s ago`;
@@ -109,7 +113,7 @@ function updateMonitoringLiveStatus(state = 'idle', message) {
   }
 
   if (state === 'loading') {
-    label.textContent = 'Refreshing telemetry…';
+    label.textContent = 'Checking for collector reports…';
     return;
   }
 
@@ -122,8 +126,8 @@ function updateMonitoringLiveStatus(state = 'idle', message) {
 }
 
 function telemetryBadge(device) {
-  const label = device.telemetryAvailable ? (device.telemetrySourceType || 'Telemetry') : 'Unavailable';
-  const tone = device.telemetryAvailable ? 'resolved' : 'warning';
+  const label = device.stale ? 'Stale telemetry' : (device.telemetryAvailable ? (device.telemetrySourceType || 'Telemetry') : 'Unavailable');
+  const tone = device.telemetryAvailable && !device.stale ? 'resolved' : 'warning';
   return `<span class='badge ${tone} monitor-telemetry-badge' title='${aitsmEscapeHtml(label)}'>${aitsmEscapeHtml(label)}</span>`;
 }
 
@@ -131,12 +135,11 @@ function renderMonitorSummary(summary) {
   const wrap = document.getElementById('monitorSummary');
   if (!wrap) return;
 
-  const host = summary?.hostTelemetry || {};
   const chips = [
     ['Discovered Devices', summary?.totalDiscovered ?? 0],
     ['Monitored Devices', summary?.monitoredDevices ?? 0],
     ['Telemetry Available', summary?.telemetryAvailableDevices ?? 0],
-    ['Host CPU', `${Number(host.cpuUsagePercent ?? 0).toFixed(1)}%`]
+    ['Collector', String(summary?.collectorState || 'NOT_ENROLLED').replaceAll('_', ' ')]
   ];
 
   wrap.innerHTML = chips.map(([label, value]) => `<div class='kpi-chip'><div class='kpi-label'>${label}</div><div class='kpi-value'>${value}</div></div>`).join('');
@@ -146,19 +149,15 @@ function renderMonitoringHealthPanel(summary, devices) {
   const panel = document.getElementById('monitorHealthPanel');
   if (!panel) return;
 
-  const host = summary?.hostTelemetry;
-  if (!host) {
-    panel.innerHTML = `<div class='empty-state'><h3>Monitoring unavailable</h3><p>Unable to load host telemetry right now.</p></div>`;
-    return;
-  }
-
   const available = devices.filter(d => d.telemetryAvailable).length;
+  const collectorState = String(summary?.collectorState || 'NOT_ENROLLED').replaceAll('_', ' ');
+  const lastUpdate = summary?.timestamp;
   panel.innerHTML = `
     <div class='insight-grid monitor-health-grid'>
-      <div class='insight-item'><div class='insight-label'>Host</div><div class='insight-value monitor-text-wrap'>${aitsmEscapeHtml(host.hostname || '-')}</div></div>
-      <div class='insight-item'><div class='insight-label'>Host Memory</div><div class='insight-value'>${Number(host.memoryUsagePercent ?? 0).toFixed(1)}%</div></div>
+      <div class='insight-item'><div class='insight-label'>Collector health</div><div class='insight-value monitor-text-wrap'>${aitsmEscapeHtml(collectorState)}</div></div>
+      <div class='insight-item'><div class='insight-label'>Discovery</div><div class='insight-value'>${aitsmEscapeHtml(String(summary?.discoveryState || 'NEVER').replaceAll('_', ' '))}</div></div>
       <div class='insight-item'><div class='insight-label'>Telemetry coverage</div><div class='insight-value'>${available}/${devices.length}</div></div>
-      <div class='insight-item'><div class='insight-label'>Last updated</div><div class='insight-value monitor-text-wrap monitor-updated-at'>${formatLastSeen(summary.timestamp || host.timestamp || monitoringLastUpdatedAt)}</div></div>
+      <div class='insight-item'><div class='insight-label'>Last data received</div><div class='insight-value monitor-text-wrap monitor-updated-at'>${formatLastSeen(lastUpdate)}</div></div>
     </div>`;
 }
 
@@ -167,7 +166,7 @@ function renderMonitorCards(devices) {
   if (!wrap) return;
 
   if (!devices.length) {
-    wrap.innerHTML = `<div class='empty-state'><h3>No LAN devices found</h3><p>Run discovery refresh or wait for LAN telemetry ingestion from clients.</p><button class='btn btn-primary' onclick='refreshDiscovery()'>Refresh discovery</button></div>`;
+    wrap.innerHTML = `<div class='empty-state'><h3>No collector data received</h3><p>Enroll and start a collector on the target LAN. Refresh Discovery queues work for that collector; Cloud Run does not scan private networks directly.</p><button class='btn btn-primary' onclick='refreshDiscovery()'>Queue discovery</button></div>`;
     return;
   }
 
@@ -217,10 +216,10 @@ function renderMonitorTable(devices) {
     <td>${aitsmEscapeHtml(d.hostname || '-')}</td>
     <td>${aitsmEscapeHtml(d.ipAddress || '-')}</td>
     <td>${aitsmEscapeHtml(d.telemetrySourceType || '-')}</td>
-    <td>${d.reachable ? 'Online' : 'Offline'}</td>
+    <td>${d.stale ? 'Stale' : (d.reachable ? 'Online' : 'Offline')}</td>
     <td>${d.cpuUsagePercent != null ? `${Number(d.cpuUsagePercent).toFixed(1)}%` : '-'}</td>
     <td>${d.memoryUsagePercent != null ? `${Number(d.memoryUsagePercent).toFixed(1)}%` : '-'}</td>
-    <td><span class='badge ${statusBadge(d.telemetryAvailable ? 'online' : 'unavailable')}'>${d.telemetryAvailable ? 'Telemetry' : 'No telemetry'}</span></td>
+    <td><span class='badge ${statusBadge(d.telemetryAvailable && !d.stale ? 'online' : 'unavailable')}'>${d.stale ? 'Stale' : (d.telemetryAvailable ? 'Telemetry' : 'No telemetry')}</span></td>
   </tr>`).join('');
 }
 
@@ -244,13 +243,11 @@ function setRefreshDiscoveryBusy(isBusy) {
 async function refreshDiscovery() {
   setRefreshDiscoveryBusy(true);
   try {
-    const res = await fetch('/api/monitoring/refresh-discovery', { method: 'POST', headers: authHeaders() });
-    const data = await res.json();
-    if (!res.ok) {
-      alert(data.error || 'Failed to refresh discovery');
-      return;
-    }
-    await loadMonitoring({ force: true, source: 'discovery' });
+    const data = await window.aitsmFetchJson('/api/monitoring/refresh-discovery', { method: 'POST' });
+    updateMonitoringLiveStatus('live', data.message || 'Discovery queued for collector');
+    await loadMonitoring({ force: true, source: 'queued' });
+  } catch (error) {
+    alert(error.message || 'Failed to queue discovery');
   } finally {
     setRefreshDiscoveryBusy(false);
   }
@@ -279,22 +276,24 @@ async function loadMonitoring({ force = false, source = 'manual' } = {}) {
       fetch('/api/monitoring/lan-peer-ips', { headers: authHeaders() })
     ]);
 
-    const summary = await summaryRes.json();
-    const devices = await devicesRes.json();
-    const peerIps = await peerIpsRes.json();
+    const [summary, devices, peerIps] = await Promise.all([
+      summaryRes.ok ? summaryRes.json() : Promise.reject(new Error(`Monitoring summary failed with HTTP ${summaryRes.status}.`)),
+      devicesRes.ok ? devicesRes.json() : Promise.reject(new Error(`Monitoring devices failed with HTTP ${devicesRes.status}.`)),
+      peerIpsRes.ok ? peerIpsRes.json() : Promise.reject(new Error(`Monitoring peer list failed with HTTP ${peerIpsRes.status}.`))
+    ]);
     const safeDevices = Array.isArray(devices) ? devices : [];
     const safePeerIps = Array.isArray(peerIps) ? peerIps : [];
     monitoringDevicesCache = safeDevices;
 
-    renderMonitorSummary(summaryRes.ok ? summary : null);
-    renderMonitoringHealthPanel(summaryRes.ok ? summary : null, monitoringDevicesCache);
+    renderMonitorSummary(summary);
+    renderMonitoringHealthPanel(summary, monitoringDevicesCache);
     renderMonitorCards(monitoringDevicesCache);
     if (monitorRows) clearTableSkeleton(monitorRows);
     renderMonitorTable(monitoringDevicesCache);
     renderLanIpSuggestions(safePeerIps);
 
-    monitoringLastUpdatedAt = new Date();
-    updateMonitoringLiveStatus('live', source === 'discovery' ? 'Discovery refreshed just now' : undefined);
+    monitoringLastUpdatedAt = summary.timestamp || monitoringLastUpdatedAt;
+    updateMonitoringLiveStatus('live', source === 'queued' ? 'Discovery pending on collector' : undefined);
   } catch {
     monitoringDevicesCache = [];
     renderMonitorTableCount(0, 0);

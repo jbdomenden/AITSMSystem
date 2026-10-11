@@ -1,165 +1,98 @@
 package backend.services
 
-import backend.models.HostTelemetryDto
-import backend.models.LanDeviceDto
+import backend.models.CollectorDeviceReport
+import backend.models.CollectorEnrollmentRequest
+import backend.models.CollectorReportRequest
+import backend.models.CollectorReportResponse
+import backend.models.DiscoveryRefreshResponse
 import backend.models.MonitoringSummaryDto
-import backend.repository.DeviceRepository
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.lang.management.ManagementFactory
+import backend.repository.MonitoringRepository
+import backend.security.RateLimiter
 import java.net.InetAddress
-import java.net.NetworkInterface
-import java.util.Locale
-import java.time.LocalDateTime
+import java.time.Clock
+import java.time.Instant
+import java.util.UUID
 
 class MonitoringService(
-    private val deviceRepository: DeviceRepository,
-    private val assetDetectionService: AssetDetectionService
+    private val repository: MonitoringRepository,
+    private val assetDetectionService: AssetDetectionService,
+    private val clock: Clock = Clock.systemUTC()
 ) {
-    fun devices() = deviceRepository.list().filter { assetDetectionService.matches(it.ipAddress) }
-    fun cpu() = devices().map { mapOf("device" to it.deviceName, "cpu" to it.cpuUsage.toString()) }
-    fun alerts() = devices().filter { it.cpuUsage > 85 || it.memoryUsage > 90 || it.status.equals("critical", true) }
-        .map { mapOf("device" to it.deviceName, "message" to "High resource usage detected") }
+    private val ingestionLimiter = RateLimiter(120, 60_000L, clock)
 
-    fun hostTelemetry(): HostTelemetryDto {
-        val osBean = ManagementFactory.getPlatformMXBean(com.sun.management.OperatingSystemMXBean::class.java)
-        val cpu = (osBean.cpuLoad.takeIf { it >= 0 } ?: 0.0) * 100
-        val totalMem = osBean.totalMemorySize.coerceAtLeast(1)
-        val freeMem = osBean.freeMemorySize.coerceAtLeast(0)
-        val usedMem = (totalMem - freeMem).coerceAtLeast(0)
-        val memPct = usedMem.toDouble() / totalMem * 100
-
-        val host = InetAddress.getLocalHost()
-        return HostTelemetryDto(
-            cpuUsagePercent = (cpu * 10).toInt() / 10.0,
-            memoryUsagePercent = (memPct * 10).toInt() / 10.0,
-            totalMemoryBytes = totalMem,
-            usedMemoryBytes = usedMem,
-            hostname = host.hostName,
-            ipAddress = host.hostAddress,
-            timestamp = LocalDateTime.now().toString()
-        )
-    }
-
-    fun lanDevices(): List<LanDeviceDto> {
-        val reachabilityCache = mutableMapOf<String, Boolean>()
-        fun isReachable(ip: String): Boolean = reachabilityCache.getOrPut(ip) { isDeviceReachable(ip) }
-
-        val fromAgents = devices().map {
-            val hasTelemetry = it.cpuUsage > 0 || it.memoryUsage > 0
-            val reachable = isReachable(it.ipAddress)
-            LanDeviceDto(
-                id = "device-${it.id}",
-                hostname = it.deviceName,
-                ipAddress = it.ipAddress,
-                reachable = reachable,
-                telemetryAvailable = hasTelemetry,
-                telemetrySourceType = if (hasTelemetry) "AGENT" else "UNAVAILABLE",
-                cpuUsagePercent = if (hasTelemetry) it.cpuUsage.toDouble() else null,
-                memoryUsagePercent = if (hasTelemetry) it.memoryUsage.toDouble() else null,
-                lastSeen = it.lastSeen
-            )
+    fun enroll(request: CollectorEnrollmentRequest) = repository.enroll(
+        request.copy(siteId = request.siteId.trim(), name = request.name.trim()).also {
+            require(it.siteId.matches(Regex("[A-Za-z0-9][A-Za-z0-9._-]{0,99}"))) { "Site id is invalid." }
+            require(it.name.isNotBlank() && it.name.length <= 150) { "Collector name is required and must be 150 characters or fewer." }
         }
-
-        val discovered = discoverLanPeers().map { peer ->
-            val reachable = isReachable(peer.ipAddress)
-            LanDeviceDto(
-                id = "peer-${peer.ipAddress}",
-                hostname = peer.hostname,
-                ipAddress = peer.ipAddress,
-                reachable = reachable,
-                telemetryAvailable = false,
-                telemetrySourceType = "DISCOVERED",
-                cpuUsagePercent = null,
-                memoryUsagePercent = null,
-                lastSeen = LocalDateTime.now().toString()
-            )
-        }
-
-        return (fromAgents + discovered)
-            .distinctBy { it.ipAddress }
-            .sortedBy { it.ipAddress }
-    }
+    )
+    fun collectors() = repository.listCollectors()
+    fun revoke(rawId: String): Boolean = repository.revoke(UUID.fromString(rawId))
+    fun devices() = repository.devices()
+    fun lanDevices() = devices()
+    fun lanPeerIps() = devices().map { it.ipAddress }.distinct().sorted()
+    fun cpu() = devices().filter { it.telemetryAvailable }.map { mapOf("device" to it.hostname, "cpu" to (it.cpuUsagePercent?.toString() ?: "unavailable")) }
+    fun alerts() = devices().filter { (it.cpuUsagePercent ?: 0.0) > 85 || (it.memoryUsagePercent ?: 0.0) > 90 }
+        .map { mapOf("device" to it.hostname, "message" to "High resource usage reported by collector") }
 
     fun summary(): MonitoringSummaryDto {
-        val devices = lanDevices()
-        val host = hostTelemetry()
+        val devices = devices()
+        val collectors = collectors().filter { it.state != "REVOKED" }
+        val newest = collectors.maxByOrNull { it.lastSeenAt ?: it.enrolledAt }
+        val discovery = repository.latestDiscovery()
         return MonitoringSummaryDto(
-            totalDiscovered = devices.size,
-            monitoredDevices = devices.count { it.reachable },
-            telemetryAvailableDevices = devices.count { it.telemetryAvailable },
-            hostTelemetry = host,
-            timestamp = LocalDateTime.now().toString()
+            totalDiscovered = devices.size, monitoredDevices = devices.count { it.reachable },
+            telemetryAvailableDevices = devices.count { it.telemetryAvailable && !it.stale }, hostTelemetry = null,
+            timestamp = devices.mapNotNull { it.receivedAt }.maxOrNull(), collectorState = newest?.state ?: "NOT_ENROLLED",
+            collectorLastSeenAt = newest?.lastSeenAt, discoveryState = discovery.first,
+            discoveryCompletedAt = discovery.second, serviceHealthCheckedAt = clock.instant().toString()
         )
     }
 
-    fun refreshDiscovery(): Map<String, String> {
-        val peers = discoverLanPeers().joinToString(" | ") { "${it.hostname}:${it.ipAddress}" }
-        return mapOf("message" to "Discovery refresh completed", "interfaces" to peers)
+    fun requestDiscovery(): DiscoveryRefreshResponse {
+        val (requestId, _) = repository.queueDiscovery()
+        return DiscoveryRefreshResponse(requestId.toString(), "PENDING", "Discovery was queued for the LAN collector.")
+    }
+    fun nextCommand(rawToken: String): backend.models.DiscoveryCommand? {
+        val collectorId = repository.authenticate(rawToken) ?: throw InvalidCollectorTokenException()
+        return repository.nextCommand(collectorId, assetDetectionService.getConfiguredPrivateCidrs())
+    }
+    fun ingest(rawToken: String, report: CollectorReportRequest): CollectorReportResponse {
+        val collectorId = repository.authenticate(rawToken) ?: throw InvalidCollectorTokenException()
+        if (!ingestionLimiter.allow(collectorId.toString())) throw CollectorRateLimitException()
+        require(report.devices.size <= 1_000) { "A report may contain at most 1000 devices." }
+        val measuredAt = parseMeasurement(report.measuredAt)
+        report.discoveryError?.let { require(it.length <= 500) { "Discovery error is too long." } }
+        report.devices.forEach(::validateDevice)
+        val (receivedAt, count) = repository.saveReport(collectorId, report, measuredAt)
+        return CollectorReportResponse(true, receivedAt.toString(), count)
     }
 
-    fun lanPeerIps(): List<String> = discoverLanPeers()
-        .map { it.ipAddress.trim() }
-        .plus(devices().map { it.ipAddress.trim() })
-        .filter { assetDetectionService.matches(it) }
-        .distinct()
-        .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it })
-
-    private data class Peer(val hostname: String, val ipAddress: String)
-
-    private fun discoverLanPeers(): List<Peer> {
-        val localAddresses = NetworkInterface.getNetworkInterfaces().toList()
-            .filter { it.isUp && !it.isLoopback }
-            .flatMap { ni -> ni.inetAddresses.toList() }
-            .map { it.hostAddress.substringBefore('%') }
-            .toSet()
-
-        return discoverArpPeers()
-            .filterNot { it.ipAddress in localAddresses || it.ipAddress.startsWith("127.") }
-            .distinctBy { it.ipAddress }
-    }
-
-    private fun discoverArpPeers(): List<Peer> {
-        val osName = System.getProperty("os.name", "").lowercase(Locale.getDefault())
-        val commands = if ("windows" in osName) {
-            listOf(listOf("cmd", "/c", "arp -a"))
-        } else {
-            listOf(
-                listOf("sh", "-c", "ip neigh"),
-                listOf("sh", "-c", "arp -an")
-            )
+    private fun validateDevice(device: CollectorDeviceReport) {
+        require(device.deviceKey.isNotBlank() && device.deviceKey.length <= 200) { "Device key is invalid." }
+        require(device.hostname.isNotBlank() && device.hostname.length <= 200) { "Hostname is invalid." }
+        require(device.ipAddress.length <= 45 && isLiteralIp(device.ipAddress) && assetDetectionService.matchesConfigured(device.ipAddress)) {
+            "Device IP must be inside an explicitly configured private CIDR range."
         }
-
-        return commands.asSequence()
-            .flatMap { command -> executeCommand(command).asSequence() }
-            .mapNotNull { parsePeerIp(it) }
-            .distinct()
-            .map { Peer("LAN Peer", it) }
-            .toList()
-    }
-
-    private fun executeCommand(command: List<String>): List<String> = runCatching {
-        val process = ProcessBuilder(command).start()
-        BufferedReader(InputStreamReader(process.inputStream)).use { it.readLines() }
-    }.getOrElse { emptyList() }
-
-    private fun parsePeerIp(line: String): String? {
-        val directToken = line.substringBefore(' ').trim().removePrefix("(").removeSuffix(")")
-        if (assetDetectionService.matches(directToken) && !line.contains("FAILED", ignoreCase = true)) {
-            return directToken
+        require((device.macAddress?.length ?: 0) <= 32 && (device.osDetails?.length ?: 0) <= 300) { "Device metadata is too long." }
+        require(device.cpuUsagePercent == null || device.cpuUsagePercent in 0.0..100.0) { "CPU usage must be between 0 and 100." }
+        require(device.memoryUsagePercent == null || device.memoryUsagePercent in 0.0..100.0) { "Memory usage must be between 0 and 100." }
+        require((device.storageTotalBytes ?: 0) >= 0 && (device.storageUsedBytes ?: 0) >= 0) { "Storage values cannot be negative." }
+        if (!device.telemetryAvailable) require(device.cpuUsagePercent == null && device.memoryUsagePercent == null && device.storageTotalBytes == null && device.storageUsedBytes == null) {
+            "Uninstrumented peers cannot report detailed telemetry."
         }
-
-        val candidate = Regex("""\b(?:\d{1,3}\.){3}\d{1,3}\b""")
-            .find(line)
-            ?.value
-            ?.trim()
-            ?: return null
-
-        return candidate.takeIf { assetDetectionService.matches(it) }
+        device.measurementAt?.let(::parseMeasurement)
     }
-
-    private fun isDeviceReachable(ip: String): Boolean = runCatching {
-        if (!assetDetectionService.matches(ip)) return false
-        InetAddress.getByName(ip).isReachable(1200)
+    private fun parseMeasurement(value: String): Instant {
+        val parsed = runCatching { Instant.parse(value) }.getOrElse { throw IllegalArgumentException("Measurement timestamp must be ISO-8601 UTC.") }
+        require(!parsed.isAfter(clock.instant().plusSeconds(300)) && !parsed.isBefore(clock.instant().minusSeconds(86_400))) { "Measurement timestamp is outside the accepted range." }
+        return parsed
+    }
+    private fun isLiteralIp(value: String): Boolean = runCatching {
+        val parsed = InetAddress.getByName(value)
+        !value.any(Char::isLetter) && (parsed.hostAddress == value || value.contains(':'))
     }.getOrDefault(false)
 }
+
+class CollectorRateLimitException : RuntimeException("Collector report rate limit exceeded.")
+class InvalidCollectorTokenException : RuntimeException("Collector token is invalid or revoked.")

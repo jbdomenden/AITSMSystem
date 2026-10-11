@@ -280,23 +280,26 @@ This file lists backend endpoints, what they do, and POST payload examples for q
 
 ## Monitoring (`/api/monitoring`)
 
+### POST `/api/monitoring/collectors`
+- Admin-only enrollment. Returns a scoped raw token once; only its hash is stored.
+
+### GET `/api/monitoring/collectors`
+- Admin-only collector connectivity and last-seen states.
+
+### DELETE `/api/monitoring/collectors/{id}`
+- Revokes a collector token.
+
+### GET `/api/monitoring/collector/commands`
+- Collector bearer-token endpoint. Returns the next queued discovery request or HTTP 204.
+
+### POST `/api/monitoring/collector/reports`
+- Collector bearer-token endpoint for validated device discovery and telemetry reports. Server receipt time is authoritative.
+
 ### POST `/api/monitoring/client-metrics`
-- Client/agent upserts local host metrics.
-- Example input:
-```json
-{
-  "deviceName": "Client-PC-01",
-  "ipAddress": "192.168.1.24",
-  "department": "Finance",
-  "assignedUser": "alice",
-  "cpuUsage": 58,
-  "memoryUsage": 72,
-  "status": "Online"
-}
-```
+- Retired; returns JSON HTTP 410.
 
 ### GET `/api/monitoring/host-telemetry`
-- Host telemetry snapshot.
+- Retired; returns JSON HTTP 410 because Cloud Run host data is not endpoint telemetry.
 
 ### GET `/api/monitoring/lan-devices`
 - Aggregated LAN device view.
@@ -305,7 +308,7 @@ This file lists backend endpoints, what they do, and POST payload examples for q
 - Monitoring summary KPIs.
 
 ### POST `/api/monitoring/refresh-discovery`
-- Refresh LAN discovery.
+- Queues discovery for an enrolled collector; Cloud Run never scans the LAN directly.
 - Example input:
 ```json
 {}

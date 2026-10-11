@@ -9,6 +9,7 @@ import backend.repository.TicketRepository
 import backend.repository.UserRepository
 import backend.repository.InvitationRepository
 import backend.repository.PasswordResetRepository
+import backend.repository.MonitoringRepository
 import backend.queries.SystemSettingsQueries
 import backend.queries.InventoryQueries
 import backend.services.AIService
@@ -44,6 +45,7 @@ class ServiceContainer(application: Application) {
     val inventoryQueries = InventoryQueries()
     val assetDetectionService = AssetDetectionService(systemSettingsQueries)
     val deviceRepo = DeviceRepository(assetDetectionService)
+    val monitoringRepository = MonitoringRepository()
     val knowledgeRepo = KnowledgeRepository()
     val aiConversationRepository = AIConversationRepository()
 
@@ -54,10 +56,10 @@ class ServiceContainer(application: Application) {
     val mfaService = MfaService(auditRepo)
     val reauthenticationService = ReauthenticationService()
     val authService = AuthService(userRepo, auditRepo, notificationService, emailService, sessionService, passwordResetRepo, mfaService)
-    val invitationService = InvitationService(invitationRepo, userRepo, auditRepo, emailService)
-    val profilePhotoService = ProfilePhotoService(userRepo, auditRepo)
+    val invitationService = InvitationService(invitationRepo, userRepo, auditRepo, emailService, notificationService)
+    val profilePhotoService = ProfilePhotoService(userRepo, auditRepo, notificationService)
     val ticketService = TicketService(ticketRepo, auditRepo, notificationService, userRepo)
-    val monitoringService = MonitoringService(deviceRepo, assetDetectionService)
+    val monitoringService = MonitoringService(monitoringRepository, assetDetectionService)
     val aiService = AIService()
     val aiConfigService = AIConfigService(application.environment.config)
     private val aiProvider = GeminiProvider()

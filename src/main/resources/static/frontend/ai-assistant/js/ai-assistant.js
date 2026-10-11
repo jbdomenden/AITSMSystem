@@ -47,19 +47,15 @@ function loadState() {
   }
 }
 
-function renderFallbackSections(fallback = {}) {
-  const causes = (fallback.likelyCauses || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('');
-  const steps = (fallback.troubleshootingSteps || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('');
-  const escalate = (fallback.escalationCriteria || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('');
-
-  return `
-    <div class='ai-sections'>
-      <div><strong>Issue Summary</strong><p>${escapeHtml(fallback.issueSummary || 'Not provided')}</p></div>
-      <div><strong>Likely Causes</strong><ul>${causes || '<li>No likely causes provided.</li>'}</ul></div>
-      <div><strong>Troubleshooting Steps</strong><ol>${steps || '<li>No troubleshooting steps provided.</li>'}</ol></div>
-      <div><strong>Escalation Criteria</strong><ul>${escalate || '<li>No escalation guidance provided.</li>'}</ul></div>
-      <div><strong>Suggested Priority</strong><p>${escapeHtml(fallback.suggestedPriority || 'Medium')}</p></div>
-    </div>`;
+function renderFallbackSections(container, fallback = {}) {
+  const text = [
+    'Issue summary', fallback.issueSummary || 'Not provided', '',
+    'Likely causes', ...(fallback.likelyCauses || ['No likely causes provided.']).map((item) => `- ${item}`), '',
+    'Troubleshooting steps', ...(fallback.troubleshootingSteps || ['No troubleshooting steps provided.']).map((item, index) => `${index + 1}. ${item}`), '',
+    'Escalation guidance', ...(fallback.escalationCriteria || ['No escalation guidance provided.']).map((item) => `- ${item}`), '',
+    'Suggested priority', fallback.suggestedPriority || 'Medium'
+  ].join('\n');
+  window.AitsmAiRenderer.render(container, text);
 }
 
 function renderMessages() {
@@ -67,14 +63,21 @@ function renderMessages() {
   if (!thread) return;
 
   if (!aiState.messages.length) {
-    thread.innerHTML = "<p class='small'>Start by describing your issue. The assistant will return troubleshooting guidance.</p>";
+    const empty = document.createElement('p');
+    empty.className = 'small';
+    empty.textContent = 'Start by describing your issue. The assistant will return troubleshooting guidance.';
+    thread.replaceChildren(empty);
   } else {
-    thread.innerHTML = aiState.messages.map((message) => {
-      if (message.role === 'user') {
-        return `<article class='ai-message ai-message-user'><div class='ai-message-bubble'>${escapeHtml(message.content).replaceAll('\n', '<br>')}</div></article>`;
-      }
-      return `<article class='ai-message ai-message-assistant'><div class='ai-message-bubble'><p>${escapeHtml(message.content || '').replaceAll('\n', '<br>')}</p></div></article>`;
-    }).join('');
+    thread.replaceChildren(...aiState.messages.map((message) => {
+      const article = document.createElement('article');
+      article.className = `ai-message ${message.role === 'user' ? 'ai-message-user' : 'ai-message-assistant'}`;
+      const bubble = document.createElement('div');
+      bubble.className = 'ai-message-bubble';
+      if (message.role === 'user') bubble.textContent = message.content || '';
+      else window.AitsmAiRenderer.render(bubble, message.content || '');
+      article.append(bubble);
+      return article;
+    }));
   }
 
   thread.scrollTop = thread.scrollHeight;
@@ -96,7 +99,7 @@ function renderFallbackPanel() {
 
   panel.classList.remove('hidden');
   message.textContent = visible.fallback.message || 'AI backend is unavailable.';
-  details.innerHTML = renderFallbackSections(visible.fallback);
+  renderFallbackSections(details, visible.fallback);
 }
 
 function setPending(isPending) {

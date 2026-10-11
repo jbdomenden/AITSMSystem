@@ -148,6 +148,7 @@ class AuthService(
             ?: error("User not found or cannot be approved")
         auditRepository.log(actorUserId, "Approved external account ${updated.email} as ${role.name} in ${updated.department}", "users")
         emailService?.sendSecurityNotice(updated.email, if (role == UserRole.ADMIN) "AITSM administrator account activated" else "AITSM account activated", if (role == UserRole.ADMIN) "Your account was approved with administrator access. MFA enrollment is required at first sign-in." else "Your account was approved for access.")
+        notificationService?.push(updated.id, "Account approved", "Your account was approved for access.", "account_approved", relatedUserId = updated.id, eventKey = "external-account:${updated.id}:approved")
         return updated
     }
 
@@ -225,6 +226,7 @@ class AuthService(
         auditRepository.log(actorUserId, "Updated role for user ${updated.email} to ${role.name}", "users")
         sessions?.revokeAll(targetUserId)
         emailService?.sendSecurityNotice(updated.email, "AITSM role changed", "Your account role changed to ${role.name} and existing sessions were revoked.")
+        notificationService?.push(updated.id, "Role changed", "Your account role changed to ${role.name.replace('_', ' ').lowercase()}.", "role_changed", relatedUserId = updated.id, eventKey = "role:${updated.id}:${role.name}:${updated.createdAt}")
         return updated
     }
 
@@ -267,6 +269,7 @@ class AuthService(
         if (state != AccountState.ACTIVE) sessions?.revokeAll(targetUserId)
         auditRepository.log(actorUserId, "Changed account state for ${updated.email} to ${state.name}", "users")
         emailService?.sendSecurityNotice(updated.email, "AITSM account status changed", "Your account status changed to ${state.name}.")
+        notificationService?.push(updated.id, "Account status changed", "Your account status changed to ${state.name.replace('_', ' ').lowercase()}.", "account_state_changed", relatedUserId = updated.id, eventKey = "account-state:${updated.id}:${state.name}:${updated.createdAt}")
         return updated
     }
 
@@ -275,6 +278,7 @@ class AuthService(
             ?: error("User not found or cannot be modified")
         val state = if (approved) "approved" else "set to pending verification"
         auditRepository.log(actorUserId, "Email $state for ${updated.email}", "users")
+        notificationService?.push(updated.id, if (approved) "Account approved" else "Account approval changed", if (approved) "Your account was approved." else "Your account requires verification before access can continue.", if (approved) "account_approved" else "account_rejected", relatedUserId = updated.id, eventKey = "account-approval:${updated.id}:$approved:${updated.createdAt}")
         return updated
     }
 
@@ -317,6 +321,7 @@ class AuthService(
         auditRepository.log(actorUserId, "Granted admin role to ${updated.email}", "users")
         sessions?.revokeAll(updated.id)
         emailService?.sendSecurityNotice(updated.email, "AITSM administrator access granted", "Your account was granted administrator access. Existing sessions were revoked and MFA is required.")
+        notificationService?.push(updated.id, "Access changed", "Your account was granted administrator access.", "role_changed", relatedUserId = updated.id, eventKey = "role:${updated.id}:ADMIN:${updated.createdAt}")
         return AdminGrantResponse(true, updated, "Admin role granted successfully")
     }
 

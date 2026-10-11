@@ -42,9 +42,23 @@ class TicketService(
     fun allForAdvisory() = repository.list(null, true, 500, 0).items
 
     fun update(id: Int, req: TicketRequest, userId: Int?): Ticket? {
+        val existing = repository.get(id) ?: return null
         val normalized = normalizeTicketRequest(req)
         validateTicketRequest(normalized)
-        return repository.update(id, normalized).also { audit.log(userId, "Updated ticket #$id", "tickets") }
+        return repository.update(id, normalized).also { updated ->
+            audit.log(userId, "Updated ticket #$id", "tickets")
+            if (updated != null && userId != updated.userId) {
+                val priorityChanged = existing.priority != updated.priority
+                notifications.pushOncePerTicketEvent(
+                    userId = updated.userId,
+                    eventType = if (priorityChanged) "ticket_priority_changed" else "ticket_updated",
+                    ticketId = updated.id,
+                    title = if (priorityChanged) "Ticket Priority Changed" else "Ticket Updated",
+                    message = if (priorityChanged) "Ticket #${updated.id} priority changed to ${updated.priority}" else "Ticket #${updated.id} was updated",
+                    occurrenceKey = updated.updatedAt
+                )
+            }
+        }
     }
 
     fun updateStatus(id: Int, statusValue: String, actor: String, userId: Int?, role: UserRole): Ticket? {
@@ -93,7 +107,8 @@ class TicketService(
                     eventType = "ticket_status_updated_${status.name.lowercase()}",
                     ticketId = updated.id,
                     title = "Ticket Status Updated",
-                    message = "Ticket #${updated.id} updated to $displayStatus"
+                    message = "Ticket #${updated.id} updated to $displayStatus",
+                    occurrenceKey = updated.updatedAt
                 )
             }
         }

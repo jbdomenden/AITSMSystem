@@ -17,7 +17,8 @@ import javax.imageio.ImageIO
 
 class ProfilePhotoService(
     private val userRepository: UserRepository,
-    private val auditRepository: AuditRepository
+    private val auditRepository: AuditRepository,
+    private val notificationService: NotificationService
 ) {
     private val uploadDir: Path = Path.of(Env.get("PROFILE_UPLOAD_DIR") ?: "uploads/profile-photos")
         .toAbsolutePath().normalize()
@@ -68,8 +69,10 @@ class ProfilePhotoService(
         return target.takeIf { it.parent == uploadDir && Files.isRegularFile(it) }
     }
 
-    fun review(requestId: Int, reviewerId: Int, approved: Boolean): ProfilePhotoRequest {
-        val request = pending().firstOrNull { it.id == requestId } ?: error("Profile photo request was not found or was already reviewed.")
+    fun review(requestId: Int, reviewerId: Int, approved: Boolean, reason: String? = null): ProfilePhotoRequest {
+        val sanitizedReason = reason?.trim()?.replace(Regex("[\\p{Cc}&&[^\\n\\t]]"), "")?.takeIf { it.isNotBlank() }
+        require((sanitizedReason?.length ?: 0) <= 500) { "Reviewer explanation must be 500 characters or fewer." }
+        val request = userRepository.profilePhotoRequestById(requestId) ?: error("Profile photo request was not found.")
         val owner = userRepository.findById(request.userId) ?: error("Profile photo owner was not found.")
         val reviewer = userRepository.findById(reviewerId) ?: throw SecurityException("Reviewer account was not found.")
         require(owner.id != reviewer.id) { "You cannot review your own profile photo." }
@@ -80,15 +83,41 @@ class ProfilePhotoService(
             UserRole.SUPERADMIN -> reviewer.role == UserRole.SUPERADMIN
         }
         if (!allowed) throw SecurityException("You are not allowed to review this profile photo request.")
+        val requestedStatus = if (approved) backend.models.ProfilePhotoStatus.APPROVED else backend.models.ProfilePhotoStatus.REJECTED
+        if (request.status != backend.models.ProfilePhotoStatus.PENDING) {
+            if (request.status != requestedStatus) error("Profile photo request was already reviewed with a different outcome.")
+            pushReviewNotification(request, approved, sanitizedReason)
+            return request
+        }
         val reviewed = userRepository.reviewProfilePhotoRequest(requestId, reviewerId, approved)
             ?: error("Profile photo request was not found or was already reviewed.")
+        pushReviewNotification(reviewed, approved, sanitizedReason)
         if (!approved) {
             val filename = request.photoUrl.substringAfterLast('/')
             val target = uploadDir.resolve(filename).normalize()
             if (target.parent == uploadDir) Files.deleteIfExists(target)
         }
-        auditRepository.log(reviewerId, "${if (approved) "Approved" else "Rejected"} profile photo request ${reviewed.id}", "profile_photo_requests")
+        auditRepository.log(
+            reviewerId,
+            "${if (approved) "Approved" else "Rejected"} profile photo request ${reviewed.id}",
+            "profile_photo_requests",
+            target = "user:${reviewed.userId}",
+            metadata = "requestId=${reviewed.id};outcome=${if (approved) "approved" else "rejected"}${sanitizedReason?.let { ";reason=$it" }.orEmpty()}"
+        )
         return reviewed
+    }
+
+    private fun pushReviewNotification(request: ProfilePhotoRequest, approved: Boolean, reason: String?) {
+        val standardRejection = "Your profile photo was rejected because it does not comply with the company’s code of conduct or ethics guidelines. Please upload a different photo."
+        notificationService.push(
+            userId = request.userId,
+            title = if (approved) "Profile photo approved" else "Profile photo rejected",
+            message = if (approved) "Your profile photo was approved and is now visible on your account."
+                else listOfNotNull(standardRejection, reason?.let { "Reviewer explanation: $it" }).joinToString(" "),
+            type = if (approved) "profile_photo_approved" else "profile_photo_rejected",
+            relatedUserId = request.userId,
+            eventKey = "profile-photo:${request.id}:${if (approved) "approved" else "rejected"}"
+        )
     }
 
 }

@@ -21,6 +21,8 @@ class AssetDetectionServiceTest {
         assertTrue(service.matches("10.0.10.9"))
         assertTrue(service.matches("172.16.0.1"))
         assertFalse(service.matches("8.8.8.8"))
+        assertTrue(service.getConfiguredPrivateCidrs().isEmpty())
+        assertFalse(service.matchesConfigured("192.168.1.5"))
     }
 
     @Test
@@ -33,6 +35,8 @@ class AssetDetectionServiceTest {
         assertTrue(service.matches("169.120.45.22"))
         assertTrue(service.matches("10.0.7.3"))
         assertFalse(service.matches("192.168.1.2"))
+        assertEquals(listOf("169.120.0.0/16", "10.0.0.0/16"), service.getConfiguredPrivateCidrs())
+        assertTrue(service.matchesConfigured("10.0.7.3"))
     }
 
     @Test

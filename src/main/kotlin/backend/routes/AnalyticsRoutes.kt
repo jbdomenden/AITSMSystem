@@ -22,8 +22,8 @@ fun Route.analyticsRoutes(ticketService: TicketService, monitoringService: Monit
         }
         get("/system-health") {
             if (!call.requireRole(UserRole.ADMIN)) return@get
-            val devices = monitoringService.devices()
-            val avgCpu = devices.map { it.cpuUsage }.average().toInt()
+            val devices = monitoringService.devices().filter { it.telemetryAvailable && !it.stale }
+            val avgCpu = devices.mapNotNull { it.cpuUsagePercent }.average().takeIf { !it.isNaN() }?.toInt() ?: 0
             val health = (100 - avgCpu).coerceAtLeast(0)
             call.respond(AnalyticsResponse("system-health", listOf(
                 mapOf("insight" to "abnormal spikes", "value" to if (avgCpu > 75) "Detected" else "Stable"),

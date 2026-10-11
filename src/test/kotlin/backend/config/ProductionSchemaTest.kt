@@ -20,7 +20,8 @@ class ProductionSchemaTest {
             "reauth_grants", "auth_sessions", "security_events", "profile_photo_requests",
             "colleague_requests", "direct_messages", "eula_acceptance", "devices", "tickets",
             "ticket_history", "notifications", "sla_policies", "system_settings", "knowledge_articles",
-            "audit_logs", "ai_conversation_messages", "inventory_assets", "inventory_asset_snapshots"
+            "audit_logs", "ai_conversation_messages", "inventory_assets", "inventory_asset_snapshots",
+            "monitoring_collectors", "monitoring_devices", "monitoring_discovery_requests"
         )
 
         runtimeTables.forEach { table ->
@@ -34,5 +35,7 @@ class ProductionSchemaTest {
                 Regex("create\\s+table\\s+if\\s+not\\s+exists\\s+notifications[\\s\\S]*?related_user_id").containsMatchIn(sql),
             "Production SQL is missing notifications.related_user_id"
         )
+        assertTrue(sql.contains("notifications_event_key_uidx"), "Production SQL is missing notification idempotency index")
+        assertTrue(sql.contains("delete from notifications where type = 'direct_message'"), "Legacy direct-message bell rows are not removed")
     }
 }

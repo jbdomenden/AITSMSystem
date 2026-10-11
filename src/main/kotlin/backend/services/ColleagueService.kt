@@ -43,13 +43,6 @@ class ColleagueService(private val repository: ColleagueRepository, private val 
     fun sendMessage(actorId: Int, colleagueId: Int, body: String): DirectMessage {
         ensureColleague(actorId, colleagueId); val normalized = body.trim(); require(normalized.isNotBlank() && normalized.length <= 2000) { "Message must be between 1 and 2000 characters." }
         return repository.sendMessage(actorId, colleagueId, normalized).also {
-            notifications.push(
-                userId = colleagueId,
-                title = "New message",
-                message = "You received a new direct message.",
-                type = "direct_message",
-                relatedUserId = actorId
-            )
             audit.log(actorId, "Sent direct message to user #$colleagueId", "direct_messages")
         }
     }

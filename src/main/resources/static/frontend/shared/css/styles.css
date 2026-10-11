@@ -1407,3 +1407,8 @@ body.global-search-open { overflow:hidden; }
   }
   .app-layout:has(> .sidebar:empty) > .content { grid-column: 1; }
 }
+.ai-message-bubble { overflow-wrap: anywhere; word-break: break-word; }
+.ai-message-bubble h4 { margin: .75rem 0 .35rem; font-size: 1rem; }
+.ai-message-bubble p { margin: .35rem 0; white-space: pre-wrap; }
+.ai-message-bubble ul, .ai-message-bubble ol { margin: .35rem 0 .75rem; padding-left: 1.35rem; }
+.ai-message-bubble a { overflow-wrap: anywhere; }

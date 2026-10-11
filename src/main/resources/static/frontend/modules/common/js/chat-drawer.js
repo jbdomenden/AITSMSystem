@@ -445,9 +445,6 @@
     if (state.display !== 'open' || Number(state.selectedId) !== Number(colleagueId)) return [];
     const messages = await api(`/api/colleagues/${Number(colleagueId)}/messages`);
     renderMessages(Array.isArray(messages) ? messages : [], colleagueId);
-    await api(`/api/notifications/direct-messages/${Number(colleagueId)}/read`, { method: 'PATCH' }).catch(() => null);
-    window.loadUserHeaderNotifications?.();
-    window.loadHeaderNotifications?.();
     const selected = selectedConversation();
     if (selected?.unreadCount) {
       acknowledgeRead(colleagueId);

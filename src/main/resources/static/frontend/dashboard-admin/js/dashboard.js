@@ -67,12 +67,7 @@ function statusBadgeClass(status) {
 }
 
 function fetchJsonOrThrow(url, options = {}) {
-  return fetch(url, { headers: authHeaders(), ...options })
-    .then(async (res) => {
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `Failed request: ${url}`);
-      return data;
-    });
+  return window.aitsmFetchJson(url, options);
 }
 
 function monthKey(date) {
@@ -311,7 +306,6 @@ function renderMetricCards() {
 
   const tickets = dashboardState.tickets;
   const monitorSummary = dashboardState.monitoringSummary || {};
-  const host = monitorSummary.hostTelemetry || {};
   const inventory = dashboardState.inventoryStats || {};
 
   const activeCount = tickets.filter((ticket) => {
@@ -330,8 +324,8 @@ function renderMetricCards() {
     ['AT', 'Active Tickets', activeCount, 'Open and in-progress requests'],
     ['RC', 'Resolved Tickets', resolvedCount, 'Resolved and closed requests'],
     ['TC', 'Telemetry Coverage', `${Number(monitorSummary.telemetryAvailableDevices || 0)}/${Number(monitorSummary.totalDiscovered || 0)}`, 'Devices with telemetry stream'],
-    ['CPU', 'Host CPU', `${Number(host.cpuUsagePercent || 0).toFixed(1)}%`, host.hostname || 'No host data'],
-    ['MEM', 'Host Memory', `${Number(host.memoryUsagePercent || 0).toFixed(1)}%`, `Updated ${formatDateTime(monitorSummary.timestamp)}`]
+    ['CL', 'Collector Health', String(monitorSummary.collectorState || 'NOT_ENROLLED').replaceAll('_', ' '), `Last seen ${formatDateTime(monitorSummary.collectorLastSeenAt)}`],
+    ['UP', 'Telemetry Updated', monitorSummary.timestamp ? formatDateTime(monitorSummary.timestamp) : 'Never', 'Authoritative server receipt time']
   ];
 
   summary.innerHTML = cards.map(([icon, label, value, hint]) => `
@@ -401,7 +395,10 @@ function renderSystemPerformance() {
 
   const tickets = dashboardState.tickets;
   const monitorSummary = dashboardState.monitoringSummary || {};
-  const host = monitorSummary.hostTelemetry || {};
+  const telemetryDevices = dashboardState.lanDevices.filter((device) => device.telemetryAvailable && !device.stale);
+  const average = (key) => telemetryDevices.length
+    ? telemetryDevices.reduce((sum, device) => sum + Number(device[key] || 0), 0) / telemetryDevices.length
+    : 0;
 
   const activeTickets = tickets.filter((ticket) => {
     const status = normalizeTicketStatus(ticket.status);
@@ -414,8 +411,8 @@ function renderSystemPerformance() {
   const ticketLoad = Math.min(100, (activeTickets / totalTickets) * 100);
 
   const metrics = [
-    { label: 'Server CPU', value: Number(host.cpuUsagePercent || 0), target: 'Below 75%' },
-    { label: 'Server Memory', value: Number(host.memoryUsagePercent || 0), target: 'Below 80%' },
+    { label: 'Device CPU Average', value: average('cpuUsagePercent'), target: 'Reporting devices only' },
+    { label: 'Device Memory Average', value: average('memoryUsagePercent'), target: 'Reporting devices only' },
     { label: 'Telemetry Coverage', value: telemetryCoverage, target: 'Above 70%' },
     { label: 'Active Ticket Load', value: ticketLoad, target: 'Lower is better' }
   ].map((metric) => ({ ...metric, value: Math.max(0, Math.min(100, Number(metric.value.toFixed(1)))) }));

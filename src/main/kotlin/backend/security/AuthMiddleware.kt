@@ -38,7 +38,11 @@ private val cleanPagePaths = (endUserPages + adminPages + authenticatedPages)
     .plus(setOf("/login", "/signup"))
 
 internal fun protectedPageAudience(path: String): PageAudience? {
-    val page = path.substringAfterLast('/')
+    if (path.startsWith("/api/") || path.startsWith("/modules/") || path.startsWith("/uploads/")) return null
+    val normalized = path.substringBefore('?').removeSuffix("/")
+    val cleanPage = normalized.removePrefix("/")
+    val legacyResourcePage = Regex("^/?([a-z-]+)/html/\\1\\.html$").matchEntire(normalized)?.groupValues?.get(1)
+    val page = legacyResourcePage ?: cleanPage
     return when (page) {
         in endUserPages -> PageAudience.END_USER
         in adminPages -> PageAudience.ADMIN
@@ -107,7 +111,7 @@ fun Application.configureSecurityBoundary(sessions: SessionService) {
                 finish(); return@intercept
             }
         }
-        if (call.request.httpMethod in unsafeMethods && path !in csrfExempt) {
+        if (call.request.httpMethod in unsafeMethods && path !in csrfExempt && !path.startsWith("/api/monitoring/collector/")) {
             val origin = call.request.headers["Origin"] ?: call.request.headers["Referer"]?.let {
                 runCatching { URI(it).let { uri -> "${uri.scheme}://${uri.authority}" } }.getOrNull()
             }

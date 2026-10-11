@@ -29,6 +29,40 @@ class AssetDetectionService(private val settingsQueries: SystemSettingsStore) {
         return getPrefixes().any { normalizedIp.startsWith(it) }
     }
 
+    fun matchesConfigured(ip: String): Boolean {
+        val raw = settingsQueries.getByKey(ASSET_IP_PREFIXES_KEY) ?: return false
+        val prefixes = runCatching { Json.decodeFromString<List<String>>(raw) }.getOrDefault(emptyList())
+        return normalizePrefixes(prefixes).any { ip.trim().startsWith(it) }
+    }
+
+    fun getPrivateCidrs(): List<String> = getPrefixes().mapNotNull { prefix ->
+        val value = prefix.removeSuffix(".")
+        val octets = value.split('.')
+        when (octets.size) {
+            1 -> "${octets[0]}.0.0.0/8"
+            2 -> "${octets[0]}.${octets[1]}.0.0/16"
+            3 -> "${octets[0]}.${octets[1]}.${octets[2]}.0/24"
+            4 -> "$value/32"
+            else -> null
+        }
+    }
+
+    fun getConfiguredPrivateCidrs(): List<String> {
+        val raw = settingsQueries.getByKey(ASSET_IP_PREFIXES_KEY) ?: return emptyList()
+        val prefixes = runCatching { Json.decodeFromString<List<String>>(raw) }.getOrDefault(emptyList())
+        return normalizePrefixes(prefixes).mapNotNull { prefix ->
+            val value = prefix.removeSuffix(".")
+            val octets = value.split('.')
+            when (octets.size) {
+                1 -> "${octets[0]}.0.0.0/8"
+                2 -> "${octets[0]}.${octets[1]}.0.0/16"
+                3 -> "${octets[0]}.${octets[1]}.${octets[2]}.0/24"
+                4 -> "$value/32"
+                else -> null
+            }
+        }
+    }
+
     private fun normalizePrefixes(prefixes: List<String>): List<String> {
         val normalized = prefixes
             .map { it.trim() }

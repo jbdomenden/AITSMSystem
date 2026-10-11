@@ -43,6 +43,36 @@ function readCookie(name) {
 }
 
 const authHeaders = () => ({ 'Content-Type': 'application/json', 'X-CSRF-Token': decodeURIComponent(readCookie('aitsm_csrf')) });
+
+async function fetchJson(url, options = {}) {
+  const response = await fetch(url, {
+    credentials: 'same-origin',
+    ...options,
+    headers: { ...authHeaders(), ...(options.headers || {}) }
+  });
+  const contentType = response.headers.get('content-type') || '';
+  const isJson = /(^|;)\s*application\/(?:[a-z0-9.+-]*\+)?json\b/i.test(contentType);
+  if (response.status === 204) return null;
+  if (!isJson) {
+    throw new Error(`Request ${url} returned HTTP ${response.status} with an unexpected content type.`);
+  }
+  let payload;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new Error(`Request ${url} returned HTTP ${response.status} with invalid JSON.`);
+  }
+  if (!response.ok) {
+    const message = payload?.message || payload?.error || `Request failed with HTTP ${response.status}.`;
+    const error = new Error(`${message} (${url}, HTTP ${response.status})`);
+    error.status = response.status;
+    error.payload = payload;
+    throw error;
+  }
+  return payload;
+}
+
+window.aitsmFetchJson = fetchJson;
 const reauthCache = new Map();
 let pendingReauthPassword = null;
 

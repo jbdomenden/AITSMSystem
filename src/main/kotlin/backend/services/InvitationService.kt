@@ -16,7 +16,8 @@ class InvitationService(
     private val invitations: InvitationRepository,
     private val users: UserRepository,
     private val audit: AuditRepository,
-    private val email: EmailService?
+    private val email: EmailService?,
+    private val notifications: NotificationService
 ) {
     fun invite(address: String, role: UserRole, actor: Int, actorRole: UserRole): InvitationView {
         val normalized = address.trim().lowercase()
@@ -32,6 +33,7 @@ class InvitationService(
             error("Invitation email could not be sent. Verify the email delivery configuration and try again.")
         }
         audit.log(actor, "Created invitation for $normalized as ${role.name}", "invitations")
+        notifications.push(actor, "Invitation sent", "An invitation was sent to $normalized.", "user_invitation", eventKey = "invitation:${view.id}:created")
         return view
     }
 
@@ -48,6 +50,7 @@ class InvitationService(
         users.recordEulaAcceptance(user.id, request.eulaVersion)
         check(invitations.accept(invitation.id)) { "Invitation is invalid or expired" }
         audit.log(user.id, "Accepted invitation", "invitations")
+        notifications.push(user.id, "Account created", "Your account was created after accepting the invitation.", "account_created", relatedUserId = user.id, eventKey = "invitation:${invitation.id}:accepted")
         return user
     }
 

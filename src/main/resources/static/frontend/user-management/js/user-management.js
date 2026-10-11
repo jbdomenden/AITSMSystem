@@ -79,10 +79,7 @@ function toggleUserMgmtMenu(event, id) {
 }
 
 async function fetchJsonOrThrow(url, options = {}) {
-  const res = await fetch(url, { headers: authHeaders(), ...options });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `Failed request: ${url}`);
-  return data;
+  return window.aitsmFetchJson(url, options);
 }
 
 async function changeRoleFromUserManagement(userId, role) {
@@ -299,21 +296,46 @@ async function loadProfilePhotoApprovals() {
       <td>${escapeHtml(request.userName || 'Unknown')}<br><span class='small'>${escapeHtml(request.userEmail || '')}</span></td>
       <td><img class='approval-photo-preview' src='${encodeURI(request.photoUrl)}' alt='Submitted profile photo for ${escapeHtml(request.userName || 'user')}'></td>
       <td>${escapeHtml(new Date(request.submittedAt).toLocaleString())}</td>
-      <td><div class='inline-actions'><button class='btn btn-primary' type='button' ${blocked ? 'disabled' : ''} title='${reason}' onclick='reviewProfilePhoto(${request.id}, true)'>Approve</button><button class='btn btn-ghost' type='button' ${blocked ? 'disabled' : ''} title='${reason}' onclick='reviewProfilePhoto(${request.id}, false)'>Reject</button></div>${reason ? `<span class='small text-danger'>${reason}</span>` : ''}</td>
+      <td><div class='inline-actions'><button class='btn btn-primary' type='button' ${blocked ? 'disabled' : ''} title='${reason}' onclick='reviewProfilePhoto(${request.id}, true, this)'>Approve</button><button class='btn btn-ghost' type='button' ${blocked ? 'disabled' : ''} title='${reason}' onclick='reviewProfilePhoto(${request.id}, false, this)'>Reject</button></div>${reason ? `<span class='small text-danger'>${reason}</span>` : ''}</td>
     </tr>`; }).join('');
   } catch (error) {
     renderTableErrorState(rows, 4, error.message || 'Unable to load profile photo requests.');
   } finally { clearTableSkeleton(rows); }
 }
 
-async function reviewProfilePhoto(id, approved) {
+function confirmPhotoReview(approved) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay show';
+    overlay.innerHTML = `<section class='modal-card' role='dialog' aria-modal='true' aria-labelledby='photoReviewTitle'>
+      <h3 id='photoReviewTitle' class='section-title'>${approved ? 'Approve profile photo?' : 'Reject profile photo?'}</h3>
+      <p class='small'>${approved ? 'The submitted photo will replace the current approved photo.' : 'The user will be told that the photo does not comply with the company’s code of conduct or ethics guidelines and may upload a replacement.'}</p>
+      ${approved ? '' : `<div class='form-group'><label for='photoReviewReason'>Optional professional explanation</label><textarea id='photoReviewReason' maxlength='500' rows='4'></textarea><span class='small'>Maximum 500 characters. Do not include private reviewer information.</span></div>`}
+      <div class='inline-actions' style='justify-content:flex-end'><button class='btn btn-ghost' type='button' data-cancel>Cancel</button><button class='btn ${approved ? 'btn-primary' : 'btn-danger'}' type='button' data-confirm>${approved ? 'Confirm approval' : 'Confirm rejection'}</button></div>
+    </section>`;
+    const finish = (value) => { overlay.remove(); resolve(value); };
+    overlay.querySelector('[data-cancel]').addEventListener('click', () => finish(null));
+    overlay.querySelector('[data-confirm]').addEventListener('click', () => finish({ reason: overlay.querySelector('#photoReviewReason')?.value.trim() || null }));
+    overlay.addEventListener('keydown', (event) => { if (event.key === 'Escape') finish(null); });
+    document.body.appendChild(overlay);
+    (overlay.querySelector('#photoReviewReason') || overlay.querySelector('[data-confirm]')).focus();
+  });
+}
+
+async function reviewProfilePhoto(id, approved, trigger) {
   const action = approved ? 'approve' : 'reject';
-  if (!confirm(`Are you sure you want to ${action} this profile photo?`)) return;
+  const decision = await confirmPhotoReview(approved);
+  if (!decision) return;
+  if (trigger?.disabled) return;
+  if (trigger) trigger.disabled = true;
   try {
-    await fetchJsonOrThrow(`/api/profile-photo-requests/${id}/review`, { method: 'POST', body: JSON.stringify({ approved }) });
+    await fetchJsonOrThrow(`/api/profile-photo-requests/${id}/review`, { method: 'POST', body: JSON.stringify({ approved, reason: decision.reason }) });
     alert(`Profile photo ${approved ? 'approved' : 'rejected'}.`);
     await loadProfilePhotoApprovals();
-  } catch (error) { alert(error.message || `Unable to ${action} profile photo.`); }
+  } catch (error) {
+    if (trigger) trigger.disabled = false;
+    alert(error.message || `Unable to ${action} profile photo.`);
+  }
 }
 
 function wireUserManagementFilters() {

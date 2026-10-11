@@ -90,7 +90,7 @@ async function loadUserHeaderNotifications() {
     count.classList.toggle('hidden', unread === 0);
     list.innerHTML = `<div style='display:flex;justify-content:flex-end;padding:8px;border-bottom:1px solid #1f325f'><button class='btn btn-ghost' style='padding:4px 8px' onclick='markAllUserNotificationsRead()'>Mark all read</button></div>${items.map((n) => {
       const safeType = String(n.type || '').replace(/[^a-z0-9_-]/gi, '');
-      return `<button type='button' class='small' style='display:block;width:100%;text-align:left;padding:8px;border:none;border-bottom:1px solid #1f325f;background:${n.isRead ? 'transparent' : 'rgba(37,99,235,.12)'};color:inherit' onclick='openUserNotification(${Number(n.id || 0)}, "${safeType}", ${Number(n.relatedUserId || 0)})'><strong style='display:block'>${userShellEscape(n.title || 'Notification')}</strong><span>${userShellEscape(n.message || 'Notification')}</span><br><span style='opacity:.7'>${userShellEscape(n.createdAt || '')}</span></button>`;
+      return `<button type='button' class='small' style='display:block;width:100%;text-align:left;padding:8px;border:none;border-bottom:1px solid #1f325f;background:${n.isRead ? 'transparent' : 'rgba(37,99,235,.12)'};color:inherit' onclick='openUserNotification(${Number(n.id || 0)}, "${safeType}", ${Number(n.relatedTicketId || 0)}, ${Number(n.relatedUserId || 0)})'><strong style='display:block'>${userShellEscape(n.title || 'Notification')}</strong><span>${userShellEscape(n.message || 'Notification')}</span><br><span style='opacity:.7'>${userShellEscape(n.createdAt || '')}</span></button>`;
     }).join('') || "<div class='small' style='padding:8px'>No notifications.</div>"}`;
   } catch {
     list.innerHTML = "<div class='small'>Unable to load notifications.</div>";
@@ -105,10 +105,12 @@ async function markAllUserNotificationsRead() {
   await fetch('/api/notifications/read-all', { method: 'PATCH', headers: authHeaders() });
   await loadUserHeaderNotifications();
 }
-async function openUserNotification(id, type, relatedUserId = 0) {
+async function openUserNotification(id, type, relatedTicketId = 0, relatedUserId = 0) {
   await markUserNotificationRead(id);
   document.getElementById('userNotifMenu')?.classList.add('hidden');
-  if (type === 'direct_message') openAitsmChat(relatedUserId || null);
+  if (relatedTicketId) location.href = `/tickets?ticketId=${encodeURIComponent(relatedTicketId)}`;
+  else if (type.startsWith('profile_photo_')) location.href = '/profile#photoApprovalCard';
+  else if (relatedUserId) location.href = `/profile?id=${encodeURIComponent(relatedUserId)}`;
 }
 
 function renderUserUtilityHeader() {
@@ -151,6 +153,7 @@ function renderUserUtilityHeader() {
   });
 
   loadUserHeaderNotifications();
+  window.setInterval(loadUserHeaderNotifications, 30000);
 }
 
 function initializeUserShell() {

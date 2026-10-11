@@ -96,6 +96,18 @@ fun Application.module() {
         }
     }
     install(StatusPages) {
+        status(HttpStatusCode.Unauthorized) { call, status ->
+            if (call.request.path().startsWith("/api/")) call.respond(status, ApiErrorResponse(status.value, "Authentication required"))
+        }
+        status(HttpStatusCode.Forbidden) { call, status ->
+            if (call.request.path().startsWith("/api/")) call.respond(status, ApiErrorResponse(status.value, "Access denied"))
+        }
+        status(HttpStatusCode.NotFound) { call, status ->
+            if (call.request.path().startsWith("/api/")) call.respond(status, ApiErrorResponse(status.value, "API endpoint not found"))
+        }
+        status(HttpStatusCode.MethodNotAllowed) { call, status ->
+            if (call.request.path().startsWith("/api/")) call.respond(status, ApiErrorResponse(status.value, "Method not allowed"))
+        }
         exception<BadRequestException> { call, cause ->
             call.respond(
                 HttpStatusCode.BadRequest,

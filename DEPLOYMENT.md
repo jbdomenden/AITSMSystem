@@ -180,6 +180,8 @@ psql -h 127.0.0.1 -p 5433 -U $DB_MIGRATOR_USER -d $DB_NAME -v ON_ERROR_STOP=1 -f
 psql -h 127.0.0.1 -p 5433 -U $DB_MIGRATOR_USER -d $DB_NAME -v ON_ERROR_STOP=1 -f "db/migrations/V001__secure_auth_foundation.sql"
 psql -h 127.0.0.1 -p 5433 -U $DB_MIGRATOR_USER -d $DB_NAME -v ON_ERROR_STOP=1 -f "db/migrations/V002__complete_runtime_schema_and_ai_ownership.sql"
 psql -h 127.0.0.1 -p 5433 -U $DB_MIGRATOR_USER -d $DB_NAME -v ON_ERROR_STOP=1 -f "db/migrations/V003__reconcile_verified_account_state.sql"
+psql -h 127.0.0.1 -p 5433 -U $DB_MIGRATOR_USER -d $DB_NAME -v ON_ERROR_STOP=1 -f "db/migrations/V004__transaction_notification_idempotency.sql"
+psql -h 127.0.0.1 -p 5433 -U $DB_MIGRATOR_USER -d $DB_NAME -v ON_ERROR_STOP=1 -f "db/migrations/V005__collector_monitoring.sql"
 Remove-Item Env:PGPASSWORD
 ```
 
@@ -382,6 +384,9 @@ Test with separate administrator and end-user accounts:
 9. Gemini chat, ticket analysis, configuration testing, and rate limiting.
 10. Profile-photo upload, approval, display, and persistence after a new revision.
 11. Colleague requests and messaging in two browser sessions.
+12. Enroll a Windows collector, confirm an accepted HTTPS report, verify online/stale/offline states, then revoke the token.
+
+Apply `V004__transaction_notification_idempotency.sql` and `V005__collector_monitoring.sql` before deploying this release. Collector installation and firewall guidance is in `collector/windows/README.md`.
 
 Unauthenticated security checks:
 
