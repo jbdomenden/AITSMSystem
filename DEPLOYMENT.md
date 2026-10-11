@@ -386,7 +386,7 @@ Test with separate administrator and end-user accounts:
 11. Colleague requests and messaging in two browser sessions.
 12. Enroll a Windows collector, confirm an accepted HTTPS report, verify online/stale/offline states, then revoke the token.
 
-Apply `V004__transaction_notification_idempotency.sql` and `V005__collector_monitoring.sql` before deploying this release. Collector installation and firewall guidance is in `collector/windows/README.md`.
+Apply all ordered migrations through `V006__backfill_colleague_notification_actors.sql` before deploying this release. Collector installation and firewall guidance is in `collector/windows/README.md`.
 
 Unauthenticated security checks:
 

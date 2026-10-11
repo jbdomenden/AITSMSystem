@@ -93,7 +93,7 @@ Registration is invitation-only. Invitation and password-reset tokens are random
 
 Sensitive administration, MFA changes, exports, account deletion, recovery-code regeneration, and security configuration use five-minute reauthentication grants. Only hashes are persisted; grants are bound to the current user, session, and exact scope, and mutation grants are single-use. The user-management page includes invitation lifecycle controls and an audited superadmin-only recovery path for another administrator's MFA.
 
-For a new database, apply `db/schema.sql` and then every file in `db/migrations` in version order. For an existing database, apply unapplied migrations through `V005__collector_monitoring.sql`. V004 separates transaction notifications from direct messages and adds idempotency keys. V005 adds collectors, reported devices, and queued discovery requests. Production performs no schema mutation at startup. See `SECURITY.md` for the full release gate.
+For a new database, apply `db/schema.sql` and then every file in `db/migrations` in version order. For an existing database, apply unapplied migrations through `V006__backfill_colleague_notification_actors.sql`. V004 separates transaction notifications from direct messages and adds idempotency keys. V005 adds collectors, reported devices, and queued discovery requests. V006 safely links matching legacy colleague notifications to the responsible employee. Production performs no schema mutation at startup. See `SECURITY.md` for the full release gate.
 
 Focused verification: `./gradlew test --tests backend.security.SecurityBoundariesTest`. Full verification: `./gradlew test`. CI also runs OWASP Dependency-Check and Gitleaks.
 

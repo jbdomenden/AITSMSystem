@@ -16,6 +16,9 @@
   }
 
   async function request(url, options = {}) {
+    if (typeof global.aitsmFetchJson === 'function') {
+      return global.aitsmFetchJson(url, options);
+    }
     const response = await fetch(url, {
       credentials: 'same-origin',
       cache: 'no-store',
@@ -23,7 +26,11 @@
       headers: { ...headers(options.method && options.method !== 'GET'), ...(options.headers || {}) }
     });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || payload.message || `Request failed (${response.status}).`);
+    if (!response.ok) {
+      const error = new Error(payload.error || payload.message || `Request failed (${response.status}).`);
+      error.status = response.status;
+      throw error;
+    }
     return payload;
   }
 
@@ -57,6 +64,13 @@
     center.status.textContent = message;
     center.status.classList.toggle('text-danger', error);
     center.status.hidden = !message;
+  }
+
+  function actionError(error, fallback) {
+    if (error?.status === 403 && !cookie('aitsm_csrf')) {
+      return 'Your session security token is stale. Sign out and sign in again, then retry.';
+    }
+    return error?.message || fallback;
   }
 
   function updateBadge(center, unread) {
@@ -167,7 +181,7 @@
       center.menu.classList.add('hidden');
       location.assign(target);
     } catch (error) {
-      setStatus(center, error.message || 'Unable to open this notification.', true);
+      setStatus(center, actionError(error, 'Unable to open this notification.'), true);
     } finally {
       center.opening.delete(notification.id);
     }
@@ -187,7 +201,7 @@
     } catch (error) {
       center.markingAll = false;
       render(center);
-      setStatus(center, error.message || 'Unable to mark notifications as read.', true);
+      setStatus(center, actionError(error, 'Unable to mark notifications as read.'), true);
     }
   }
 

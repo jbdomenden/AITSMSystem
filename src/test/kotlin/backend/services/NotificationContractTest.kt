@@ -59,6 +59,7 @@ class NotificationContractTest {
         assertContains(admin, "/modules/common/js/notification-center.js")
         assertContains(user, "/modules/common/js/notification-center.js")
         assertContains(client, "request('/api/notifications/read-all', { method: 'PATCH' })")
+        assertContains(client, "global.aitsmFetchJson(url, options)")
         assertContains(client, "notification.relatedUserId")
         assertContains(client, "relatedUserProfileImageUrl")
         assertContains(client, "new Intl.DateTimeFormat")
@@ -66,5 +67,13 @@ class NotificationContractTest {
         assertFalse(client.contains("innerHTML"))
         assertTrue(client.contains("if (center.opening.has(notification.id)) return"))
         assertTrue(client.contains("if (center.markingAll) return"))
+    }
+
+    @Test fun `legacy colleague notifications are safely backfilled`() {
+        val migration = Files.readString(Path.of("db/migrations/V006__backfill_colleague_notification_actors.sql"))
+        assertContains(migration, "n.related_user_id IS NULL")
+        assertContains(migration, "ABS(EXTRACT(EPOCH FROM (n.created_at - cr.created_at))) <= 300")
+        assertContains(migration, "'You were added by: ' || matched.actor_name")
+        assertContains(migration, "WHERE match_rank = 1")
     }
 }
