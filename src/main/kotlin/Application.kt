@@ -72,6 +72,12 @@ fun Application.module() {
     }
 
     install(CORS) {
+        // Ktor only permits simple methods by default. Browser PATCH/PUT/DELETE
+        // requests otherwise receive 403 before authentication, CSRF validation,
+        // or the API route can run.
+        allowMethod(HttpMethod.Patch)
+        allowMethod(HttpMethod.Put)
+        allowMethod(HttpMethod.Delete)
         allowHeader("Content-Type")
         allowHeader("X-CSRF-Token")
         allowHeader("X-Reauth-Token")

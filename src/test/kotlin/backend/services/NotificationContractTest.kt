@@ -54,6 +54,7 @@ class NotificationContractTest {
 
     @Test fun `both shells use one accessible persistent notification client`() {
         val client = Files.readString(root.resolve("resources/static/frontend/modules/common/js/notification-center.js"))
+        val application = Files.readString(root.resolve("kotlin/Application.kt"))
         val admin = Files.readString(root.resolve("resources/static/frontend/modules/sidebar/js/admin-shell.js"))
         val user = Files.readString(root.resolve("resources/static/frontend/modules/sidebar/js/user-shell.js"))
         assertContains(admin, "/modules/common/js/notification-center.js")
@@ -69,6 +70,9 @@ class NotificationContractTest {
         assertFalse(client.contains("innerHTML"))
         assertTrue(client.contains("if (center.opening.has(notification.id)) return"))
         assertTrue(client.contains("if (center.markingAll) return"))
+        assertContains(application, "allowMethod(HttpMethod.Patch)")
+        assertContains(application, "allowMethod(HttpMethod.Put)")
+        assertContains(application, "allowMethod(HttpMethod.Delete)")
     }
 
     @Test fun `legacy colleague notifications are safely backfilled`() {
