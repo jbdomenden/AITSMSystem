@@ -15,9 +15,28 @@
     return result;
   }
 
-  async function request(url, options = {}) {
+  async function recoverCsrf() {
+    const response = await fetch('/api/auth/csrf-token', {
+      method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' }
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.csrfToken) throw new Error(payload.error || payload.message || 'Unable to refresh session security.');
+    return payload.csrfToken;
+  }
+
+  async function request(url, options = {}, allowRecovery = true) {
     if (typeof global.aitsmFetchJson === 'function') {
-      return global.aitsmFetchJson(url, options);
+      try {
+        return await global.aitsmFetchJson(url, options);
+      } catch (error) {
+        const mutating = options.method && options.method !== 'GET';
+        if (!allowRecovery || !mutating || error?.status !== 403) throw error;
+        const csrfToken = await recoverCsrf();
+        return global.aitsmFetchJson(url, {
+          ...options,
+          headers: { ...(options.headers || {}), 'X-CSRF-Token': csrfToken }
+        });
+      }
     }
     const response = await fetch(url, {
       credentials: 'same-origin',
@@ -29,6 +48,11 @@
     if (!response.ok) {
       const error = new Error(payload.error || payload.message || `Request failed (${response.status}).`);
       error.status = response.status;
+      const mutating = options.method && options.method !== 'GET';
+      if (allowRecovery && mutating && response.status === 403) {
+        const csrfToken = await recoverCsrf();
+        return request(url, { ...options, headers: { ...(options.headers || {}), 'X-CSRF-Token': csrfToken } }, false);
+      }
       throw error;
     }
     return payload;

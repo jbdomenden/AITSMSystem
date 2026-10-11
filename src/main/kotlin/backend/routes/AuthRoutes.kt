@@ -50,6 +50,14 @@ import io.ktor.server.routing.*
 
 fun Route.authRoutes(authService: AuthService, sessions: SessionService, invitations: InvitationService, mfa: MfaService, reauthentication: ReauthenticationService) {
     route("/api/auth") {
+        get("/csrf-token") {
+            val session = call.principal()
+                ?: return@get call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Authentication required"))
+            val csrf = sessions.rotateCsrf(session.sessionId)
+            val secure = Env.get("APP_ENV").equals("production", true)
+            call.response.cookies.append(SessionCookies.csrf(csrf, secure))
+            call.respond(mapOf("csrfToken" to csrf))
+        }
         post("/register") {
             call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Registration requires an invitation"))
         }

@@ -60,6 +60,8 @@ class NotificationContractTest {
         assertContains(user, "/modules/common/js/notification-center.js")
         assertContains(client, "request('/api/notifications/read-all', { method: 'PATCH' })")
         assertContains(client, "global.aitsmFetchJson(url, options)")
+        assertContains(client, "fetch('/api/auth/csrf-token'")
+        assertContains(client, "'X-CSRF-Token': csrfToken")
         assertContains(client, "notification.relatedUserId")
         assertContains(client, "relatedUserProfileImageUrl")
         assertContains(client, "new Intl.DateTimeFormat")

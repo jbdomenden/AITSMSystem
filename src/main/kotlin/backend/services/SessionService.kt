@@ -83,6 +83,17 @@ class SessionService {
         }
     }
 
+    fun rotateCsrf(sessionId: UUID): String {
+        val csrf = randomToken(32)
+        val updated = transaction {
+            SessionsTable.update({
+                (SessionsTable.id eq sessionId) and SessionsTable.revokedAt.isNull()
+            }) { it[csrfHash] = sha256(csrf) }
+        }
+        check(updated == 1) { "Active session was not found." }
+        return csrf
+    }
+
     fun revoke(sessionId: UUID) = transaction {
         SessionsTable.update({ SessionsTable.id eq sessionId }) { it[revokedAt] = LocalDateTime.now() }
     }

@@ -35,6 +35,14 @@ class SecurityBoundariesTest {
         assertFalse(SessionCookies.auth("raw", production = false).secure)
     }
 
+    @Test fun `csrf recovery cookie remains script readable and transport secure`() {
+        val cookie = SessionCookies.csrf("rotated", production = true)
+        assertFalse(cookie.httpOnly)
+        assertTrue(cookie.secure)
+        assertEquals("/", cookie.path)
+        assertEquals("Lax", cookie.extensions["SameSite"])
+    }
+
     @Test fun `permission matrix enforces least privilege`() {
         assertTrue(Permission.TICKET_CREATE in PermissionMatrix.permissions(UserRole.END_USER))
         assertFalse(Permission.USER_INVITE in PermissionMatrix.permissions(UserRole.END_USER))
