@@ -6,6 +6,7 @@ COPY gradlew gradlew.bat build.gradle.kts settings.gradle.kts gradle.properties 
 RUN chmod +x gradlew
 COPY src ./src
 COPY db ./db
+COPY collector ./collector
 RUN ./gradlew --no-daemon clean test buildFatJar
 
 FROM eclipse-temurin:21-jre-alpine
