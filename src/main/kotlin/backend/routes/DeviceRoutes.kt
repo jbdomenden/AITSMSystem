@@ -12,6 +12,7 @@ import backend.security.userId
 import backend.services.AssetDetectionService
 import backend.services.InventoryService
 import backend.services.MonitoringService
+import backend.services.preferredLiveDevicesByIp
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -68,9 +69,7 @@ fun Route.deviceRoutes(
             if (!call.requireRole(UserRole.ADMIN)) return@get
             val limit = (call.request.queryParameters["limit"]?.toIntOrNull() ?: 20).coerceIn(1, 100)
             val offset = (call.request.queryParameters["offset"]?.toLongOrNull() ?: 0L).coerceAtLeast(0)
-            val liveStatuses = monitoringService.lanDevices()
-                .filter { it.telemetrySourceType != "HOST" }
-                .associateBy { it.ipAddress }
+            val liveStatuses = preferredLiveDevicesByIp(monitoringService.lanDevices())
             val page = deviceRepository.listWithLiveStatus(liveStatuses, limit, offset)
             call.respond(PaginatedResponse(page.items, PaginationMeta(page.total, limit, offset, (offset / limit).toInt() + 1)))
         }
@@ -111,8 +110,7 @@ fun Route.deviceRoutes(
 
         post("/sync-from-monitoring") {
             if (!call.requireRole(UserRole.ADMIN)) return@post
-            val peers = monitoringService.lanDevices()
-                .filter { it.telemetrySourceType != "HOST" }
+            val peers = preferredLiveDevicesByIp(monitoringService.lanDevices()).values
                 .map {
                     DeviceRepository.DiscoveredPeer(
                         ipAddress = it.ipAddress,

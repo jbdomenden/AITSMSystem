@@ -145,6 +145,15 @@ class MonitoringService(
     }.getOrDefault(false)
 }
 
+internal fun preferredLiveDevicesByIp(devices: List<backend.models.LanDeviceDto>): Map<String, backend.models.LanDeviceDto> =
+    devices.filter { it.telemetrySourceType != "HOST" }
+        .groupBy { it.ipAddress }
+        .mapValues { (_, readings) ->
+            readings.firstOrNull { it.telemetryAvailable && !it.stale }
+                ?: readings.firstOrNull { it.reachable && !it.stale }
+                ?: readings.first()
+        }
+
 internal fun CollectorDeviceReport.toInventoryUpsert(): InventoryUpsertDetectedRequest {
     val details = inventory
     return InventoryUpsertDetectedRequest(
