@@ -42,4 +42,11 @@ class FrontendSafetyContractTest {
         assertTrue(frontend.contains("/^(\\d{1,3}\\.){3}\\d{1,3}$/"))
         assertFalse(frontend.contains("/^(\\\\d{1,3}\\\\.){3}\\\\d{1,3}$/"))
     }
+
+    @Test fun `end user ticket actions wait for session and always expose details`() {
+        val frontend = Files.readString(Path.of("src/main/resources/static/frontend/tickets/js/tickets.js"))
+        assertTrue(frontend.contains("await window.aitsmReady"))
+        assertTrue(frontend.contains("View details"))
+        assertFalse(frontend.contains("if (!items.length) return '-'"))
+    }
 }

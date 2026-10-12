@@ -96,15 +96,19 @@ function actionMenu(ticket){
   const isOpen = status === 'open';
   const isPending = status === 'pending' || status === 'in progress' || status === 'follow-up requested';
   const canFollowUp = !['resolved', 'closed', 'cancelled'].includes(status) && hoursSince(ticket.updatedAt) >= FOLLOW_UP_HOURS;
-  const items = [];
+  const items = [`<button type='button' onclick='viewMyTicket(${ticket.id})'>View details</button>`];
   if (isResolved) items.push(`<button type='button' onclick='updateMyTicketStatus(${ticket.id}, "Closed")'>Close ticket</button>`);
   if (isOpen || isPending) items.push(`<button type='button' onclick='updateMyTicketStatus(${ticket.id}, "Cancelled")'>Cancel ticket</button>`);
   if(canFollowUp) items.push(`<button type='button' onclick='updateMyTicketStatus(${ticket.id}, "Follow-up Requested")'>Request follow-up</button>`);
-  if (!items.length) return '-';
   return `<div class='row-action-wrap'>
     <button class='btn btn-ghost icon-btn' onclick='toggleRowActionMenu(event, ${ticket.id})' title='Actions' aria-label='Actions'>⋯</button>
     <div id='ticketRowMenu-${ticket.id}' class='row-action-menu hidden'>${items.join('')}</div>
   </div>`;
+}
+
+function viewMyTicket(id) {
+  closeAllRowMenus();
+  location.href = userTicketHref(id);
 }
 
 async function createTicket() {
@@ -186,4 +190,7 @@ async function loadTickets() {
 }
 
 document.addEventListener('click', () => closeAllRowMenus());
-document.addEventListener('DOMContentLoaded', loadTickets);
+document.addEventListener('DOMContentLoaded', async () => {
+  await window.aitsmReady;
+  await loadTickets();
+});
