@@ -288,8 +288,23 @@ This file lists backend endpoints, what they do, and POST payload examples for q
 
 ## Monitoring (`/api/monitoring`)
 
+### POST `/api/monitoring/collector-packages`
+- Authenticated, CSRF-protected package creation. Administrators may request `LAN` or `SELF`; every non-admin request is forced to `SELF`. Returns a high-entropy code that expires in 10 minutes and is stored only as a hash.
+
+### POST `/api/monitoring/collector-installer/windows`
+- Authenticated, CSRF-protected Windows EXE download. The enrollment code must be active and owned by the current user.
+
+### POST `/api/monitoring/collector/redeem`
+- Rate-limited installer endpoint that atomically redeems a single-use enrollment code and returns a collector credential once.
+
+### GET `/api/monitoring/my-collectors`
+- Returns only collector records owned by the authenticated user.
+
+### DELETE `/api/monitoring/my-collectors/{id}`
+- End-user self-service revocation. Ownership is enforced server-side.
+
 ### POST `/api/monitoring/collectors`
-- Admin-only enrollment. Returns a scoped raw token once; only its hash is stored.
+- Legacy admin-only direct enrollment. Returns a scoped raw token once; only its hash is stored. The portal uses the package workflow above.
 
 ### GET `/api/monitoring/collectors`
 - Admin-only collector connectivity and last-seen states.
@@ -298,7 +313,7 @@ This file lists backend endpoints, what they do, and POST payload examples for q
 - Revokes a collector token.
 
 ### GET `/api/monitoring/collector/commands`
-- Collector bearer-token endpoint. Returns the next queued discovery request or HTTP 204.
+- Collector bearer-token endpoint. Returns the next queued discovery request for `LAN` collectors or HTTP 204 for `SELF` collectors.
 
 ### POST `/api/monitoring/collector/reports`
 - Collector bearer-token endpoint for validated device discovery and telemetry reports. Server receipt time is authoritative.

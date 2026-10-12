@@ -75,6 +75,40 @@ async function fetchJsonOrThrow(url) {
   return data;
 }
 
+async function downloadMyCollector() {
+  const button = document.getElementById('downloadMyCollectorBtn');
+  const status = document.getElementById('myCollectorStatus');
+  button.disabled = true; status.textContent = 'Creating your secure installer…'; status.className = 'small';
+  try {
+    const response = await fetch('/api/monitoring/collector-packages', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ name: `${window.currentUser?.fullName || 'User'} Windows device`, siteId: 'self-device', scope: 'SELF' }) });
+    const enrollment = await response.json();
+    if (!response.ok) throw new Error(enrollment.error || 'Unable to create enrollment');
+    const download = await fetch('/api/monitoring/collector-installer/windows', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ enrollmentCode: enrollment.enrollmentCode }) });
+    if (!download.ok) { const data = await download.json().catch(() => ({})); throw new Error(data.error || 'Installer download failed'); }
+    const disposition = download.headers.get('content-disposition') || '';
+    const filename = disposition.match(/filename="([^"]+)"/i)?.[1] || 'AITSMCollectorSetup.exe';
+    const url = URL.createObjectURL(await download.blob());
+    const link = document.createElement('a'); link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+    status.textContent = 'Downloaded. Run the installer within 10 minutes and approve the Windows prompt.'; status.className = 'small text-success';
+  } catch (error) { status.textContent = error.message || 'Unable to download collector.'; status.className = 'small text-danger'; }
+  finally { button.disabled = false; }
+}
+
+async function loadMyCollectors() {
+  const target = document.getElementById('myCollectors');
+  const response = await fetch('/api/monitoring/my-collectors', { headers: authHeaders() });
+  const collectors = await response.json();
+  if (!response.ok) throw new Error(collectors.error || 'Unable to load collectors');
+  target.innerHTML = collectors.length ? collectors.map(item => `<div class='insight-item'><div><strong>${aitsmEscapeHtml(item.name)}</strong><div class='small'>${aitsmEscapeHtml(item.state)} · ${item.lastSeenAt ? aitsmEscapeHtml(formatDateTime(item.lastSeenAt)) : 'Never connected'}</div></div>${item.state === 'REVOKED' ? '' : `<button class='btn btn-ghost' type='button' onclick='revokeMyCollector("${item.collectorId}")'>Remove</button>`}</div>`).join('') : `<p class='small'>No collector installed for your account.</p>`;
+}
+
+async function revokeMyCollector(id) {
+  if (!confirm('Remove this collector from your account?')) return;
+  const response = await fetch(`/api/monitoring/my-collectors/${encodeURIComponent(id)}`, { method: 'DELETE', headers: authHeaders() });
+  if (!response.ok) { const data = await response.json().catch(() => ({})); return showAppAlert(data.error || 'Unable to remove collector'); }
+  await loadMyCollectors();
+}
+
 async function loadUserDashboard() {
   const rows = document.getElementById('recentTicketRows');
   if (rows) showTableSkeleton(rows, { rowCount: 5, columnCount: 5 });
@@ -87,6 +121,7 @@ async function loadUserDashboard() {
     renderUserSummary(sortedTickets);
     if (rows) clearTableSkeleton(rows);
     renderRecentTickets(sortedTickets);
+    await loadMyCollectors();
   } catch (error) {
     renderUserSummary([]);
     if (rows) renderTableErrorState(rows, 5, 'Unable to load tickets right now. Please try again.');
@@ -95,4 +130,8 @@ async function loadUserDashboard() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', loadUserDashboard);
+document.addEventListener('DOMContentLoaded', async () => {
+  await window.aitsmReady;
+  document.getElementById('downloadMyCollectorBtn')?.addEventListener('click', downloadMyCollector);
+  await loadUserDashboard();
+});

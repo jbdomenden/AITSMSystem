@@ -1,11 +1,14 @@
 package backend.repository
 
 import backend.config.DiscoveryRequestsTable
+import backend.config.CollectorEnrollmentCodesTable
 import backend.config.MonitoringCollectorsTable
 import backend.config.MonitoringDevicesTable
 import backend.models.CollectorDeviceReport
 import backend.models.CollectorEnrollmentRequest
 import backend.models.CollectorEnrollmentResponse
+import backend.models.CollectorPackageResponse
+import backend.models.CollectorRedeemResponse
 import backend.models.CollectorReportRequest
 import backend.models.CollectorView
 import backend.models.DiscoveryCommand
@@ -39,6 +42,8 @@ object CollectorToken {
     )
 }
 
+data class CollectorIdentity(val id: UUID, val scope: String, val ownerUserId: Int?)
+
 class MonitoringRepository(private val clock: Clock = Clock.systemUTC()) {
     private fun now(): LocalDateTime = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC)
     private fun iso(value: LocalDateTime?): String? = value?.toInstant(ZoneOffset.UTC)?.toString()
@@ -51,6 +56,8 @@ class MonitoringRepository(private val clock: Clock = Clock.systemUTC()) {
             it[MonitoringCollectorsTable.id] = id
             it[siteId] = request.siteId
             it[name] = request.name
+            it[scope] = "LAN"
+            it[ownerUserId] = null
             it[tokenHash] = CollectorToken.hash(token)
             it[MonitoringCollectorsTable.enrolledAt] = enrolledAt
             it[lastSeenAt] = null
@@ -59,11 +66,74 @@ class MonitoringRepository(private val clock: Clock = Clock.systemUTC()) {
         CollectorEnrollmentResponse(id.toString(), request.siteId, request.name, token, iso(enrolledAt)!!)
     }
 
-    fun authenticate(rawToken: String): UUID? = transaction {
+    fun createEnrollmentCode(userId: Int, scopeValue: String, site: String, collectorName: String): CollectorPackageResponse = transaction {
+        val id = UUID.randomUUID()
+        val code = CollectorToken.issue(id)
+        val created = now()
+        val expires = created.plusMinutes(10)
+        CollectorEnrollmentCodesTable.insert {
+            it[CollectorEnrollmentCodesTable.id] = id
+            it[codeHash] = CollectorToken.hash(code)
+            it[requestedBy] = userId
+            it[scope] = scopeValue
+            it[siteId] = site
+            it[name] = collectorName
+            it[createdAt] = created
+            it[expiresAt] = expires
+            it[redeemedAt] = null
+            it[collectorId] = null
+        }
+        CollectorPackageResponse(code, iso(expires)!!, scopeValue)
+    }
+
+    fun redeemEnrollmentCode(rawCode: String, privateCidrs: List<String>): CollectorRedeemResponse? = transaction {
+        val codeId = CollectorToken.collectorId(rawCode) ?: return@transaction null
+        val row = CollectorEnrollmentCodesTable.selectAll().where { CollectorEnrollmentCodesTable.id eq codeId }.singleOrNull()
+            ?: return@transaction null
+        if (row[CollectorEnrollmentCodesTable.redeemedAt] != null || row[CollectorEnrollmentCodesTable.expiresAt].isBefore(now()) ||
+            !CollectorToken.matches(rawCode, row[CollectorEnrollmentCodesTable.codeHash])) return@transaction null
+
+        val collectorId = UUID.randomUUID()
+        val token = CollectorToken.issue(collectorId)
+        val redeemed = now()
+        val claimed = CollectorEnrollmentCodesTable.update({
+            (CollectorEnrollmentCodesTable.id eq codeId) and CollectorEnrollmentCodesTable.redeemedAt.isNull()
+        }) {
+            it[redeemedAt] = redeemed
+        }
+        if (claimed != 1) return@transaction null
+        MonitoringCollectorsTable.insert {
+            it[id] = collectorId
+            it[siteId] = row[CollectorEnrollmentCodesTable.siteId]
+            it[name] = row[CollectorEnrollmentCodesTable.name]
+            it[scope] = row[CollectorEnrollmentCodesTable.scope]
+            it[ownerUserId] = row[CollectorEnrollmentCodesTable.requestedBy]
+            it[tokenHash] = CollectorToken.hash(token)
+            it[enrolledAt] = redeemed
+            it[lastSeenAt] = null
+            it[revokedAt] = null
+        }
+        CollectorEnrollmentCodesTable.update({ CollectorEnrollmentCodesTable.id eq codeId }) {
+            it[CollectorEnrollmentCodesTable.collectorId] = collectorId
+        }
+        CollectorRedeemResponse(collectorId.toString(), token, row[CollectorEnrollmentCodesTable.scope], privateCidrs)
+    }
+
+    fun enrollmentCodeBelongsTo(rawCode: String, userId: Int): Boolean = transaction {
+        val codeId = CollectorToken.collectorId(rawCode) ?: return@transaction false
+        val row = CollectorEnrollmentCodesTable.selectAll().where {
+            (CollectorEnrollmentCodesTable.id eq codeId) and (CollectorEnrollmentCodesTable.requestedBy eq userId)
+        }.singleOrNull() ?: return@transaction false
+        row[CollectorEnrollmentCodesTable.redeemedAt] == null && row[CollectorEnrollmentCodesTable.expiresAt].isAfter(now()) &&
+            CollectorToken.matches(rawCode, row[CollectorEnrollmentCodesTable.codeHash])
+    }
+
+    fun authenticate(rawToken: String): CollectorIdentity? = transaction {
         val id = CollectorToken.collectorId(rawToken) ?: return@transaction null
         val row = MonitoringCollectorsTable.selectAll().where { MonitoringCollectorsTable.id eq id }.singleOrNull()
             ?: return@transaction null
-        if (row[MonitoringCollectorsTable.revokedAt] != null || !CollectorToken.matches(rawToken, row[MonitoringCollectorsTable.tokenHash])) null else id
+        if (row[MonitoringCollectorsTable.revokedAt] != null || !CollectorToken.matches(rawToken, row[MonitoringCollectorsTable.tokenHash])) null
+        else CollectorIdentity(id, row[MonitoringCollectorsTable.scope], row[MonitoringCollectorsTable.ownerUserId])
     }
 
     fun revoke(id: UUID): Boolean = transaction {
@@ -72,9 +142,12 @@ class MonitoringRepository(private val clock: Clock = Clock.systemUTC()) {
         } > 0
     }
 
-    fun listCollectors(): List<CollectorView> = transaction {
+    fun listCollectors(ownerId: Int? = null): List<CollectorView> = transaction {
         val instantNow = clock.instant()
-        MonitoringCollectorsTable.selectAll().orderBy(MonitoringCollectorsTable.enrolledAt, SortOrder.DESC).map { row ->
+        val query = MonitoringCollectorsTable.selectAll().let { base ->
+            if (ownerId == null) base else base.where { MonitoringCollectorsTable.ownerUserId eq ownerId }
+        }
+        query.orderBy(MonitoringCollectorsTable.enrolledAt, SortOrder.DESC).map { row ->
             val lastSeen = row[MonitoringCollectorsTable.lastSeenAt]
             val state = when {
                 row[MonitoringCollectorsTable.revokedAt] != null -> "REVOKED"
@@ -84,8 +157,15 @@ class MonitoringRepository(private val clock: Clock = Clock.systemUTC()) {
                 else -> "OFFLINE"
             }
             CollectorView(row[MonitoringCollectorsTable.id].toString(), row[MonitoringCollectorsTable.siteId], row[MonitoringCollectorsTable.name], state,
-                iso(row[MonitoringCollectorsTable.enrolledAt])!!, iso(lastSeen), iso(row[MonitoringCollectorsTable.revokedAt]))
+                iso(row[MonitoringCollectorsTable.enrolledAt])!!, iso(lastSeen), iso(row[MonitoringCollectorsTable.revokedAt]),
+                row[MonitoringCollectorsTable.scope], row[MonitoringCollectorsTable.ownerUserId])
         }
+    }
+
+    fun revokeOwned(id: UUID, ownerId: Int): Boolean = transaction {
+        MonitoringCollectorsTable.update({
+            (MonitoringCollectorsTable.id eq id) and (MonitoringCollectorsTable.ownerUserId eq ownerId) and MonitoringCollectorsTable.revokedAt.isNull()
+        }) { it[revokedAt] = now() } > 0
     }
 
     fun saveReport(collectorId: UUID, report: CollectorReportRequest, measurement: Instant): Pair<Instant, Int> = transaction {

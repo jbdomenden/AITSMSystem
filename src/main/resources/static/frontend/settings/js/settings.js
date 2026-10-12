@@ -57,9 +57,50 @@ async function testAiConnection() {
   finally { setAiButtonsDisabled(false); }
 }
 
+function collectorFilename(response) {
+  const disposition = response.headers.get('content-disposition') || '';
+  return disposition.match(/filename="([^"]+)"/i)?.[1] || 'AITSMCollectorSetup.exe';
+}
+
+async function downloadCollectorInstaller() {
+  const button = document.getElementById('downloadCollectorBtn');
+  const status = document.getElementById('collectorDownloadStatus');
+  button.disabled = true; status.textContent = 'Creating a secure one-time installer…'; status.className = 'small';
+  try {
+    const enrollment = await fetchJsonOrThrow('/api/monitoring/collector-packages', {
+      method: 'POST', body: JSON.stringify({
+        name: document.getElementById('collectorName').value.trim(),
+        siteId: document.getElementById('collectorSite').value.trim(),
+        scope: document.getElementById('collectorScope').value
+      })
+    });
+    const response = await fetch('/api/monitoring/collector-installer/windows', {
+      method: 'POST', headers: authHeaders(), body: JSON.stringify({ enrollmentCode: enrollment.enrollmentCode })
+    });
+    if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || 'Installer download failed'); }
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement('a'); link.href = url; link.download = collectorFilename(response); document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+    status.textContent = `Installer downloaded. Run it within 10 minutes (${enrollment.scope} scope).`; status.className = 'small text-success';
+  } catch (error) { status.textContent = error.message || 'Unable to create installer.'; status.className = 'small text-danger'; }
+  finally { button.disabled = false; }
+}
+
+async function loadCollectors() {
+  const rows = document.getElementById('collectorRows');
+  const collectors = await fetchJsonOrThrow('/api/monitoring/collectors');
+  rows.innerHTML = collectors.length ? collectors.map(item => `<tr><td>${aitsmEscapeHtml(item.name)}</td><td>${aitsmEscapeHtml(item.scope)}</td><td><span class='badge ${item.state === 'ONLINE' ? 'resolved' : 'warning'}'>${aitsmEscapeHtml(item.state)}</span></td><td>${aitsmEscapeHtml(item.lastSeenAt ? new Date(item.lastSeenAt).toLocaleString() : 'Never')}</td><td>${item.state === 'REVOKED' ? '-' : `<button class='btn btn-ghost' type='button' onclick='revokeCollector("${item.collectorId}")'>Revoke</button>`}</td></tr>`).join('') : `<tr><td colspan='5'>No collectors enrolled.</td></tr>`;
+}
+
+async function revokeCollector(id) {
+  if (!confirm('Revoke this collector? It will stop accepting reports immediately.')) return;
+  await fetchJsonOrThrow(`/api/monitoring/collectors/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  await loadCollectors();
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('aiTestConnectionBtn')?.addEventListener('click', testAiConnection);
   document.getElementById('aiSaveConfigBtn')?.addEventListener('click', saveAiConfig);
-  try { await Promise.all([loadSlaPolicies(), loadAssetDetectionPrefixes(), loadAiConfig()]); }
+  document.getElementById('downloadCollectorBtn')?.addEventListener('click', downloadCollectorInstaller);
+  try { await Promise.all([loadSlaPolicies(), loadAssetDetectionPrefixes(), loadAiConfig(), loadCollectors()]); }
   catch (error) { showAppAlert(error.message || 'Unable to load settings data'); }
 });

@@ -28,6 +28,10 @@ out/
 !**/src/main/**/out/
 !**/src/test/**/out/
 
+# Windows collector build output
+collector/windows/installer/obj/
+collector/windows/installer/publish/
+
 ### NetBeans ###
 /nbproject/private/
 /nbbuild/

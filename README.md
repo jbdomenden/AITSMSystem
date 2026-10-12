@@ -93,7 +93,7 @@ Registration is invitation-only. Invitation and password-reset tokens are random
 
 Sensitive administration, MFA changes, exports, account deletion, recovery-code regeneration, and security configuration use five-minute reauthentication grants. Only hashes are persisted; grants are bound to the current user, session, and exact scope, and mutation grants are single-use. The user-management page includes invitation lifecycle controls and an audited superadmin-only recovery path for another administrator's MFA.
 
-For a new database, apply `db/schema.sql` and then every file in `db/migrations` in version order. For an existing database, apply unapplied migrations through `V006__backfill_colleague_notification_actors.sql`. V004 separates transaction notifications from direct messages and adds idempotency keys. V005 adds collectors, reported devices, and queued discovery requests. V006 safely links matching legacy colleague notifications to the responsible employee. Production performs no schema mutation at startup. See `SECURITY.md` for the full release gate.
+For a new database, apply `db/schema.sql` and then every file in `db/migrations` in version order. For an existing database, apply all unapplied migrations through `V008__collector_self_service_enrollment.sql`. V004 separates transaction notifications from direct messages and adds idempotency keys. V005 adds collectors, reported devices, and queued discovery requests. V006 safely links matching legacy colleague notifications to the responsible employee. V008 adds one-time, owner- and role-scoped collector enrollment. Production performs no schema mutation at startup. See `SECURITY.md` for the full release gate.
 
 Focused verification: `./gradlew test --tests backend.security.SecurityBoundariesTest`. Full verification: `./gradlew test`. CI also runs OWASP Dependency-Check and Gitleaks.
 
@@ -104,7 +104,7 @@ Admins and superadmins can manage user roles from the Admin Dashboard (User Acce
 
 ## LAN collector
 
-Cloud Run cannot inspect a private LAN. A scoped Windows collector runs inside the target network, polls outbound over HTTPS for discovery work, and posts authenticated reports. Tokens are returned once and stored only as SHA-256 hashes. Configure only approved private ranges in **Settings → Asset Detection Configuration**. See [`collector/windows/README.md`](collector/windows/README.md) for enrollment, installation, permissions, verification, troubleshooting, and uninstall steps.
+Cloud Run cannot inspect a private LAN. The portal generates a one-click Windows x64 EXE that enrolls once, installs an automatic background service, protects its machine credential with Windows DPAPI, and reports outbound over HTTPS. Administrators can deploy company/LAN or self-device collectors; end users can deploy only a self-device collector that cannot scan peers. Enrollment codes expire after 10 minutes, work once, are stored only as hashes, and remain bound to the account that requested the download. Configure only approved private ranges in **Settings → Asset Detection Configuration**. See [`collector/windows/README.md`](collector/windows/README.md) for installation, permissions, health, repair, revocation, troubleshooting, and uninstall steps.
 
 The UI distinguishes service health, collector connectivity, discovery status, observable peers, and devices with detailed agent telemetry. `timestamp` is the server receipt time; collector measurement time remains separate. Browser reloads and failed refreshes do not manufacture new update times.
 

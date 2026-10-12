@@ -169,10 +169,26 @@ object MonitoringCollectorsTable : Table("monitoring_collectors") {
     val id = uuid("id")
     val siteId = varchar("site_id", 100).index()
     val name = varchar("name", 150)
+    val scope = varchar("scope", 20).default("LAN")
+    val ownerUserId = integer("owner_user_id").references(UsersTable.id, onDelete = ReferenceOption.SET_NULL).nullable().index()
     val tokenHash = varchar("token_hash", 64).uniqueIndex()
     val enrolledAt = datetime("enrolled_at")
     val lastSeenAt = datetime("last_seen_at").nullable().index()
     val revokedAt = datetime("revoked_at").nullable().index()
+    override val primaryKey = PrimaryKey(id)
+}
+
+object CollectorEnrollmentCodesTable : Table("collector_enrollment_codes") {
+    val id = uuid("id")
+    val codeHash = varchar("code_hash", 64).uniqueIndex()
+    val requestedBy = integer("requested_by").references(UsersTable.id, onDelete = ReferenceOption.CASCADE).index()
+    val scope = varchar("scope", 20)
+    val siteId = varchar("site_id", 100)
+    val name = varchar("name", 150)
+    val createdAt = datetime("created_at")
+    val expiresAt = datetime("expires_at").index()
+    val redeemedAt = datetime("redeemed_at").nullable().index()
+    val collectorId = uuid("collector_id").references(MonitoringCollectorsTable.id, onDelete = ReferenceOption.SET_NULL).nullable()
     override val primaryKey = PrimaryKey(id)
 }
 
@@ -406,6 +422,7 @@ object DatabaseFactory {
                 EulaAcceptanceTable,
                 DevicesTable,
                 MonitoringCollectorsTable,
+                CollectorEnrollmentCodesTable,
                 MonitoringDevicesTable,
                 DiscoveryRequestsTable,
                 TicketsTable,

@@ -17,7 +17,8 @@ private val unsafeMethods = setOf(HttpMethod.Post, HttpMethod.Put, HttpMethod.Pa
 private val publicAssetExtensions = setOf("css", "js", "png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "woff", "woff2", "ttf", "map")
 private val csrfExempt = setOf(
     "/api/auth/login", "/api/auth/register", "/api/auth/verify-email", "/api/auth/resend-verification",
-    "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/invitations/accept", "/api/monitoring/client-metrics"
+    "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/invitations/accept", "/api/monitoring/client-metrics",
+    "/api/monitoring/collector/redeem"
 )
 
 internal enum class PageAudience { AUTHENTICATED, END_USER, ADMIN }

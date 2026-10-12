@@ -384,9 +384,9 @@ Test with separate administrator and end-user accounts:
 9. Gemini chat, ticket analysis, configuration testing, and rate limiting.
 10. Profile-photo upload, approval, display, and persistence after a new revision.
 11. Colleague requests and messaging in two browser sessions.
-12. Enroll a Windows collector, confirm an accepted HTTPS report, verify online/stale/offline states, then revoke the token.
+12. From each role, create and download the Windows collector package. Confirm end users receive `SELF` scope, administrators can receive `LAN` scope, the enrollment redeems only once, the Windows service starts automatically, an HTTPS report is accepted, health changes to Online, and revocation causes later reports to receive HTTP 401.
 
-Apply all ordered migrations through `V006__backfill_colleague_notification_actors.sql` before deploying this release. Collector installation and firewall guidance is in `collector/windows/README.md`.
+Apply all ordered migrations through `V008__collector_self_service_enrollment.sql` before deploying this release. V008 must be applied before the application revision because production disables runtime schema mutation. Collector installation, scope, credential storage, firewall, verification, and uninstall guidance is in `collector/windows/README.md`.
 
 Unauthenticated security checks:
 

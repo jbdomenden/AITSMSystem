@@ -98,7 +98,11 @@ Errors are normalized through status pages and `ApiErrorResponse` (status code +
 ## 6. Monitoring Domain
 
 Features include:
-- Outbound authenticated LAN collector with hashed revocable enrollment tokens
+- One-click, self-contained Windows x64 collector installed as an automatic background service
+- Single-use, 10-minute enrollment codes stored only as hashes and bound to the requesting account
+- Machine-bound DPAPI credential storage with a SYSTEM/Administrators-only folder
+- Administrator-controlled `LAN` collectors and end-user-owned `SELF` collectors; self scope cannot scan or report peers
+- Owner-scoped health views and immediate server-side revocation
 - Queued private-CIDR discovery and persisted server-received telemetry timestamps
 - CPU/alerts summary endpoints for dashboards
 - Device sync utilities

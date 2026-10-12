@@ -2,6 +2,8 @@ package backend.services
 
 import backend.models.CollectorDeviceReport
 import backend.models.CollectorEnrollmentRequest
+import backend.models.CollectorPackageRequest
+import backend.models.CollectorRedeemResponse
 import backend.models.CollectorReportRequest
 import backend.models.CollectorReportResponse
 import backend.models.DiscoveryRefreshResponse
@@ -9,6 +11,7 @@ import backend.models.InventoryUpsertDetectedRequest
 import backend.models.MonitoringSummaryDto
 import backend.repository.MonitoringRepository
 import backend.security.RateLimiter
+import backend.models.UserRole
 import java.net.InetAddress
 import java.time.Clock
 import java.time.Instant
@@ -29,7 +32,24 @@ class MonitoringService(
         }
     )
     fun collectors() = repository.listCollectors()
+    fun collectorsForUser(userId: Int) = repository.listCollectors(userId)
+    fun createPackage(userId: Int, role: UserRole, request: CollectorPackageRequest) = run {
+        val requestedScope = request.scope.trim().uppercase()
+        val admin = role in setOf(UserRole.ADMIN, UserRole.IT_ADMIN, UserRole.SUPERADMIN)
+        val scope = if (admin) requestedScope else "SELF"
+        require(scope in setOf("SELF", "LAN")) { "Collector scope must be SELF or LAN." }
+        val site = request.siteId.trim().ifBlank { if (scope == "SELF") "self-device" else "company-lan" }
+        val name = request.name.trim()
+        require(site.matches(Regex("[A-Za-z0-9][A-Za-z0-9._-]{0,99}"))) { "Site id is invalid." }
+        require(name.isNotBlank() && name.length <= 150) { "Collector name is required and must be 150 characters or fewer." }
+        repository.createEnrollmentCode(userId, scope, site, name)
+    }
+    fun redeemPackage(code: String): CollectorRedeemResponse? = repository.redeemEnrollmentCode(
+        code.trim(), assetDetectionService.getConfiguredPrivateCidrs()
+    )
+    fun canDownloadPackage(code: String, userId: Int) = repository.enrollmentCodeBelongsTo(code.trim(), userId)
     fun revoke(rawId: String): Boolean = repository.revoke(UUID.fromString(rawId))
+    fun revokeOwned(rawId: String, userId: Int): Boolean = repository.revokeOwned(UUID.fromString(rawId), userId)
     fun devices() = repository.devices()
     fun lanDevices() = devices()
     fun lanPeerIps() = devices().map { it.ipAddress }.distinct().sorted()
@@ -56,28 +76,31 @@ class MonitoringService(
         return DiscoveryRefreshResponse(requestId.toString(), "PENDING", "Discovery was queued for the LAN collector.")
     }
     fun nextCommand(rawToken: String): backend.models.DiscoveryCommand? {
-        val collectorId = repository.authenticate(rawToken) ?: throw InvalidCollectorTokenException()
-        return repository.nextCommand(collectorId, assetDetectionService.getConfiguredPrivateCidrs())
+        val collector = repository.authenticate(rawToken) ?: throw InvalidCollectorTokenException()
+        if (collector.scope != "LAN") return null
+        return repository.nextCommand(collector.id, assetDetectionService.getConfiguredPrivateCidrs())
     }
     fun ingest(rawToken: String, report: CollectorReportRequest): CollectorReportResponse {
-        val collectorId = repository.authenticate(rawToken) ?: throw InvalidCollectorTokenException()
-        if (!ingestionLimiter.allow(collectorId.toString())) throw CollectorRateLimitException()
+        val collector = repository.authenticate(rawToken) ?: throw InvalidCollectorTokenException()
+        if (!ingestionLimiter.allow(collector.id.toString())) throw CollectorRateLimitException()
         require(report.devices.size <= 1_000) { "A report may contain at most 1000 devices." }
+        if (collector.scope == "SELF") require(report.devices.size == 1) { "Self-device collectors may report exactly one device." }
         val measuredAt = parseMeasurement(report.measuredAt)
         report.discoveryError?.let { require(it.length <= 500) { "Discovery error is too long." } }
-        report.devices.forEach(::validateDevice)
-        val (receivedAt, count) = repository.saveReport(collectorId, report, measuredAt)
+        report.devices.forEach { validateDevice(it, collector.scope) }
+        val (receivedAt, count) = repository.saveReport(collector.id, report, measuredAt)
         report.devices.forEach { device ->
             inventoryService.upsertDetectedAsset(device.toInventoryUpsert(), saveSnapshot = false)
         }
         return CollectorReportResponse(true, receivedAt.toString(), count)
     }
 
-    private fun validateDevice(device: CollectorDeviceReport) {
+    private fun validateDevice(device: CollectorDeviceReport, scope: String) {
         require(device.deviceKey.isNotBlank() && device.deviceKey.length <= 200) { "Device key is invalid." }
         require(device.hostname.isNotBlank() && device.hostname.length <= 200) { "Hostname is invalid." }
-        require(device.ipAddress.length <= 45 && isLiteralIp(device.ipAddress) && assetDetectionService.matchesConfigured(device.ipAddress)) {
-            "Device IP must be inside an explicitly configured private CIDR range."
+        require(device.ipAddress.length <= 45 && isLiteralIp(device.ipAddress) &&
+            (if (scope == "SELF") isPrivateIp(device.ipAddress) else assetDetectionService.matchesConfigured(device.ipAddress))) {
+            "Device IP must be inside an authorized private range."
         }
         require((device.macAddress?.length ?: 0) <= 32 && (device.osDetails?.length ?: 0) <= 300) { "Device metadata is too long." }
         device.inventory?.let(::validateInventory)
@@ -86,6 +109,9 @@ class MonitoringService(
         require((device.storageTotalBytes ?: 0) >= 0 && (device.storageUsedBytes ?: 0) >= 0) { "Storage values cannot be negative." }
         if (!device.telemetryAvailable) require(device.cpuUsagePercent == null && device.memoryUsagePercent == null && device.storageTotalBytes == null && device.storageUsedBytes == null && device.inventory == null) {
             "Uninstrumented peers cannot report detailed telemetry."
+        }
+        if (scope == "SELF") require(device.telemetryAvailable && device.inventory != null) {
+            "Self-device collectors must report authenticated host inventory and telemetry."
         }
         device.measurementAt?.let(::parseMeasurement)
     }
@@ -111,6 +137,12 @@ class MonitoringService(
     private fun isLiteralIp(value: String): Boolean = runCatching {
         val parsed = InetAddress.getByName(value)
         !value.any(Char::isLetter) && (parsed.hostAddress == value || value.contains(':'))
+    }.getOrDefault(false)
+    private fun isPrivateIp(value: String): Boolean = runCatching {
+        val bytes = InetAddress.getByName(value).address
+        bytes.size == 4 && ((bytes[0].toInt() and 0xff) == 10 ||
+            ((bytes[0].toInt() and 0xff) == 172 && (bytes[1].toInt() and 0xff) in 16..31) ||
+            ((bytes[0].toInt() and 0xff) == 192 && (bytes[1].toInt() and 0xff) == 168))
     }.getOrDefault(false)
 }
 

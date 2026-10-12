@@ -196,12 +196,20 @@ data class HostTelemetryDto(
 )
 
 @Serializable data class CollectorEnrollmentRequest(val siteId: String, val name: String)
+@Serializable data class CollectorPackageRequest(val siteId: String = "self-device", val name: String = "Windows device", val scope: String = "SELF")
+@Serializable data class CollectorPackageResponse(val enrollmentCode: String, val expiresAt: String, val scope: String)
+@Serializable data class CollectorInstallerDownloadRequest(val enrollmentCode: String)
+@Serializable data class CollectorRedeemRequest(val enrollmentCode: String)
+@Serializable data class CollectorRedeemResponse(
+    val collectorId: String, val token: String, val scope: String, val privateCidrs: List<String>, val intervalSeconds: Int = 60
+)
 @Serializable data class CollectorEnrollmentResponse(
     val collectorId: String, val siteId: String, val name: String, val token: String, val enrolledAt: String
 )
 @Serializable data class CollectorView(
     val collectorId: String, val siteId: String, val name: String, val state: String,
-    val enrolledAt: String, val lastSeenAt: String? = null, val revokedAt: String? = null
+    val enrolledAt: String, val lastSeenAt: String? = null, val revokedAt: String? = null,
+    val scope: String = "LAN", val ownerUserId: Int? = null
 )
 @Serializable data class CollectorDeviceReport(
     val deviceKey: String, val hostname: String, val ipAddress: String, val macAddress: String? = null,

@@ -1,33 +1,64 @@
-# AITSM Windows LAN collector
+# AITSM Windows collector
 
-The collector runs inside the target LAN and sends data outbound over HTTPS. The Cloud Run service never scans the private network. LAN peers report only observable address, MAC, hostname, and reachability data. The Windows computer running the collector also reports authenticated hardware inventory (manufacturer, model, CPU, RAM, GPU, storage, OS, domain, and device UUID) and live resource telemetry. AITSM automatically merges that data into its inventory record while preserving administrator-managed ownership, department, and notes.
+The production portal provides a one-click, self-contained Windows x64 installer. It enrolls once over HTTPS, installs `AITSMCollector` as an automatic Windows service, stores its collector credential with Windows DPAPI (`LocalMachine`), restricts the installation folder to SYSTEM and local Administrators, and begins reporting every 60 seconds. No inbound firewall rule, copied token, PowerShell command, .NET installation, or scheduled task is required.
 
-## Enroll and configure
+## Download and install
 
-1. As an AITSM administrator, create a collector with `POST /api/monitoring/collectors` using JSON such as `{"siteId":"manila-office","name":"LAN collector 1"}`. The response contains the raw token once. Store it securely; the server stores only its SHA-256 hash.
-2. Copy `collector.config.example.json` to a restricted folder as `collector.config.json`. Set the production HTTPS URL, paste the token, and list only private CIDR ranges that this collector is authorized to observe.
-3. Restrict the configuration ACL to the service account: `icacls collector.config.json /inheritance:r /grant:r "SYSTEM:R" "Administrators:R"`.
+### Administrator: company/LAN collector
 
-Never commit or email the populated configuration. Revoke a compromised collector with `DELETE /api/monitoring/collectors/{collectorId}` and enroll a replacement.
+1. Open **Settings → Windows Collector Installer**.
+2. Enter a descriptive collector and site name, choose **Company / LAN**, and select **Download collector**.
+3. Within 10 minutes, run the downloaded EXE and approve the Windows administrator prompt. Do not rename the file before running it.
+4. Confirm the collector changes from **Never connected** to **Online** in Settings.
 
-## Start, verify, and stop
+An administrator may instead choose **This computer only**. Only a Company/LAN collector receives discovery work and observes authorized LAN peers. Peer records contain only observable address, MAC, hostname, and reachability; they do not claim hardware telemetry.
 
-Run once from an elevated PowerShell prompt:
+### End user: this computer only
+
+1. Open the end-user dashboard and find **Protect This Computer**.
+2. Select **Download collector**, run the EXE within 10 minutes, and approve the Windows administrator prompt.
+3. Confirm the device appears as **Online**.
+
+End-user installers are always forced to `SELF` scope by the server, even if a request is modified. A self-device collector can report exactly one private-address host with its own authenticated hardware inventory and resource telemetry. It cannot poll LAN discovery commands or submit peer devices.
+
+Each download contains a high-entropy, single-use enrollment code in its generated filename. The server stores only its SHA-256 hash. Redemption returns the long-lived collector token once to the installer; the token is then DPAPI-encrypted on that Windows machine. Never share an unredeemed installer. Generate a new one if it expires or is renamed.
+
+## Health, repair, revocation, and uninstall
+
+- **Online**: a valid report was received in the last 2 minutes.
+- **Stale**: the most recent report is 2–10 minutes old.
+- **Offline**: no valid report was received for more than 10 minutes.
+- **Never connected**: enrollment exists but no report has arrived.
+- **Revoked**: the server will reject further reports for that credential.
+
+Running the same installer again repairs a partially completed local service installation by reusing the already protected local credential. To replace a revoked enrollment, uninstall locally first and download a new installer.
+
+Administrators can revoke all managed collectors in Settings. End users can view and revoke only collectors that they enrolled for themselves. Revocation is immediate and does not erase historical inventory under the normal data-retention policy.
+
+To remove the local service, run an elevated command from the installed binary:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File .\AitsmCollector.ps1 -ConfigPath .\collector.config.json -Once
+"C:\ProgramData\AITSMCollector\AITSMCollector.exe" --uninstall
 ```
 
-Successful output includes the server-recorded `receivedAt` timestamp and accepted device count. Confirm the collector shows Online and that Last data received matches the report time in AITSM. For continuous collection, omit `-Once`; stop with Ctrl+C. For unattended use, create a Windows Scheduled Task under a dedicated least-privilege account.
+Then revoke the matching portal entry. The encrypted credential is deleted locally. The service log is at `C:\ProgramData\AITSMCollector\collector.log`; it is capped by rotation and never intentionally logs the token.
 
-## Permissions, firewall, and troubleshooting
+## Network and troubleshooting
 
-- Permit outbound TCP 443 to the AITSM hostname. No inbound firewall rule or port forwarding is required.
-- `Get-NetNeighbor`, `Get-NetIPAddress`, and CIM queries must be available. Some adapter/MAC details require an elevated shell.
-- Discovery is limited to the server-provided private CIDRs. Configure Windows/network firewalls to allow the local observation methods your organization approves; devices that do not answer still never receive fabricated telemetry.
-- HTTP 401 means the token is missing, revoked, or incorrect. HTTP 429 means the collector is reporting too frequently. HTTP 400 means a payload value or address is outside the allowed range.
-- An Offline or Stale collector retains the last valid server receipt timestamp; refreshing the browser does not change it.
+- Allow outbound TCP 443 to the AITSM production hostname. No inbound port or router change is required.
+- Company/LAN discovery is restricted to the private CIDRs configured in **Settings → Asset Detection Configuration**.
+- HTTP 401 in the local log means the credential was revoked or rejected. Revoke/uninstall it and download a replacement.
+- If the EXE says the enrollment is expired or already used, download a fresh installer.
+- Windows may display an unknown-publisher warning until the organization applies an Authenticode code-signing certificate. Only use the installer downloaded while signed in to the trusted AITSM portal.
+- A browser refresh does not make a collector online; state is based only on the server receipt time of authenticated reports.
 
-## Safe uninstall
+## Build and release
 
-Stop the process or delete its Scheduled Task, revoke the collector in AITSM, then securely delete `collector.config.json` and the script directory. Historical device reports remain available according to the application’s data-retention policy.
+The installer source is in `collector/windows/installer`. Build the production Windows x64 resource with:
+
+```powershell
+dotnet publish collector/windows/installer/AITSMCollectorSetup.csproj -c Release -r win-x64 --self-contained true -o collector/windows/installer/publish
+Copy-Item collector/windows/installer/publish/AITSMCollectorSetup.exe src/main/resources/collector/AITSMCollectorSetup.exe -Force
+```
+
+The packaged EXE is served only after an authenticated, CSRF-protected request whose enrollment code belongs to the requesting account. Production deployment must apply `V008__collector_self_service_enrollment.sql` before starting the new application revision.
