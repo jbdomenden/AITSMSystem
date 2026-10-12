@@ -13,6 +13,7 @@ import backend.models.CollectorReportRequest
 import backend.models.CollectorView
 import backend.models.DiscoveryCommand
 import backend.models.LanDeviceDto
+import backend.models.normalizeCollectorMeasurement
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
@@ -191,7 +192,9 @@ class MonitoringRepository(private val clock: Clock = Clock.systemUTC()) {
         val existing = MonitoringDevicesTable.selectAll().where {
             (MonitoringDevicesTable.collectorId eq collectorId) and (MonitoringDevicesTable.deviceKey eq device.deviceKey)
         }.singleOrNull()
-        val measured = runCatching { Instant.parse(device.measurementAt ?: fallbackMeasurement.toString()) }.getOrDefault(fallbackMeasurement)
+        val measured = runCatching {
+            normalizeCollectorMeasurement(device.measurementAt ?: fallbackMeasurement.toString(), fallbackMeasurement)
+        }.getOrDefault(fallbackMeasurement)
         val values: MonitoringDevicesTable.(org.jetbrains.exposed.sql.statements.UpdateBuilder<*>) -> Unit = { statement ->
             statement[hostname] = device.hostname
             statement[ipAddress] = device.ipAddress

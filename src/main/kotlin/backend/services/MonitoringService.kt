@@ -9,6 +9,7 @@ import backend.models.CollectorReportResponse
 import backend.models.DiscoveryRefreshResponse
 import backend.models.InventoryUpsertDetectedRequest
 import backend.models.MonitoringSummaryDto
+import backend.models.normalizeCollectorMeasurement
 import backend.repository.MonitoringRepository
 import backend.security.RateLimiter
 import backend.models.UserRole
@@ -130,9 +131,7 @@ class MonitoringService(
         require((inventory.storageBreakdownJson?.length ?: 0) <= 8_000) { "Storage inventory is too long." }
     }
     private fun parseMeasurement(value: String): Instant {
-        val parsed = runCatching { Instant.parse(value) }.getOrElse { throw IllegalArgumentException("Measurement timestamp must be ISO-8601 UTC.") }
-        require(!parsed.isAfter(clock.instant().plusSeconds(300)) && !parsed.isBefore(clock.instant().minusSeconds(86_400))) { "Measurement timestamp is outside the accepted range." }
-        return parsed
+        return normalizeCollectorMeasurement(value, clock.instant())
     }
     private fun isLiteralIp(value: String): Boolean = runCatching {
         val parsed = InetAddress.getByName(value)

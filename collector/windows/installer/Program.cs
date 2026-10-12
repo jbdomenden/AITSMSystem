@@ -207,7 +207,13 @@ internal static class CollectorLoop
         if (config.Scope == "LAN") devices.AddRange(InventoryReader.ReadPeers(config.PrivateCidrs));
         var payload = JsonSerializer.Serialize(new { measuredAt = DateTimeOffset.UtcNow, devices, discoveryRequestId = discoveryId, discoveryError = (string?)null }, Program.JsonOptions());
         using var response = await http.PostAsync($"{config.BaseUrl}/api/monitoring/collector/reports", new StringContent(payload, Encoding.UTF8, "application/json"), token);
-        if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"Server rejected report with HTTP {(int)response.StatusCode}.");
+        if (!response.IsSuccessStatusCode)
+        {
+            var detail = await response.Content.ReadAsStringAsync(token);
+            detail = Regex.Replace(detail, "[\\r\\n]+", " ");
+            if (detail.Length > 500) detail = detail[..500];
+            throw new InvalidOperationException($"Server rejected report with HTTP {(int)response.StatusCode}: {detail}");
+        }
     }
 }
 

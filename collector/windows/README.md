@@ -48,6 +48,7 @@ Then revoke the matching portal entry. The encrypted credential is deleted local
 - Allow outbound TCP 443 to the AITSM production hostname. No inbound port or router change is required.
 - Company/LAN discovery is restricted to the private CIDRs configured in **Settings → Asset Detection Configuration**.
 - HTTP 401 in the local log means the credential was revoked or rejected. Revoke/uninstall it and download a replacement.
+- A Windows clock that is badly out of sync no longer blocks enrollment data; the server safely substitutes its authoritative receipt time while preserving the reported device data.
 - If the EXE says the enrollment is expired or already used, download a fresh installer.
 - Windows may display an unknown-publisher warning until the organization applies an Authenticode code-signing certificate. Only use the installer downloaded while signed in to the trusted AITSM portal.
 - A browser refresh does not make a collector online; state is based only on the server receipt time of authenticated reports.
