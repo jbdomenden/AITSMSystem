@@ -5,8 +5,7 @@ function ensureActionMenuBackdrop() {
   backdrop.id = 'actionMenuBackdrop';
   backdrop.className = 'action-menu-backdrop hidden';
   backdrop.addEventListener('click', () => {
-    document.querySelectorAll('.row-action-menu').forEach((el) => el.classList.add('hidden'));
-  document.getElementById('actionMenuBackdrop')?.classList.add('hidden');
+    closeAllRowMenus();
     backdrop.classList.add('hidden');
   });
   document.body.appendChild(backdrop);
@@ -77,9 +76,9 @@ function toggleRowActionMenu(event, id) {
   const menu = document.getElementById(`ticketRowMenu-${id}`);
   if (!menu) return;
   const trigger = event.currentTarget;
-  const isHidden = menu.classList.contains('hidden');
+  const open = menu.classList.contains('hidden');
   closeAllRowMenus();
-  if (!isHidden) return;
+  if (!open) return;
   ensureActionMenuBackdrop();
   document.getElementById('actionMenuBackdrop')?.classList.remove('hidden');
   const rect = trigger.getBoundingClientRect();
@@ -101,7 +100,7 @@ function actionMenu(ticket){
   if (isOpen || isPending) items.push(`<button type='button' onclick='updateMyTicketStatus(${ticket.id}, "Cancelled")'>Cancel ticket</button>`);
   if(canFollowUp) items.push(`<button type='button' onclick='updateMyTicketStatus(${ticket.id}, "Follow-up Requested")'>Request follow-up</button>`);
   return `<div class='row-action-wrap'>
-    <button class='btn btn-ghost icon-btn' onclick='toggleRowActionMenu(event, ${ticket.id})' title='Actions' aria-label='Actions'>⋯</button>
+    <button class='btn btn-ghost icon-btn' onclick='toggleRowActionMenu(event, ${ticket.id})' title='Actions' aria-label='Actions'>...</button>
     <div id='ticketRowMenu-${ticket.id}' class='row-action-menu hidden'>${items.join('')}</div>
   </div>`;
 }

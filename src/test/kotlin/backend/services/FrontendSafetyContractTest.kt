@@ -47,6 +47,7 @@ class FrontendSafetyContractTest {
         val frontend = Files.readString(Path.of("src/main/resources/static/frontend/tickets/js/tickets.js"))
         assertTrue(frontend.contains("await window.aitsmReady"))
         assertTrue(frontend.contains("View details"))
+        assertTrue(frontend.contains("aria-label='Actions'>...</button>"))
         assertFalse(frontend.contains("if (!items.length) return '-'"))
     }
 }
