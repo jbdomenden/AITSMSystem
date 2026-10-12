@@ -108,7 +108,23 @@ function renderAdminTicketAiContext() {
   document.getElementById('adminTicketAiTitle').textContent = `AI assistance for ticket #${ticket.id}`;
   document.getElementById('adminTicketAiMeta').textContent = `${ticket.title} • ${statusLabel(ticket.status)} • ${ticket.priority}`;
   document.getElementById('adminTicketAiResults').classList.add('hidden');
-  document.getElementById('adminTicketAiStatus').textContent = 'Generate a reviewable Gemini summary and resolution draft. Nothing will be posted automatically.';
+  const saved = document.getElementById('adminTicketSavedResolution');
+  const savedText = document.getElementById('adminTicketSavedResolutionText');
+  const savedMeta = document.getElementById('adminTicketSavedResolutionMeta');
+  const saveButton = document.getElementById('saveTicketAiDraftBtn');
+  const isClosed = normalizeStatus(ticket.status) === 'closed';
+  saved?.classList.toggle('hidden', !ticket.reviewedResolution);
+  if (savedText) savedText.textContent = ticket.reviewedResolution || '';
+  if (savedMeta) savedMeta.textContent = ticket.reviewedResolution
+    ? `Last saved ${formatDate(ticket.resolutionUpdatedAt)}${ticket.resolutionUpdatedBy ? ` by ${ticket.resolutionUpdatedBy}` : ''}.`
+    : '';
+  if (saveButton) {
+    saveButton.disabled = isClosed;
+    saveButton.title = isClosed ? 'Reopen the ticket before saving a new resolution.' : '';
+  }
+  document.getElementById('adminTicketAiStatus').textContent = isClosed
+    ? 'This ticket is closed. You can generate and copy assistance, but reopen it before saving a new resolution.'
+    : 'Generate a reviewable Gemini summary and resolution draft. Saving requires confirmation.';
 }
 
 async function generateAdminTicketAssistance() {
@@ -160,6 +176,43 @@ async function copyAdminTicketDraft() {
   } catch {
     status.classList.add('text-danger');
     status.textContent = 'Copy failed. Select the draft text and copy it manually.';
+  }
+}
+
+async function saveAdminTicketDraft() {
+  const ticketId = Number(getRequestedAdminTicketId());
+  const draft = document.getElementById('adminTicketAiDraft')?.value.trim();
+  const status = document.getElementById('adminTicketAiStatus');
+  const button = document.getElementById('saveTicketAiDraftBtn');
+  if (!(ticketId > 0) || !status || !button) return;
+  if (!draft) {
+    status.classList.add('text-danger');
+    status.textContent = 'Review and enter a resolution before saving.';
+    return;
+  }
+  if (!window.confirm(`Save this reviewed resolution to ticket #${ticketId}?`)) return;
+
+  button.disabled = true;
+  status.classList.remove('text-danger', 'text-success');
+  status.textContent = 'Saving the reviewed resolution…';
+  try {
+    const response = await fetch(`/api/tickets/${ticketId}/resolution`, {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify({ resolution: draft })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || data.message || 'Unable to save the resolution');
+    const index = adminTicketState.tickets.findIndex((ticket) => Number(ticket.id) === ticketId);
+    if (index >= 0) adminTicketState.tickets[index] = data;
+    renderAdminTicketAiContext();
+    document.getElementById('adminTicketAiResults').classList.remove('hidden');
+    status.classList.add('text-success');
+    status.textContent = 'Reviewed resolution saved to the ticket.';
+  } catch (error) {
+    status.classList.add('text-danger');
+    status.textContent = error.message;
+    button.disabled = false;
   }
 }
 
@@ -357,6 +410,7 @@ document.addEventListener('click', () => closeAdminRowMenus());
 document.addEventListener('DOMContentLoaded', () => {
   wireAdminTicketFilters();
   document.getElementById('generateTicketAiBtn')?.addEventListener('click', generateAdminTicketAssistance);
+  document.getElementById('saveTicketAiDraftBtn')?.addEventListener('click', saveAdminTicketDraft);
   document.getElementById('copyTicketAiDraftBtn')?.addEventListener('click', copyAdminTicketDraft);
   loadAdminTicketManagement();
 });

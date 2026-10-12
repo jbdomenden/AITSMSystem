@@ -91,6 +91,17 @@ class TicketRepository {
         get(id)
     }
 
+    fun updateResolution(id: Int, resolution: String, updatedBy: String): Ticket? = transaction {
+        val now = LocalDateTime.now()
+        TicketsTable.update({ TicketsTable.id eq id }) {
+            it[reviewedResolution] = resolution
+            it[resolutionUpdatedBy] = updatedBy
+            it[resolutionUpdatedAt] = now
+            it[updatedAt] = now
+        }
+        get(id)
+    }
+
     private fun toTicket(row: ResultRow): Ticket {
         val priorityValue = row[TicketsTable.priority]
         val slaMinutes = SLAPoliciesTable.selectAll().where { SLAPoliciesTable.priority eq priorityValue }
@@ -106,6 +117,9 @@ class TicketRepository {
             category = row[TicketsTable.category],
             status = runCatching { TicketStatus.valueOf(row[TicketsTable.status]) }.getOrDefault(TicketStatus.OPEN),
             assignedTo = row[TicketsTable.assignedTo],
+            reviewedResolution = row[TicketsTable.reviewedResolution],
+            resolutionUpdatedBy = row[TicketsTable.resolutionUpdatedBy],
+            resolutionUpdatedAt = row[TicketsTable.resolutionUpdatedAt]?.toString(),
             deviceId = row[TicketsTable.deviceId],
             createdAt = row[TicketsTable.createdAt].toString(),
             updatedAt = row[TicketsTable.updatedAt].toString(),

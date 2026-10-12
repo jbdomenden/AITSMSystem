@@ -74,6 +74,11 @@
         <button id='generateTicketAiBtn' class='btn btn-primary' type='button'>Generate assistance</button>
       </div>
       <p id='adminTicketAiStatus' class='small'></p>
+      <section id='adminTicketSavedResolution' class='hidden'>
+        <h4>Saved reviewed resolution</h4>
+        <div id='adminTicketSavedResolutionText' class='ai-review-copy'></div>
+        <p id='adminTicketSavedResolutionMeta' class='small'></p>
+      </section>
       <div id='adminTicketAiResults' class='ai-ticket-assistance-results hidden'>
         <section>
           <h4>Ticket summary</h4>
@@ -88,6 +93,7 @@
           <textarea id='adminTicketAiDraft' rows='8'></textarea>
           <p id='adminTicketAiAdvisory' class='small'></p>
           <div class='inline-actions'>
+            <button id='saveTicketAiDraftBtn' class='btn btn-primary' type='button'>Save reviewed draft to ticket</button>
             <button id='copyTicketAiDraftBtn' class='btn btn-ghost' type='button'>Copy reviewed draft</button>
           </div>
         </section>

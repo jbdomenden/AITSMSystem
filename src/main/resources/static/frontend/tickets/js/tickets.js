@@ -54,6 +54,24 @@ function focusRequestedTicket() {
   row.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
+function renderRequestedTicketDetails(tickets) {
+  const panel = document.getElementById('selectedTicketDetails');
+  const requestedId = Number(getRequestedTicketId());
+  const ticket = tickets.find((item) => Number(item.id) === requestedId);
+  if (!panel || !ticket) {
+    panel?.classList.add('hidden');
+    return;
+  }
+  panel.classList.remove('hidden');
+  document.getElementById('selectedTicketTitle').textContent = `Ticket #${ticket.id}: ${ticket.title}`;
+  document.getElementById('selectedTicketMeta').textContent = `${ticket.status} • ${ticket.priority} • ${ticket.category}`;
+  document.getElementById('selectedTicketDescription').textContent = ticket.description || 'No description provided.';
+  document.getElementById('selectedTicketResolution').textContent = ticket.reviewedResolution || 'No reviewed resolution has been posted yet.';
+  document.getElementById('selectedTicketResolutionMeta').textContent = ticket.resolutionUpdatedAt
+    ? `Last updated ${parseDate(ticket.resolutionUpdatedAt)?.toLocaleString() || ticket.resolutionUpdatedAt}.`
+    : '';
+}
+
 function toggleRowActionMenu(event, id) {
   event.stopPropagation();
   const menu = document.getElementById(`ticketRowMenu-${id}`);
@@ -159,6 +177,7 @@ async function loadTickets() {
       </tr>`;
     }).join('');
     focusRequestedTicket();
+    renderRequestedTicketDetails(tickets);
   } catch {
     renderTableErrorState(rows, 6, 'Unable to load tickets');
   } finally {

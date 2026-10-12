@@ -133,7 +133,8 @@ Frontend can submit visible final AI output to `/api/ai/create-ticket-draft` and
 - Knowledge recommendations are limited to existing published articles and link back to the read-only library.
 - Possible duplicate tickets use local, explainable matching and never merge or close records automatically.
 - Admins and superadmins can generate a summary, troubleshooting checklist, and editable resolution draft for a selected ticket.
-- AI output never changes priority, assignment, status, approval, access, or ticket data automatically.
+- After human review and confirmation, an admin can save the edited resolution to an active ticket; the requester can then read it from the ticket details view.
+- AI output never changes priority, assignment, status, approval, access, or ticket data automatically. Saving the reviewed resolution is a separate, explicit administrator action.
 - Provider failure or malformed structured output falls back to safe local guidance.
 
 ---

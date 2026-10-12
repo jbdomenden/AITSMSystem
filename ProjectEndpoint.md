@@ -198,6 +198,14 @@ This file lists backend endpoints, what they do, and POST payload examples for q
 { "status": "PENDING" }
 ```
 
+### PUT `/api/tickets/{id}/resolution`
+- Admin/superadmin-only endpoint that saves a human-reviewed resolution on an active ticket.
+- Closed tickets must be reopened before their reviewed resolution can be changed.
+- Example input:
+```json
+{ "resolution": "Verified the display driver update and confirmed normal startup." }
+```
+
 ---
 
 ## Knowledge Base (`/api/knowledge`)

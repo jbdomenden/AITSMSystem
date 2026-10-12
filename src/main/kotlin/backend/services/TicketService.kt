@@ -114,6 +114,26 @@ class TicketService(
         }
     }
 
+    fun updateResolution(id: Int, resolutionValue: String, actor: String, userId: Int?): Ticket? {
+        val existing = repository.get(id) ?: return null
+        require(existing.status != TicketStatus.CLOSED) { "Closed tickets cannot accept a new resolution draft" }
+        val resolution = resolutionValue.trim()
+        require(resolution.isNotBlank()) { "Resolution is required" }
+        require(resolution.length <= 10_000) { "Resolution must not exceed 10,000 characters" }
+
+        return repository.updateResolution(id, resolution, actor)?.also { updated ->
+            audit.log(userId, "Saved reviewed resolution for ticket #$id", "tickets")
+            notifications.pushOncePerTicketEvent(
+                userId = updated.userId,
+                eventType = "ticket_resolution_updated",
+                ticketId = updated.id,
+                title = "Ticket Resolution Updated",
+                message = "A reviewed resolution was saved for ticket #${updated.id}",
+                occurrenceKey = updated.resolutionUpdatedAt ?: updated.updatedAt
+            )
+        }
+    }
+
     private fun parseStatus(raw: String): TicketStatus {
         val normalized = raw.trim().lowercase()
         return when (normalized) {

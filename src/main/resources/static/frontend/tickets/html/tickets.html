@@ -32,6 +32,21 @@
         </table>
       </div>
     </section>
+
+    <section id='selectedTicketDetails' class='card hidden' aria-live='polite'>
+      <div class='card-head'>
+        <div>
+          <p class='page-kicker'>Ticket details</p>
+          <h3 id='selectedTicketTitle' class='section-title'></h3>
+          <p id='selectedTicketMeta' class='section-subtitle'></p>
+        </div>
+      </div>
+      <h4>Reported issue</h4>
+      <div id='selectedTicketDescription' class='ai-review-copy'></div>
+      <h4>Reviewed resolution</h4>
+      <div id='selectedTicketResolution' class='ai-review-copy'></div>
+      <p id='selectedTicketResolutionMeta' class='small'></p>
+    </section>
   </main>
 </div>
 <script src='/modules/sidebar/js/user-shell.js'></script><script src='/modules/common/js/app.js'></script><script src='/modules/common/js/help.js'></script><script src='/modules/common/js/table-skeleton.js'></script><script src='/tickets/js/tickets.js'></script>
