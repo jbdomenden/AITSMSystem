@@ -25,4 +25,13 @@ class LiveDeviceSelectionTest {
         val observed = reading("LAN_OBSERVED", telemetry = false, stale = false)
         assertEquals(observed, preferredLiveDevicesByIp(listOf(staleAgent, observed))["192.168.1.51"])
     }
+
+    @Test fun `duplicate readings for one ip collapse to the best live device`() {
+        val observed = reading("LAN_OBSERVED", telemetry = false, stale = false)
+        val agent = reading("COLLECTOR_AGENT", telemetry = true, stale = false, cpu = 31.0)
+        val devices = deduplicatedLiveDevices(listOf(observed, agent))
+
+        assertEquals(1, devices.size)
+        assertEquals(agent, devices.single())
+    }
 }

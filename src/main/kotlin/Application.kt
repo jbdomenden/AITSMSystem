@@ -212,7 +212,11 @@ fun Application.module() {
             get("/${resourcePath}") { call.redirectKeepingQuery(cleanPath, permanent = true) }
         }
         get("/api/health") {
-            call.respond(mapOf("status" to "ok"))
+            call.respond(mapOf(
+                "status" to "ok",
+                "environment" to (Env.get("DEPLOYMENT_ENV")?.lowercase() ?: "production"),
+                "application" to (Env.get("COMPANY_NAME") ?: "AITSM")
+            ))
         }
         get("/metrics") {
             if (!call.requirePermission(Permission.SECURITY_MANAGE)) return@get
@@ -292,6 +296,9 @@ internal fun validateRuntimeConfiguration(appEnv: String, value: (String) -> Str
     require((value("SMTP_PORT")?.toIntOrNull() ?: 0) in 1..65535) { "SMTP_PORT must be a valid TCP port" }
     require(value("SMTP_STARTTLS").equals("true", true)) { "SMTP_STARTTLS must be true in production" }
     require((value("AI_PROVIDER") ?: "gemini").equals("gemini", true)) { "AI_PROVIDER must be gemini" }
+    require((value("DEPLOYMENT_ENV") ?: "production").lowercase() in setOf("production", "beta")) {
+        "DEPLOYMENT_ENV must be production or beta"
+    }
 
     if (value("BOOTSTRAP_SUPERADMIN").equals("true", true)) {
         require(!value("SUPERADMIN_EMAIL").isNullOrBlank()) { "SUPERADMIN_EMAIL is required for bootstrap" }

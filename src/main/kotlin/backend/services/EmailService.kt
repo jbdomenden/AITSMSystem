@@ -21,10 +21,12 @@ class EmailService private constructor(
     private val replyToAddress: String?
 ) {
     private val logger = LoggerFactory.getLogger(EmailService::class.java)
+    private val environmentPrefix = if (Env.get("DEPLOYMENT_ENV").equals("beta", true)) "[AITSM BETA] " else ""
+    private val environmentNotice = if (environmentPrefix.isNotEmpty()) "\n\nThis message was sent from the AITSM beta environment. Do not treat beta activity as production activity." else ""
 
     fun sendPasswordReset(recipient: String, resetUrl: String): Boolean = sendPlain(
         recipient, "Reset your AITSM password",
-        "A password reset was requested for your AITSM account. This single-use link expires in 30 minutes:\n\n$resetUrl\n\nIf you did not request this, ignore this message."
+        "A password reset was requested for your AITSM account. This single-use link expires in 30 minutes:\n\n$resetUrl\n\nIf you did not request this, ignore this message.$environmentNotice"
     )
 
     fun sendPasswordChanged(recipient: String): Boolean = sendPlain(
@@ -39,7 +41,7 @@ class EmailService private constructor(
     private fun sendPlain(recipient: String, subjectLine: String, body: String): Boolean = runCatching {
         val message = MimeMessage(session).apply {
             setFrom(InternetAddress(fromAddress, fromName)); setRecipients(Message.RecipientType.TO, InternetAddress.parse(recipient, false))
-            subject = subjectLine; sentDate = Date(); setHeader("Auto-Submitted", "auto-generated")
+            subject = environmentPrefix + subjectLine; sentDate = Date(); setHeader("Auto-Submitted", "auto-generated")
             replyToAddress?.let { replyTo = arrayOf(InternetAddress(it)) }; setText(body, "UTF-8")
         }
         Transport.send(message); true
@@ -49,11 +51,11 @@ class EmailService private constructor(
         val message = MimeMessage(session).apply {
             setFrom(InternetAddress(fromAddress, fromName))
             setRecipients(Message.RecipientType.TO, InternetAddress.parse(recipient, false))
-            subject = "Your AITSM invitation"
+            subject = environmentPrefix + "Your AITSM invitation"
             sentDate = Date()
             setHeader("Auto-Submitted", "auto-generated")
             replyToAddress?.let { replyTo = arrayOf(InternetAddress(it)) }
-            setText("You have been invited to AITSM. This single-use link expires in 24 hours:\n\n$invitationUrl\n\nIf you did not expect this invitation, ignore this message.", "UTF-8")
+            setText("You have been invited to AITSM. This single-use link expires in 24 hours:\n\n$invitationUrl\n\nIf you did not expect this invitation, ignore this message.$environmentNotice", "UTF-8")
         }
         Transport.send(message)
         logger.info("Invitation email sent to {}", recipient)
@@ -65,7 +67,7 @@ class EmailService private constructor(
         val message = MimeMessage(session).apply {
             setFrom(InternetAddress(fromAddress, fromName))
             setRecipients(Message.RecipientType.TO, InternetAddress.parse(recipient, false))
-            subject = "Verify your AITSM account"
+            subject = environmentPrefix + "Verify your AITSM account"
             sentDate = Date()
             setHeader("Auto-Submitted", "auto-generated")
             setHeader("X-Auto-Response-Suppress", "All")

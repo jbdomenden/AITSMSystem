@@ -14,6 +14,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 
 /** Hosted Gemini integration. The API key is read only on the server. */
@@ -32,24 +33,29 @@ class GeminiProvider : AIProvider {
             "$speaker:\n${message.content}"
         }
         val payload = buildJsonObject {
-            put("model", model)
-            put("input", input)
-            put("store", false)
-            if (system.isNotBlank()) put("system_instruction", system)
-            putJsonObject("generation_config") {
+            if (system.isNotBlank()) putJsonObject("systemInstruction") {
+                putJsonArray("parts") { add(buildJsonObject { put("text", system) }) }
+            }
+            putJsonArray("contents") {
+                add(buildJsonObject {
+                    put("role", "user")
+                    putJsonArray("parts") { add(buildJsonObject { put("text", input) }) }
+                })
+            }
+            putJsonObject("generationConfig") {
                 put("temperature", 0.35)
-                put("thinking_level", "low")
-                put("max_output_tokens", 1_000)
+                put("maxOutputTokens", 1_000)
             }
         }
-        return execute(key, timeoutMillis, payload.toString())
+        return execute(key, model, timeoutMillis, payload.toString())
     }
 
     override fun testConnection(model: String, timeoutMillis: Long): AIProviderResult =
         chat(model, minOf(timeoutMillis, 15_000L), listOf(AIMessage("user", "Reply exactly: OK")))
 
-    private fun execute(key: String, timeoutMillis: Long, payload: String): AIProviderResult = try {
-        val request = HttpRequest.newBuilder(URI("https://generativelanguage.googleapis.com/v1beta/interactions"))
+    private fun execute(key: String, model: String, timeoutMillis: Long, payload: String): AIProviderResult = try {
+        val modelName = model.removePrefix("models/")
+        val request = HttpRequest.newBuilder(URI("https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent"))
             .timeout(Duration.ofMillis(timeoutMillis))
             .header("Content-Type", "application/json")
             .header("x-goog-api-key", key)
@@ -68,13 +74,11 @@ class GeminiProvider : AIProvider {
         } else {
             val text = runCatching {
                 json.parseToJsonElement(response.body())
-                    .jsonObject["steps"]
+                    .jsonObject["candidates"]
                     ?.jsonArray
                     ?.asSequence()
-                    ?.mapNotNull { step ->
-                        val stepObject = step.jsonObject
-                        if (stepObject["type"]?.jsonPrimitive?.contentOrNull != "model_output") return@mapNotNull null
-                        stepObject["content"]?.jsonArray?.joinToString("") { part ->
+                    ?.mapNotNull { candidate ->
+                        candidate.jsonObject["content"]?.jsonObject?.get("parts")?.jsonArray?.joinToString("") { part ->
                             part.jsonObject["text"]?.jsonPrimitive?.contentOrNull.orEmpty()
                         }
                     }

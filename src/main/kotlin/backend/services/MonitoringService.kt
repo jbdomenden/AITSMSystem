@@ -1,5 +1,7 @@
 package backend.services
 
+import backend.config.Env
+
 import backend.models.CollectorDeviceReport
 import backend.models.CollectorEnrollmentRequest
 import backend.models.CollectorPackageRequest
@@ -43,7 +45,10 @@ class MonitoringService(
         val name = request.name.trim()
         require(site.matches(Regex("[A-Za-z0-9][A-Za-z0-9._-]{0,99}"))) { "Site id is invalid." }
         require(name.isNotBlank() && name.length <= 150) { "Collector name is required and must be 150 characters or fewer." }
-        repository.createEnrollmentCode(userId, scope, site, name)
+        repository.createEnrollmentCode(userId, scope, site, name).copy(
+            environment = Env.get("DEPLOYMENT_ENV")?.trim()?.lowercase() ?: "production",
+            baseUrl = Env.get("APP_BASE_URL")?.trim()?.removeSuffix("/").orEmpty()
+        )
     }
     fun redeemPackage(code: String): CollectorRedeemResponse? = repository.redeemEnrollmentCode(
         code.trim(), assetDetectionService.getConfiguredPrivateCidrs()
@@ -51,7 +56,7 @@ class MonitoringService(
     fun canDownloadPackage(code: String, userId: Int) = repository.enrollmentCodeBelongsTo(code.trim(), userId)
     fun revoke(rawId: String): Boolean = repository.revoke(UUID.fromString(rawId))
     fun revokeOwned(rawId: String, userId: Int): Boolean = repository.revokeOwned(UUID.fromString(rawId), userId)
-    fun devices() = repository.devices()
+    fun devices() = deduplicatedLiveDevices(repository.devices())
     fun lanDevices() = devices()
     fun lanPeerIps() = devices().map { it.ipAddress }.distinct().sorted()
     fun cpu() = devices().filter { it.telemetryAvailable }.map { mapOf("device" to it.hostname, "cpu" to (it.cpuUsagePercent?.toString() ?: "unavailable")) }
@@ -146,9 +151,12 @@ class MonitoringService(
 }
 
 internal fun preferredLiveDevicesByIp(devices: List<backend.models.LanDeviceDto>): Map<String, backend.models.LanDeviceDto> =
+    deduplicatedLiveDevices(devices).associateBy { it.ipAddress }
+
+internal fun deduplicatedLiveDevices(devices: List<backend.models.LanDeviceDto>): List<backend.models.LanDeviceDto> =
     devices.filter { it.telemetrySourceType != "HOST" }
         .groupBy { it.ipAddress }
-        .mapValues { (_, readings) ->
+        .map { (_, readings) ->
             readings.firstOrNull { it.telemetryAvailable && !it.stale }
                 ?: readings.firstOrNull { it.reachable && !it.stale }
                 ?: readings.first()

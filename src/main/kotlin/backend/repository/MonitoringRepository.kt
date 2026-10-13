@@ -157,9 +157,16 @@ class MonitoringRepository(private val clock: Clock = Clock.systemUTC()) {
                 lastSeen.toInstant(ZoneOffset.UTC).isAfter(instantNow.minusSeconds(600)) -> "STALE"
                 else -> "OFFLINE"
             }
+            val statusReason = when (state) {
+                "REVOKED" -> "Credential revoked. This collector can no longer submit telemetry."
+                "NEVER_CONNECTED" -> "Enrollment completed, but no telemetry report has been received."
+                "ONLINE" -> "Telemetry received within the last two minutes."
+                "STALE" -> "No telemetry received for more than two minutes."
+                else -> "No telemetry received for more than ten minutes. Check the Windows service, network access, and embedded environment address."
+            }
             CollectorView(row[MonitoringCollectorsTable.id].toString(), row[MonitoringCollectorsTable.siteId], row[MonitoringCollectorsTable.name], state,
                 iso(row[MonitoringCollectorsTable.enrolledAt])!!, iso(lastSeen), iso(row[MonitoringCollectorsTable.revokedAt]),
-                row[MonitoringCollectorsTable.scope], row[MonitoringCollectorsTable.ownerUserId])
+                row[MonitoringCollectorsTable.scope], row[MonitoringCollectorsTable.ownerUserId], statusReason)
         }
     }
 

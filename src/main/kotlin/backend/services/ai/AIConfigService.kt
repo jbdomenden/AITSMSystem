@@ -30,6 +30,7 @@ class AIConfigService(config: ApplicationConfig) {
     fun update(request: AIConfigUpdateRequest): AIConfigResponse {
         val model = request.model.trim()
         require(model.isNotBlank()) { "Model selection is required" }
+        require(model.matches(Regex("(?:models/)?[A-Za-z0-9][A-Za-z0-9._-]{1,99}"))) { "Model selection is invalid" }
 
         val updated = state.updateAndGet { it.copy(model = model) }
         return AIConfigResponse(updated.provider, updated.model, updated.timeoutMillis)

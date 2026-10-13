@@ -19,6 +19,26 @@ function useCanonicalPageUrl() {
 
 useCanonicalPageUrl();
 
+async function mountEnvironmentBadge() {
+  try {
+    const response = await fetch('/api/health', { credentials: 'same-origin' });
+    if (!response.ok) return;
+    const health = await response.json();
+    const environment = String(health.environment || 'production').toLowerCase();
+    window.aitsmEnvironment = environment;
+    if (environment !== 'beta' || document.getElementById('environmentBadge')) return;
+    const badge = document.createElement('div');
+    badge.id = 'environmentBadge';
+    badge.className = 'environment-badge';
+    badge.setAttribute('role', 'status');
+    badge.textContent = 'BETA · TEST DATA';
+    document.body.appendChild(badge);
+    if (!document.title.startsWith('[BETA]')) document.title = `[BETA] ${document.title}`;
+  } catch { /* Environment labeling must not block the application. */ }
+}
+
+document.addEventListener('DOMContentLoaded', mountEnvironmentBadge, { once: true });
+
 function aitsmEscapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'

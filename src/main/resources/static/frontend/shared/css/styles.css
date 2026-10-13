@@ -32,6 +32,23 @@ body {
 
 a { text-decoration: none; color: inherit; }
 .text-primary { color: var(--primary); }
+.environment-badge {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  z-index: 3000;
+  transform: translateX(-50%);
+  padding: 7px 14px;
+  border: 1px solid #f59e0b;
+  border-radius: 999px;
+  background: #fff7d6;
+  color: #92400e;
+  box-shadow: 0 8px 24px rgba(146, 64, 14, .2);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  pointer-events: none;
+}
 
 .app-layout { min-height: 100vh; height: 100vh; display: grid; grid-template-columns: minmax(0, var(--sidebar-width)) minmax(0, 1fr); padding-top: var(--topbar-height); overflow: hidden; transition: grid-template-columns .3s ease; }
 .sidebar {

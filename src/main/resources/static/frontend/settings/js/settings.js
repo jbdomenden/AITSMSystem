@@ -80,7 +80,8 @@ async function downloadCollectorInstaller() {
     if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || 'Installer download failed'); }
     const url = URL.createObjectURL(await response.blob());
     const link = document.createElement('a'); link.href = url; link.download = collectorFilename(response); document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
-    status.textContent = `Installer downloaded. Run it within 10 minutes (${enrollment.scope} scope).`; status.className = 'small text-success';
+    const target = enrollment.baseUrl || window.location.origin;
+    status.textContent = `Installer downloaded for ${String(enrollment.environment || 'production').toUpperCase()} (${target}, ${enrollment.scope} scope). Run it within 10 minutes.`; status.className = 'small text-success';
   } catch (error) { status.textContent = error.message || 'Unable to create installer.'; status.className = 'small text-danger'; }
   finally { button.disabled = false; }
 }
@@ -88,7 +89,7 @@ async function downloadCollectorInstaller() {
 async function loadCollectors() {
   const rows = document.getElementById('collectorRows');
   const collectors = await fetchJsonOrThrow('/api/monitoring/collectors');
-  rows.innerHTML = collectors.length ? collectors.map(item => `<tr><td>${aitsmEscapeHtml(item.name)}</td><td>${aitsmEscapeHtml(item.scope)}</td><td><span class='badge ${item.state === 'ONLINE' ? 'resolved' : 'warning'}'>${aitsmEscapeHtml(item.state)}</span></td><td>${aitsmEscapeHtml(item.lastSeenAt ? new Date(item.lastSeenAt).toLocaleString() : 'Never')}</td><td>${item.state === 'REVOKED' ? '-' : `<button class='btn btn-ghost' type='button' onclick='revokeCollector("${item.collectorId}")'>Revoke</button>`}</td></tr>`).join('') : `<tr><td colspan='5'>No collectors enrolled.</td></tr>`;
+  rows.innerHTML = collectors.length ? collectors.map(item => `<tr><td>${aitsmEscapeHtml(item.name)}<div class='small'>${aitsmEscapeHtml(item.statusReason || '')}</div></td><td>${aitsmEscapeHtml(item.scope)}</td><td><span class='badge ${item.state === 'ONLINE' ? 'resolved' : 'warning'}'>${aitsmEscapeHtml(item.state)}</span></td><td>${aitsmEscapeHtml(item.lastSeenAt ? new Date(item.lastSeenAt).toLocaleString() : 'Never')}</td><td>${item.state === 'REVOKED' ? '-' : `<button class='btn btn-ghost' type='button' onclick='revokeCollector("${item.collectorId}")'>Revoke</button>`}</td></tr>`).join('') : `<tr><td colspan='5'>No collectors enrolled.</td></tr>`;
 }
 
 async function revokeCollector(id) {

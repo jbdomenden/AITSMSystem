@@ -89,7 +89,8 @@ async function downloadMyCollector() {
     const filename = disposition.match(/filename="([^"]+)"/i)?.[1] || 'AITSMCollectorSetup.exe';
     const url = URL.createObjectURL(await download.blob());
     const link = document.createElement('a'); link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
-    status.textContent = 'Downloaded. Run the installer within 10 minutes and approve the Windows prompt.'; status.className = 'small text-success';
+    const target = enrollment.baseUrl || window.location.origin;
+    status.textContent = `Downloaded for ${String(enrollment.environment || 'production').toUpperCase()} (${target}). Run the installer within 10 minutes and approve the Windows prompt.`; status.className = 'small text-success';
   } catch (error) { status.textContent = error.message || 'Unable to download collector.'; status.className = 'small text-danger'; }
   finally { button.disabled = false; }
 }
@@ -99,7 +100,7 @@ async function loadMyCollectors() {
   const response = await fetch('/api/monitoring/my-collectors', { headers: authHeaders() });
   const collectors = await response.json();
   if (!response.ok) throw new Error(collectors.error || 'Unable to load collectors');
-  target.innerHTML = collectors.length ? collectors.map(item => `<div class='insight-item'><div><strong>${aitsmEscapeHtml(item.name)}</strong><div class='small'>${aitsmEscapeHtml(item.state)} · ${item.lastSeenAt ? aitsmEscapeHtml(formatDateTime(item.lastSeenAt)) : 'Never connected'}</div></div>${item.state === 'REVOKED' ? '' : `<button class='btn btn-ghost' type='button' onclick='revokeMyCollector("${item.collectorId}")'>Remove</button>`}</div>`).join('') : `<p class='small'>No collector installed for your account.</p>`;
+  target.innerHTML = collectors.length ? collectors.map(item => `<div class='insight-item'><div><strong>${aitsmEscapeHtml(item.name)}</strong><div class='small'>${aitsmEscapeHtml(item.state)} · ${item.lastSeenAt ? aitsmEscapeHtml(formatDateTime(item.lastSeenAt)) : 'Never connected'}</div><div class='small'>${aitsmEscapeHtml(item.statusReason || '')}</div></div>${item.state === 'REVOKED' ? '' : `<button class='btn btn-ghost' type='button' onclick='revokeMyCollector("${item.collectorId}")'>Remove</button>`}</div>`).join('') : `<p class='small'>No collector installed for your account.</p>`;
 }
 
 async function revokeMyCollector(id) {
