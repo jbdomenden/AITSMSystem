@@ -50,4 +50,18 @@ class FrontendSafetyContractTest {
         assertTrue(frontend.contains("aria-label='Actions'>...</button>"))
         assertFalse(frontend.contains("if (!items.length) return '-'"))
     }
+
+    @Test fun `account creation is presented only through verified invitations`() {
+        val login = Files.readString(Path.of("src/main/resources/static/frontend/login/html/login.html"))
+        val loginScript = Files.readString(Path.of("src/main/resources/static/frontend/login/js/auth.js"))
+        val invitation = Files.readString(Path.of("src/main/resources/static/frontend/signup/html/signup.html"))
+        val invitationScript = Files.readString(Path.of("src/main/resources/static/frontend/signup/js/auth.js"))
+        assertFalse(login.contains("href='/signup'"))
+        assertFalse(loginScript.contains("/api/auth/register"))
+        assertTrue(invitation.contains("Accept your invitation"))
+        assertTrue(invitation.contains("id='invitationAcceptanceForm' hidden"))
+        assertTrue(invitationScript.contains("/api/auth/invitations/inspect"))
+        assertTrue(invitationScript.contains("form.hidden = false"))
+        assertFalse(invitationScript.contains("/api/auth/register"))
+    }
 }
