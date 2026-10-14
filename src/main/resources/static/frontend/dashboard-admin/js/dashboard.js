@@ -4,6 +4,7 @@ const dashboardState = {
   lanDevices: [],
   notifications: [],
   inventoryStats: null,
+  slaAnalytics: null,
   trend: {
     view: 'monthly',
     month: 'all',
@@ -68,6 +69,33 @@ function statusBadgeClass(status) {
 
 function fetchJsonOrThrow(url, options = {}) {
   return window.aitsmFetchJson(url, options);
+}
+
+function renderSlaIntelligence() {
+  const analytics = dashboardState.slaAnalytics || {};
+  const summary = document.getElementById('slaAnalyticsSummary');
+  if (summary) {
+    const cards = [
+      ['Response compliance', `${Number(analytics.responseCompliancePercent || 0).toFixed(1)}%`, `${Number(analytics.responseMet || 0)} met / ${Number(analytics.responseMeasured || 0)} measured`],
+      ['Resolution compliance', `${Number(analytics.resolutionCompliancePercent || 0).toFixed(1)}%`, `${Number(analytics.resolutionMet || 0)} met / ${Number(analytics.resolutionMeasured || 0)} measured`],
+      ['Active breaches', Number(analytics.activeBreaches || 0), 'Response or resolution deadline exceeded'],
+      ['High AI risk', Number(analytics.activeHighRisk || 0), 'High or critical predicted breach risk'],
+      ['Prediction precision', `${Number(analytics.highRiskPrecisionPercent || 0).toFixed(1)}%`, `${Number(analytics.predictionSamples || 0)} completed high-risk samples`]
+    ];
+    summary.innerHTML = cards.map(([label, value, hint]) => `<div class='insight-item'><div class='small'>${escapeHtml(label)}</div><strong>${escapeHtml(value)}</strong><div class='small'>${escapeHtml(hint)}</div></div>`).join('');
+  }
+
+  const riskTarget = document.getElementById('slaRiskTickets');
+  if (!riskTarget) return;
+  const risky = dashboardState.tickets
+    .filter(ticket => !['resolved', 'closed'].includes(normalizeTicketStatus(ticket.status)))
+    .sort((a, b) => Number(b.slaRiskScore || 0) - Number(a.slaRiskScore || 0))
+    .slice(0, 6);
+  riskTarget.innerHTML = risky.length ? risky.map(ticket => `
+    <a class='notification-item' href='/ticket-management?ticketId=${encodeURIComponent(ticket.id)}'>
+      <div><strong>#${Number(ticket.id)} · ${escapeHtml(ticket.slaRiskLevel || 'LOW')} risk (${Number(ticket.slaRiskScore || 0)}%)</strong>
+      <div class='small'>${escapeHtml((ticket.slaRiskReasons || []).slice(0, 2).join(' · '))}</div></div>
+    </a>`).join('') : `<div class='empty-state'><h3>No active SLA risks</h3><p>Risk predictions will appear as tickets enter the support queue.</p></div>`;
 }
 
 function monthKey(date) {
@@ -617,12 +645,13 @@ async function loadAdminDashboard() {
   if (recentRows) showTableSkeleton(recentRows, { rowCount: 6, columnCount: 5 });
 
   try {
-    const [ticketsPayload, monitorSummary, lanDevices, notifications, inventoryStats] = await Promise.all([
+    const [ticketsPayload, monitorSummary, lanDevices, notifications, inventoryStats, slaAnalytics] = await Promise.all([
       window.aitsmFetchAllPaginated('/api/tickets'),
       fetchJsonOrThrow('/api/monitoring/summary'),
       fetchJsonOrThrow('/api/monitoring/lan-devices'),
       fetchJsonOrThrow('/api/notifications'),
-      fetchJsonOrThrow('/api/inventory/stats')
+      fetchJsonOrThrow('/api/inventory/stats'),
+      fetchJsonOrThrow('/api/sla/analytics')
     ]);
 
     dashboardState.tickets = normalizeTicketList(ticketsPayload);
@@ -630,6 +659,7 @@ async function loadAdminDashboard() {
     dashboardState.lanDevices = Array.isArray(lanDevices) ? lanDevices : [];
     dashboardState.notifications = Array.isArray(notifications) ? notifications : [];
     dashboardState.inventoryStats = inventoryStats || null;
+    dashboardState.slaAnalytics = slaAnalytics || null;
 
     renderMetricCards();
 
@@ -638,6 +668,7 @@ async function loadAdminDashboard() {
 
     applyTrendRendering();
     renderOperationalReport();
+    renderSlaIntelligence();
 
     renderSystemPerformance();
 

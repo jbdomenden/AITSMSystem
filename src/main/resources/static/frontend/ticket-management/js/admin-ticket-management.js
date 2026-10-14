@@ -325,7 +325,7 @@ function renderAdminTicketRows() {
   renderAdminTicketCount(visible.length, adminTicketState.tickets.length);
 
   if (!visible.length) {
-    renderTableEmptyState(rows, 8, 'No tickets matched the selected filters.');
+    renderTableEmptyState(rows, 9, 'No tickets matched the selected filters.');
     return;
   }
 
@@ -337,6 +337,7 @@ function renderAdminTicketRows() {
       <td>${escapeHtml(ticket.category || '-')}</td>
       <td>${escapeHtml(ticket.priority || '-')}</td>
       <td><span class='badge ${badge(ticket.status)}'>${statusLabel(ticket.status)}</span></td>
+      <td><span class='badge ${ticket.slaRiskLevel === 'CRITICAL' || ticket.slaRiskLevel === 'HIGH' ? 'warning' : 'resolved'}' title='${escapeHtml((ticket.slaRiskReasons || []).join('; '))}'>${escapeHtml(ticket.slaRiskLevel || 'LOW')} ${Number(ticket.slaRiskScore || 0)}%</span></td>
       <td>${formatDate(ticket.updatedAt || ticket.createdAt)}</td>
       <td>${actionMenu(ticket)}</td>
     </tr>
@@ -349,7 +350,7 @@ async function loadAdminTicketManagement() {
   const rows = document.getElementById('adminTicketRows');
   if (!rows) return;
 
-  showTableSkeleton(rows, { rowCount: 8, columnCount: 8, hasActions: true });
+  showTableSkeleton(rows, { rowCount: 8, columnCount: 9, hasActions: true });
 
   try {
     const [ticketsData, usersRes] = await Promise.all([
@@ -360,7 +361,7 @@ async function loadAdminTicketManagement() {
     const usersData = await usersRes.json();
 
     if (!usersRes.ok) {
-      renderTableErrorState(rows, 8, usersData.error || 'Unable to load requester data');
+      renderTableErrorState(rows, 9, usersData.error || 'Unable to load requester data');
       return;
     }
 
@@ -371,7 +372,7 @@ async function loadAdminTicketManagement() {
     renderAdminTicketRows();
     renderAdminTicketAiContext();
   } catch {
-    renderTableErrorState(rows, 8, 'Unable to load tickets');
+    renderTableErrorState(rows, 9, 'Unable to load tickets');
   } finally {
     clearTableSkeleton(rows);
   }

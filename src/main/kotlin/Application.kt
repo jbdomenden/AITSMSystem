@@ -152,6 +152,7 @@ fun Application.module() {
     container.knowledgeRepo.seedDefaults()
     container.aiChatService.startupLog()
     container.slaService.seedDefaults()
+    container.slaAutomationService.start(this)
 
     val superAdminEmail = Env.get("SUPERADMIN_EMAIL")?.takeIf { it.isNotBlank() }
     val superAdminPassword = Env.get("SUPERADMIN_PASSWORD")?.takeIf { it.isNotBlank() }
@@ -228,7 +229,7 @@ fun Application.module() {
         staticResources("/", "static/frontend")
         authRoutes(container.authService, container.sessionService, container.invitationService, container.mfaService, container.reauthenticationService)
         profilePhotoRoutes(container.profilePhotoService)
-        ticketRoutes(container.ticketService)
+        ticketRoutes(container.ticketService, container.slaAutomationService)
         monitoringRoutes(container.monitoringService, container.deviceRepo, container.assetDetectionService, container.inventoryService)
         analyticsRoutes(container.ticketService, container.monitoringService, container.aiService)
         deviceRoutes(container.deviceRepo, container.userRepo, container.monitoringService, container.assetDetectionService, container.inventoryService)
@@ -236,7 +237,7 @@ fun Application.module() {
         colleagueRoutes(container.colleagueService)
         knowledgeRoutes(container.knowledgeService)
         inventoryRoutes(container.inventoryService, container.reauthenticationService)
-        slaRoutes(container.slaService, container.reauthenticationService)
+        slaRoutes(container.slaService, container.ticketService, container.reauthenticationService)
         settingsRoutes(container.assetDetectionService, container.reauthenticationService)
         aiRoutes(container.aiChatService, container.aiConfigService, container.ticketAiAdvisor, container.reauthenticationService)
         auditRoutes(container.auditRepo)

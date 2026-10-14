@@ -78,6 +78,20 @@ CREATE TABLE IF NOT EXISTS tickets (
   category VARCHAR(80) NOT NULL,
   status VARCHAR(30) NOT NULL,
   assigned_to VARCHAR(150),
+  reviewed_resolution TEXT,
+  resolution_updated_by VARCHAR(150),
+  resolution_updated_at TIMESTAMP,
+  sla_response_target_minutes INT,
+  sla_resolution_target_minutes INT,
+  sla_response_due_at TIMESTAMP,
+  sla_resolution_due_at TIMESTAMP,
+  sla_first_response_at TIMESTAMP,
+  sla_resolved_at TIMESTAMP,
+  sla_response_warning_level INT NOT NULL DEFAULT 0,
+  sla_resolution_warning_level INT NOT NULL DEFAULT 0,
+  sla_response_breached_at TIMESTAMP,
+  sla_resolution_breached_at TIMESTAMP,
+  sla_reopened_count INT NOT NULL DEFAULT 0,
   device_id INT REFERENCES devices(id),
   created_at TIMESTAMP NOT NULL,
   updated_at TIMESTAMP NOT NULL
@@ -110,6 +124,16 @@ CREATE TABLE IF NOT EXISTS sla_policies (
   priority VARCHAR(20) NOT NULL,
   response_time INT NOT NULL,
   resolution_time INT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sla_risk_predictions (
+  id BIGSERIAL PRIMARY KEY,
+  ticket_id INT NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+  score INT NOT NULL,
+  level VARCHAR(20) NOT NULL,
+  reasons TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL,
+  UNIQUE(ticket_id, level)
 );
 
 CREATE TABLE IF NOT EXISTS monitoring_collectors (

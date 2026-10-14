@@ -1,6 +1,7 @@
 package backend.repository
 
 import backend.config.SLAPoliciesTable
+import backend.config.SlaRiskPredictionsTable
 import backend.config.TicketHistoryTable
 import backend.config.TicketsTable
 import backend.models.Ticket
@@ -8,8 +9,12 @@ import backend.models.TicketHistoryEvent
 import backend.models.TicketRequest
 import backend.models.TicketStatus
 import org.jetbrains.exposed.sql.ResultRow
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.insertIgnore
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
@@ -19,6 +24,7 @@ import java.time.LocalDateTime
 class TicketRepository {
     fun create(userId: Int, req: TicketRequest): Ticket = transaction {
         val now = LocalDateTime.now()
+        val (responseTarget, resolutionTarget) = policyTargets(req.priority)
         val id = TicketsTable.insert {
             it[TicketsTable.userId] = userId
             it[title] = req.title
@@ -29,6 +35,17 @@ class TicketRepository {
             it[deviceId] = req.deviceId
             it[createdAt] = now
             it[updatedAt] = now
+            it[slaResponseTargetMinutes] = responseTarget
+            it[slaResolutionTargetMinutes] = resolutionTarget
+            it[slaResponseDueAt] = now.plusMinutes(responseTarget.toLong())
+            it[slaResolutionDueAt] = now.plusMinutes(resolutionTarget.toLong())
+            it[slaFirstResponseAt] = null
+            it[slaResolvedAt] = null
+            it[slaResponseWarningLevel] = 0
+            it[slaResolutionWarningLevel] = 0
+            it[slaResponseBreachedAt] = null
+            it[slaResolutionBreachedAt] = null
+            it[slaReopenedCount] = 0
         }[TicketsTable.id]
 
         TicketHistoryTable.insert {
@@ -65,6 +82,9 @@ class TicketRepository {
     }
 
     fun update(id: Int, req: TicketRequest): Ticket? = transaction {
+        val existing = TicketsTable.selectAll().where { TicketsTable.id eq id }.singleOrNull() ?: return@transaction null
+        val priorityChanged = existing[TicketsTable.priority] != req.priority
+        val (responseTarget, resolutionTarget) = policyTargets(req.priority)
         TicketsTable.update({ TicketsTable.id eq id }) {
             it[title] = req.title
             it[description] = req.description
@@ -72,15 +92,45 @@ class TicketRepository {
             it[category] = req.category
             it[deviceId] = req.deviceId
             it[updatedAt] = LocalDateTime.now()
+            if (priorityChanged) {
+                it[slaResponseTargetMinutes] = responseTarget
+                it[slaResolutionTargetMinutes] = resolutionTarget
+                it[slaResponseDueAt] = existing[TicketsTable.createdAt].plusMinutes(responseTarget.toLong())
+                it[slaResolutionDueAt] = existing[TicketsTable.createdAt].plusMinutes(resolutionTarget.toLong())
+                it[slaResponseWarningLevel] = 0
+                it[slaResolutionWarningLevel] = 0
+            }
         }
         get(id)
     }
 
-    fun updateStatus(id: Int, newStatus: String, updatedBy: String): Ticket? = transaction {
+    fun updateStatus(id: Int, newStatus: String, updatedBy: String, recordFirstResponse: Boolean = false): Ticket? = transaction {
         val now = LocalDateTime.now()
+        val existing = TicketsTable.selectAll().where { TicketsTable.id eq id }.singleOrNull() ?: return@transaction null
+        val oldStatus = runCatching { TicketStatus.valueOf(existing[TicketsTable.status]) }.getOrDefault(TicketStatus.OPEN)
+        val nextStatus = runCatching { TicketStatus.valueOf(newStatus) }.getOrDefault(TicketStatus.OPEN)
+        val reopening = oldStatus in setOf(TicketStatus.RESOLVED, TicketStatus.CLOSED) && nextStatus in setOf(TicketStatus.OPEN, TicketStatus.PENDING)
         TicketsTable.update({ TicketsTable.id eq id }) {
             it[status] = newStatus
             it[updatedAt] = now
+            if (recordFirstResponse && existing[TicketsTable.slaFirstResponseAt] == null) {
+                it[slaFirstResponseAt] = now
+                val responseDueAt = existing[TicketsTable.slaResponseDueAt]
+                if (responseDueAt != null && now.isAfter(responseDueAt) && existing[TicketsTable.slaResponseBreachedAt] == null) {
+                    it[slaResponseBreachedAt] = now
+                }
+            }
+            if (nextStatus in setOf(TicketStatus.RESOLVED, TicketStatus.CLOSED) && existing[TicketsTable.slaResolvedAt] == null) {
+                it[slaResolvedAt] = now
+                val resolutionDueAt = existing[TicketsTable.slaResolutionDueAt]
+                if (resolutionDueAt != null && now.isAfter(resolutionDueAt) && existing[TicketsTable.slaResolutionBreachedAt] == null) {
+                    it[slaResolutionBreachedAt] = now
+                }
+            }
+            if (reopening) {
+                it[slaResolvedAt] = null
+                it[slaReopenedCount] = existing[TicketsTable.slaReopenedCount] + 1
+            }
         }
         TicketHistoryTable.insert {
             it[ticketId] = id
@@ -89,6 +139,57 @@ class TicketRepository {
             it[timestamp] = now
         }
         get(id)
+    }
+
+    fun allForSla(): List<Ticket> = transaction {
+        TicketsTable.selectAll().map(::toTicket)
+    }
+
+    fun claimResponseWarning(ticketId: Int, level: Int): Boolean = transaction {
+        TicketsTable.update({
+            (TicketsTable.id eq ticketId) and
+                (TicketsTable.slaResponseWarningLevel less level) and
+                TicketsTable.slaFirstResponseAt.isNull()
+        }) { it[slaResponseWarningLevel] = level } > 0
+    }
+
+    fun claimResolutionWarning(ticketId: Int, level: Int): Boolean = transaction {
+        TicketsTable.update({
+            (TicketsTable.id eq ticketId) and (TicketsTable.slaResolutionWarningLevel less level)
+        }) { it[slaResolutionWarningLevel] = level } > 0
+    }
+
+    fun claimResponseBreach(ticketId: Int, occurredAt: LocalDateTime): Boolean = transaction {
+        TicketsTable.update({
+            (TicketsTable.id eq ticketId) and TicketsTable.slaResponseBreachedAt.isNull() and TicketsTable.slaFirstResponseAt.isNull()
+        }) { it[slaResponseBreachedAt] = occurredAt } > 0
+    }
+
+    fun claimResolutionBreach(ticketId: Int, occurredAt: LocalDateTime): Boolean = transaction {
+        TicketsTable.update({ (TicketsTable.id eq ticketId) and TicketsTable.slaResolutionBreachedAt.isNull() }) {
+            it[slaResolutionBreachedAt] = occurredAt
+        } > 0
+    }
+
+    fun recordRiskPrediction(ticketId: Int, score: Int, level: String, reasons: List<String>) = transaction {
+        SlaRiskPredictionsTable.insertIgnore {
+            it[SlaRiskPredictionsTable.ticketId] = ticketId
+            it[SlaRiskPredictionsTable.score] = score.coerceIn(0, 100)
+            it[SlaRiskPredictionsTable.level] = level.take(20)
+            it[SlaRiskPredictionsTable.reasons] = reasons.joinToString(" | ").take(2_000)
+            it[createdAt] = LocalDateTime.now()
+        }
+    }
+
+    fun highRiskPredictionOutcomes(): Pair<Int, Int> = transaction {
+        val predictedTicketIds = SlaRiskPredictionsTable.selectAll()
+            .where { SlaRiskPredictionsTable.level inList listOf("HIGH", "CRITICAL") }
+            .map { it[SlaRiskPredictionsTable.ticketId] }
+            .distinct()
+        val completed = predictedTicketIds.mapNotNull { id ->
+            TicketsTable.selectAll().where { TicketsTable.id eq id }.singleOrNull()
+        }.filter { runCatching { TicketStatus.valueOf(it[TicketsTable.status]) }.getOrDefault(TicketStatus.OPEN) in setOf(TicketStatus.RESOLVED, TicketStatus.CLOSED) }
+        completed.size to completed.count { it[TicketsTable.slaResolutionBreachedAt] != null }
     }
 
     fun updateResolution(id: Int, resolution: String, updatedBy: String): Ticket? = transaction {
@@ -104,11 +205,22 @@ class TicketRepository {
 
     private fun toTicket(row: ResultRow): Ticket {
         val priorityValue = row[TicketsTable.priority]
-        val slaMinutes = SLAPoliciesTable.selectAll().where { SLAPoliciesTable.priority eq priorityValue }
-            .singleOrNull()?.get(SLAPoliciesTable.resolutionTime) ?: 480
-        val deadline = row[TicketsTable.createdAt].plusMinutes(slaMinutes.toLong())
-        val remaining = Duration.between(LocalDateTime.now(), deadline).toMinutes()
+        val policy = policyTargets(priorityValue)
+        val responseTarget = row[TicketsTable.slaResponseTargetMinutes] ?: policy.first
+        val resolutionTarget = row[TicketsTable.slaResolutionTargetMinutes] ?: policy.second
+        val responseDue = row[TicketsTable.slaResponseDueAt] ?: row[TicketsTable.createdAt].plusMinutes(responseTarget.toLong())
+        val resolutionDue = row[TicketsTable.slaResolutionDueAt] ?: row[TicketsTable.createdAt].plusMinutes(resolutionTarget.toLong())
+        val firstResponseAt = row[TicketsTable.slaFirstResponseAt]
+        val resolvedAt = row[TicketsTable.slaResolvedAt]
+        val now = LocalDateTime.now()
         val ticketStatus = runCatching { TicketStatus.valueOf(row[TicketsTable.status]) }.getOrDefault(TicketStatus.OPEN)
+        val terminal = ticketStatus in setOf(TicketStatus.RESOLVED, TicketStatus.CLOSED)
+        val responseReference = firstResponseAt ?: now
+        val resolutionReference = resolvedAt ?: if (terminal) row[TicketsTable.updatedAt] else now
+        val responseRemaining = Duration.between(responseReference, responseDue).toMinutes()
+        val resolutionRemaining = Duration.between(resolutionReference, resolutionDue).toMinutes()
+        val responseState = slaState(firstResponseAt, responseDue, row[TicketsTable.slaResponseBreachedAt], now)
+        val resolutionState = slaState(if (terminal) resolutionReference else null, resolutionDue, row[TicketsTable.slaResolutionBreachedAt], now)
         return Ticket(
             id = row[TicketsTable.id],
             userId = row[TicketsTable.userId],
@@ -124,11 +236,34 @@ class TicketRepository {
             deviceId = row[TicketsTable.deviceId],
             createdAt = row[TicketsTable.createdAt].toString(),
             updatedAt = row[TicketsTable.updatedAt].toString(),
-            slaRemainingMinutes = remaining,
-            overdue = isTicketSlaOverdue(remaining, ticketStatus)
+            slaResponseTargetMinutes = responseTarget,
+            slaResolutionTargetMinutes = resolutionTarget,
+            slaResponseDueAt = responseDue.toString(),
+            slaResolutionDueAt = resolutionDue.toString(),
+            slaFirstResponseAt = firstResponseAt?.toString(),
+            slaResolvedAt = resolvedAt?.toString(),
+            slaResponseRemainingMinutes = responseRemaining,
+            slaRemainingMinutes = resolutionRemaining,
+            slaResponseState = responseState,
+            slaResolutionState = resolutionState,
+            slaReopenedCount = row[TicketsTable.slaReopenedCount],
+            overdue = resolutionState == "BREACHED" && !terminal
         )
     }
+
+    private fun policyTargets(priority: String): Pair<Int, Int> =
+        SLAPoliciesTable.selectAll().where { SLAPoliciesTable.priority eq priority }.singleOrNull()?.let {
+            it[SLAPoliciesTable.responseTime] to it[SLAPoliciesTable.resolutionTime]
+        } ?: (60 to 480)
 }
 
 internal fun isTicketSlaOverdue(remainingMinutes: Long, status: TicketStatus): Boolean =
     remainingMinutes < 0 && status !in setOf(TicketStatus.RESOLVED, TicketStatus.CLOSED)
+
+internal fun slaState(stoppedAt: LocalDateTime?, dueAt: LocalDateTime?, breachedAt: LocalDateTime?, now: LocalDateTime): String = when {
+    dueAt == null -> "NOT_TRACKED"
+    breachedAt != null -> "BREACHED"
+    stoppedAt != null -> if (stoppedAt.isAfter(dueAt)) "BREACHED" else "MET"
+    now.isAfter(dueAt) -> "BREACHED"
+    else -> "ACTIVE"
+}

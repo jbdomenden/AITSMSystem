@@ -23,6 +23,7 @@ import backend.services.MonitoringService
 import backend.services.ProfilePhotoService
 import backend.services.NotificationService
 import backend.services.SLAService
+import backend.services.SlaAutomationService
 import backend.services.SessionService
 import backend.services.InvitationService
 import backend.services.MfaService
@@ -67,5 +68,6 @@ class ServiceContainer(application: Application) {
     val aiChatService = AIChatService(aiProvider, aiConfigService, aiConversationRepository)
     val ticketAiAdvisor = TicketAiAdvisor(ticketService, knowledgeRepo, aiProvider, aiConfigService)
     val slaService = SLAService(auditRepo)
+    val slaAutomationService = SlaAutomationService(ticketRepo, userRepo, notificationService)
     val knowledgeService = KnowledgeService(knowledgeRepo, auditRepo)
 }

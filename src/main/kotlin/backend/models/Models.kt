@@ -159,8 +159,21 @@ data class Ticket(
     val deviceId: Int? = null,
     val createdAt: String,
     val updatedAt: String,
+    val slaResponseTargetMinutes: Int? = null,
+    val slaResolutionTargetMinutes: Int? = null,
+    val slaResponseDueAt: String? = null,
+    val slaResolutionDueAt: String? = null,
+    val slaFirstResponseAt: String? = null,
+    val slaResolvedAt: String? = null,
+    val slaResponseRemainingMinutes: Long? = null,
     val slaRemainingMinutes: Long? = null,
-    val overdue: Boolean = false
+    val slaResponseState: String = "NOT_TRACKED",
+    val slaResolutionState: String = "NOT_TRACKED",
+    val slaReopenedCount: Int = 0,
+    val overdue: Boolean = false,
+    val slaRiskScore: Int = 0,
+    val slaRiskLevel: String = "LOW",
+    val slaRiskReasons: List<String> = emptyList()
 )
 
 @Serializable data class TicketRequest(val title: String, val description: String, val priority: String, val category: String, val deviceId: Int? = null)
@@ -314,6 +327,24 @@ data class Notification(
 )
 @Serializable data class SLA(val id: Int, val priority: String, val responseTime: Int, val resolutionTime: Int)
 @Serializable data class SLAUpdateRequest(val responseTime: Int, val resolutionTime: Int)
+@Serializable data class SLAAnalytics(
+    val totalTickets: Int,
+    val activeTickets: Int,
+    val responseMeasured: Int,
+    val responseMet: Int,
+    val responseBreached: Int,
+    val responseCompliancePercent: Double,
+    val resolutionMeasured: Int,
+    val resolutionMet: Int,
+    val resolutionBreached: Int,
+    val resolutionCompliancePercent: Double,
+    val averageResponseMinutes: Double?,
+    val averageResolutionMinutes: Double?,
+    val activeHighRisk: Int,
+    val activeBreaches: Int,
+    val predictionSamples: Int,
+    val highRiskPrecisionPercent: Double
+)
 @Serializable data class KnowledgeArticle(val id: Int, val title: String, val content: String, val category: String, val createdAt: String)
 @Serializable data class KnowledgeRequest(val title: String, val content: String, val category: String)
 @Serializable data class AuditLog(val id: Int, val userId: Int?, val action: String, val entity: String, val timestamp: String, val target: String? = null, val result: String = "SUCCESS", val requestId: String? = null, val sourceIp: String? = null, val userAgent: String? = null, val metadata: String? = null)

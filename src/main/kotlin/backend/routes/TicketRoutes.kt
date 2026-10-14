@@ -13,6 +13,7 @@ import backend.security.userRole
 import backend.security.PermissionMatrix
 import backend.security.Permission
 import backend.services.TicketService
+import backend.services.SlaAutomationService
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -22,7 +23,7 @@ import io.ktor.server.routing.*
 private const val DEFAULT_LIMIT = 20
 private const val MAX_LIMIT = 100
 
-fun Route.ticketRoutes(ticketService: TicketService) {
+fun Route.ticketRoutes(ticketService: TicketService, slaAutomation: SlaAutomationService) {
     route("/api/tickets") {
         post {
             if (!call.requireRole(UserRole.END_USER)) return@post
@@ -31,6 +32,7 @@ fun Route.ticketRoutes(ticketService: TicketService) {
         }
         get {
             if (!call.requireAuthenticated()) return@get
+            slaAutomation.evaluateIfDue()
             val uid = call.userId()
             val admin = Permission.TICKET_READ_ALL in PermissionMatrix.permissions(call.userRole())
             val limit = (call.request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_LIMIT).coerceIn(1, MAX_LIMIT)
@@ -50,6 +52,7 @@ fun Route.ticketRoutes(ticketService: TicketService) {
         }
         get("/{id}") {
             if (!call.requireAuthenticated()) return@get
+            slaAutomation.evaluateIfDue()
             val actorId = call.userId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val admin = Permission.TICKET_READ_ALL in PermissionMatrix.permissions(call.userRole())
             val id = call.parameters["id"]?.toIntOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)

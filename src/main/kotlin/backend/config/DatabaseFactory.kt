@@ -241,6 +241,17 @@ object TicketsTable : Table("tickets") {
     val reviewedResolution = text("reviewed_resolution").nullable()
     val resolutionUpdatedBy = varchar("resolution_updated_by", 150).nullable()
     val resolutionUpdatedAt = datetime("resolution_updated_at").nullable()
+    val slaResponseTargetMinutes = integer("sla_response_target_minutes").nullable()
+    val slaResolutionTargetMinutes = integer("sla_resolution_target_minutes").nullable()
+    val slaResponseDueAt = datetime("sla_response_due_at").nullable().index()
+    val slaResolutionDueAt = datetime("sla_resolution_due_at").nullable().index()
+    val slaFirstResponseAt = datetime("sla_first_response_at").nullable()
+    val slaResolvedAt = datetime("sla_resolved_at").nullable()
+    val slaResponseWarningLevel = integer("sla_response_warning_level").default(0)
+    val slaResolutionWarningLevel = integer("sla_resolution_warning_level").default(0)
+    val slaResponseBreachedAt = datetime("sla_response_breached_at").nullable()
+    val slaResolutionBreachedAt = datetime("sla_resolution_breached_at").nullable()
+    val slaReopenedCount = integer("sla_reopened_count").default(0)
     val deviceId = integer("device_id").references(DevicesTable.id, onDelete = ReferenceOption.CASCADE).nullable().index()
     val createdAt = datetime("created_at").index()
     val updatedAt = datetime("updated_at")
@@ -253,6 +264,17 @@ object TicketHistoryTable : Table("ticket_history") {
     val status = varchar("status", 30).index()
     val updatedBy = varchar("updated_by", 150)
     val timestamp = datetime("timestamp").index()
+    override val primaryKey = PrimaryKey(id)
+}
+
+object SlaRiskPredictionsTable : Table("sla_risk_predictions") {
+    val id = long("id").autoIncrement()
+    val ticketId = integer("ticket_id").references(TicketsTable.id, onDelete = ReferenceOption.CASCADE).index()
+    val score = integer("score")
+    val level = varchar("level", 20)
+    val reasons = text("reasons")
+    val createdAt = datetime("created_at").index()
+    init { uniqueIndex(ticketId, level) }
     override val primaryKey = PrimaryKey(id)
 }
 
@@ -433,6 +455,7 @@ object DatabaseFactory {
                 DiscoveryRequestsTable,
                 TicketsTable,
                 TicketHistoryTable,
+                SlaRiskPredictionsTable,
                 NotificationsTable,
                 SLAPoliciesTable,
                 SystemSettingsTable,

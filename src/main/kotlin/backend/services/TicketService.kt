@@ -3,6 +3,7 @@ package backend.services
 import backend.models.Ticket
 import backend.models.TicketRequest
 import backend.models.TicketStatus
+import backend.models.SLAAnalytics
 import backend.models.UserRole
 import backend.security.Permission
 import backend.security.PermissionMatrix
@@ -11,6 +12,7 @@ import backend.repository.TicketRepository
 import backend.repository.UserRepository
 import java.time.Duration
 import java.time.LocalDateTime
+import java.math.RoundingMode
 
 class TicketService(
     private val repository: TicketRepository,
@@ -36,10 +38,12 @@ class TicketService(
         }
     }
 
-    fun list(userId: Int?, admin: Boolean, limit: Int, offset: Long) = repository.list(userId, admin, limit, offset)
-    fun get(id: Int): Ticket? = repository.get(id)
+    fun list(userId: Int?, admin: Boolean, limit: Int, offset: Long) = repository.list(userId, admin, limit, offset).let {
+        it.copy(items = enrichRisk(it.items))
+    }
+    fun get(id: Int): Ticket? = repository.get(id)?.let { enrichRisk(listOf(it)).first() }
     fun history(id: Int) = repository.history(id)
-    fun allForAdvisory() = repository.list(null, true, 500, 0).items
+    fun allForAdvisory() = enrichRisk(repository.list(null, true, 500, 0).items)
 
     fun update(id: Int, req: TicketRequest, userId: Int?): Ticket? {
         val existing = repository.get(id) ?: return null
@@ -98,7 +102,7 @@ class TicketService(
             }
         }
 
-        return repository.updateStatus(id, status.name, actor)?.also { updated ->
+        return repository.updateStatus(id, status.name, actor, recordFirstResponse = admin)?.let { enrichRisk(listOf(it)).first() }?.also { updated ->
             audit.log(userId, "Changed ticket #$id to ${status.name}", "tickets")
             if (admin) {
                 val displayStatus = status.name.lowercase().replace('_', ' ').replaceFirstChar { it.titlecase() }
@@ -110,6 +114,12 @@ class TicketService(
                     message = "Ticket #${updated.id} updated to $displayStatus",
                     occurrenceKey = updated.updatedAt
                 )
+                if (existing.slaFirstResponseAt == null && updated.slaResponseState == "BREACHED") {
+                    notifySlaBreach(updated, "response")
+                }
+                if (existing.slaResolvedAt == null && status in setOf(TicketStatus.RESOLVED, TicketStatus.CLOSED) && updated.slaResolutionState == "BREACHED") {
+                    notifySlaBreach(updated, "resolution")
+                }
             }
         }
     }
@@ -181,4 +191,77 @@ class TicketService(
             )
         }
     }
+
+    private fun notifySlaBreach(ticket: Ticket, clock: String) {
+        val title = "SLA ${clock.replaceFirstChar { it.titlecase() }} Breached"
+        val message = "Ticket #${ticket.id} exceeded its $clock target"
+        val eventType = "ticket_sla_${clock}_breached"
+        notifyAdminsOncePerTicket(eventType, ticket.id, title, message)
+        notifications.pushOncePerTicketEvent(
+            userId = ticket.userId,
+            eventType = eventType,
+            ticketId = ticket.id,
+            title = title,
+            message = message
+        )
+    }
+
+    fun slaAnalytics(): SLAAnalytics {
+        val tickets = enrichRisk(repository.allForSla())
+        val active = tickets.filter { it.status !in setOf(TicketStatus.RESOLVED, TicketStatus.CLOSED) }
+        val responseMeasured = tickets.filter { it.slaResponseState in setOf("MET", "BREACHED") }
+        val resolutionMeasured = tickets.filter { it.status in setOf(TicketStatus.RESOLVED, TicketStatus.CLOSED) && it.slaResolutionState in setOf("MET", "BREACHED") }
+        val responseMet = responseMeasured.count { it.slaResponseState == "MET" }
+        val resolutionMet = resolutionMeasured.count { it.slaResolutionState == "MET" }
+        val responseDurations = tickets.mapNotNull { ticket ->
+            durationMinutes(ticket.createdAt, ticket.slaFirstResponseAt)
+        }
+        val resolutionDurations = tickets.mapNotNull { ticket ->
+            durationMinutes(ticket.createdAt, ticket.slaResolvedAt)
+        }
+        val (predictionSamples, correctHighRiskPredictions) = repository.highRiskPredictionOutcomes()
+        return SLAAnalytics(
+            totalTickets = tickets.size,
+            activeTickets = active.size,
+            responseMeasured = responseMeasured.size,
+            responseMet = responseMet,
+            responseBreached = responseMeasured.size - responseMet,
+            responseCompliancePercent = percent(responseMet, responseMeasured.size),
+            resolutionMeasured = resolutionMeasured.size,
+            resolutionMet = resolutionMet,
+            resolutionBreached = resolutionMeasured.size - resolutionMet,
+            resolutionCompliancePercent = percent(resolutionMet, resolutionMeasured.size),
+            averageResponseMinutes = average(responseDurations),
+            averageResolutionMinutes = average(resolutionDurations),
+            activeHighRisk = active.count { it.slaRiskLevel in setOf("HIGH", "CRITICAL") },
+            activeBreaches = active.count { it.slaResolutionState == "BREACHED" || it.slaResponseState == "BREACHED" },
+            predictionSamples = predictionSamples,
+            highRiskPrecisionPercent = percent(correctHighRiskPredictions, predictionSamples)
+        )
+    }
+
+    private fun enrichRisk(tickets: List<Ticket>): List<Ticket> {
+        if (tickets.isEmpty()) return tickets
+        val population = repository.allForSla()
+        val activeQueueSize = population.count { it.status !in setOf(TicketStatus.RESOLVED, TicketStatus.CLOSED) }
+        val completed = population.filter { it.status in setOf(TicketStatus.RESOLVED, TicketStatus.CLOSED) }
+        return tickets.map { ticket ->
+            val comparable = completed.filter { it.priority == ticket.priority && it.category == ticket.category }
+            val breachRate = if (comparable.isEmpty()) 0.0 else comparable.count { it.slaResolutionState == "BREACHED" }.toDouble() / comparable.size
+            val assessment = assessSlaRisk(ticket, activeQueueSize, breachRate)
+            ticket.copy(slaRiskScore = assessment.score, slaRiskLevel = assessment.level, slaRiskReasons = assessment.reasons)
+        }
+    }
+
+    private fun durationMinutes(start: String, end: String?): Long? {
+        val from = runCatching { LocalDateTime.parse(start) }.getOrNull() ?: return null
+        val to = end?.let { runCatching { LocalDateTime.parse(it) }.getOrNull() } ?: return null
+        return Duration.between(from, to).toMinutes().coerceAtLeast(0)
+    }
+
+    private fun percent(met: Int, measured: Int): Double = if (measured == 0) 0.0 else
+        (met.toBigDecimal() * 100.toBigDecimal() / measured.toBigDecimal()).setScale(1, RoundingMode.HALF_UP).toDouble()
+
+    private fun average(values: List<Long>): Double? = if (values.isEmpty()) null else
+        (values.average().toBigDecimal()).setScale(1, RoundingMode.HALF_UP).toDouble()
 }
