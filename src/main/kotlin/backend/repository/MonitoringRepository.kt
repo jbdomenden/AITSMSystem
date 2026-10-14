@@ -3,6 +3,7 @@ package backend.repository
 import backend.config.DiscoveryRequestsTable
 import backend.config.CollectorEnrollmentCodesTable
 import backend.config.MonitoringCollectorsTable
+import backend.config.MonitoringDeviceAddressesTable
 import backend.config.MonitoringDevicesTable
 import backend.models.CollectorDeviceReport
 import backend.models.CollectorEnrollmentRequest
@@ -210,14 +211,37 @@ class MonitoringRepository(private val clock: Clock = Clock.systemUTC()) {
         val collectorKey = "collector:$collectorId:${device.deviceKey.lowercase()}"
         val preferredIdentity = uuid?.let { "uuid:$it" } ?: mac?.let { "mac:$it" } ?: collectorKey
         val identityCandidates = listOfNotNull(uuid?.let { "uuid:$it" }, mac?.let { "mac:$it" }, collectorKey).distinct()
-        val matches = MonitoringDevicesTable.selectAll().where {
+        val identityMatches = MonitoringDevicesTable.selectAll().where {
             (MonitoringDevicesTable.identityKey inList identityCandidates) or
                 ((MonitoringDevicesTable.collectorId eq collectorId) and (MonitoringDevicesTable.deviceKey eq device.deviceKey))
         }.orderBy(MonitoringDevicesTable.receivedAt, SortOrder.DESC).toList()
+        val legacyHostnameMatches = if ((uuid != null || mac != null) && device.telemetryAvailable && device.hostname.isNotBlank()) {
+            MonitoringDevicesTable.selectAll().where { MonitoringDevicesTable.hostname eq device.hostname }
+                .filter { row ->
+                    row[MonitoringDevicesTable.telemetryAvailable] &&
+                        row[MonitoringDevicesTable.deviceUuid] == null &&
+                        row[MonitoringDevicesTable.identityKey]?.startsWith("legacy:") == true
+                }
+        } else emptyList()
+        val matches = (identityMatches + legacyHostnameMatches)
+            .distinctBy { it[MonitoringDevicesTable.id] }
+            .sortedByDescending { it[MonitoringDevicesTable.receivedAt] }
         val existing = matches.firstOrNull { it[MonitoringDevicesTable.identityKey] == preferredIdentity } ?: matches.firstOrNull()
-        val duplicateIds = matches.filterNot { it[MonitoringDevicesTable.id] == existing?.get(MonitoringDevicesTable.id) }
-            .map { it[MonitoringDevicesTable.id] }
-        duplicateIds.forEach { duplicateId -> MonitoringDevicesTable.deleteWhere { id eq duplicateId } }
+        if (existing != null) {
+            val canonicalId = existing[MonitoringDevicesTable.id]
+            matches.filterNot { it[MonitoringDevicesTable.id] == canonicalId }.forEach { duplicate ->
+                recordAddress(
+                    deviceId = canonicalId,
+                    collectorId = duplicate[MonitoringDevicesTable.collectorId],
+                    ipAddress = duplicate[MonitoringDevicesTable.ipAddress],
+                    macAddress = duplicate[MonitoringDevicesTable.macAddress],
+                    firstSeenAt = duplicate[MonitoringDevicesTable.receivedAt],
+                    lastSeenAt = duplicate[MonitoringDevicesTable.lastSeenAt]
+                )
+                val duplicateId = duplicate[MonitoringDevicesTable.id]
+                MonitoringDevicesTable.deleteWhere { id eq duplicateId }
+            }
+        }
         val measured = runCatching {
             normalizeCollectorMeasurement(device.measurementAt ?: fallbackMeasurement.toString(), fallbackMeasurement)
         }.getOrDefault(fallbackMeasurement)
@@ -240,18 +264,58 @@ class MonitoringRepository(private val clock: Clock = Clock.systemUTC()) {
             statement[receivedAt] = received
             statement[lastSeenAt] = received
         }
-        if (existing == null) {
+        val canonicalId = if (existing == null) {
             MonitoringDevicesTable.insert {
                 values(MonitoringDevicesTable, it)
+            }[MonitoringDevicesTable.id]
+        } else {
+            existing[MonitoringDevicesTable.id].also { existingId ->
+                MonitoringDevicesTable.update({ MonitoringDevicesTable.id eq existingId }) { values(MonitoringDevicesTable, it) }
+            }
+        }
+        recordAddress(canonicalId, collectorId, device.ipAddress, device.macAddress, received, received)
+    }
+
+    private fun org.jetbrains.exposed.sql.Transaction.recordAddress(
+        deviceId: Int,
+        collectorId: UUID,
+        ipAddress: String,
+        macAddress: String?,
+        firstSeenAt: LocalDateTime,
+        lastSeenAt: LocalDateTime
+    ) {
+        val existing = MonitoringDeviceAddressesTable.selectAll().where {
+            (MonitoringDeviceAddressesTable.deviceId eq deviceId) and
+                (MonitoringDeviceAddressesTable.ipAddress eq ipAddress)
+        }.singleOrNull()
+        if (existing == null) {
+            MonitoringDeviceAddressesTable.insert {
+                it[MonitoringDeviceAddressesTable.deviceId] = deviceId
+                it[MonitoringDeviceAddressesTable.collectorId] = collectorId
+                it[MonitoringDeviceAddressesTable.ipAddress] = ipAddress
+                it[MonitoringDeviceAddressesTable.macAddress] = macAddress
+                it[MonitoringDeviceAddressesTable.firstSeenAt] = firstSeenAt
+                it[MonitoringDeviceAddressesTable.lastSeenAt] = lastSeenAt
+                it[observationCount] = 1
             }
         } else {
-            MonitoringDevicesTable.update({ MonitoringDevicesTable.id eq existing[MonitoringDevicesTable.id] }) { values(MonitoringDevicesTable, it) }
+            MonitoringDeviceAddressesTable.update({ MonitoringDeviceAddressesTable.id eq existing[MonitoringDeviceAddressesTable.id] }) {
+                it[MonitoringDeviceAddressesTable.collectorId] = collectorId
+                it[MonitoringDeviceAddressesTable.macAddress] = macAddress ?: existing[MonitoringDeviceAddressesTable.macAddress]
+                it[MonitoringDeviceAddressesTable.firstSeenAt] = minOf(existing[MonitoringDeviceAddressesTable.firstSeenAt], firstSeenAt)
+                it[MonitoringDeviceAddressesTable.lastSeenAt] = maxOf(existing[MonitoringDeviceAddressesTable.lastSeenAt], lastSeenAt)
+                it[observationCount] = existing[MonitoringDeviceAddressesTable.observationCount] + 1
+            }
         }
     }
 
     fun devices(): List<LanDeviceDto> = transaction {
         val staleBefore = clock.instant().minusSeconds(600)
-        MonitoringDevicesTable.selectAll().orderBy(MonitoringDevicesTable.receivedAt, SortOrder.DESC).map { row ->
+        val observedAddresses = MonitoringDeviceAddressesTable.selectAll()
+            .orderBy(MonitoringDeviceAddressesTable.lastSeenAt, SortOrder.DESC)
+            .groupBy { it[MonitoringDeviceAddressesTable.deviceId] }
+            .mapValues { (_, rows) -> rows.map { it[MonitoringDeviceAddressesTable.ipAddress] }.distinct() }
+        val devices = MonitoringDevicesTable.selectAll().orderBy(MonitoringDevicesTable.receivedAt, SortOrder.DESC).map { row ->
             val received = row[MonitoringDevicesTable.receivedAt]
             val stale = received.toInstant(ZoneOffset.UTC).isBefore(staleBefore)
             LanDeviceDto(
@@ -264,9 +328,11 @@ class MonitoringRepository(private val clock: Clock = Clock.systemUTC()) {
                 receivedAt = iso(received), stale = stale, collectorId = row[MonitoringDevicesTable.collectorId].toString(),
                 macAddress = row[MonitoringDevicesTable.macAddress], osDetails = row[MonitoringDevicesTable.osDetails],
                 storageTotalBytes = row[MonitoringDevicesTable.storageTotalBytes], storageUsedBytes = row[MonitoringDevicesTable.storageUsedBytes],
-                identityKey = row[MonitoringDevicesTable.identityKey], deviceUuid = row[MonitoringDevicesTable.deviceUuid]
+                identityKey = row[MonitoringDevicesTable.identityKey], deviceUuid = row[MonitoringDevicesTable.deviceUuid],
+                observedIpAddresses = observedAddresses[row[MonitoringDevicesTable.id]].orEmpty()
             )
-        }.distinctBy { it.identityKey ?: "${it.collectorId}:${it.ipAddress}" }
+        }
+        collapseLegacyDeviceRows(devices)
     }
 
     fun queueDiscovery(): Pair<UUID, UUID> = transaction {
@@ -315,3 +381,28 @@ internal fun normalizedDeviceUuid(value: String?): String? = value?.trim()?.lowe
 internal fun normalizedMac(value: String?): String? = value?.filter(Char::isLetterOrDigit)?.uppercase()
     ?.takeIf { it.length == 12 && it.all { character -> character in '0'..'9' || character in 'A'..'F' } }
     ?.takeUnless { it == "000000000000" || it == "FFFFFFFFFFFF" }
+
+internal fun collapseLegacyDeviceRows(devices: List<LanDeviceDto>): List<LanDeviceDto> {
+    val stableByHostname = devices.filter { it.telemetryAvailable }
+        .groupBy { it.hostname.trim().lowercase() }
+        .mapValues { (_, rows) -> rows.mapNotNull(::stableDeviceIdentity).distinct() }
+    return devices.groupBy { device ->
+        val hostname = device.hostname.trim().lowercase()
+        val stable = stableDeviceIdentity(device)
+        when {
+            !device.telemetryAvailable || hostname.isBlank() -> stable ?: device.identityKey ?: "${device.collectorId}:${device.ipAddress}"
+            stable != null -> stable
+            stableByHostname[hostname].orEmpty().size == 1 -> stableByHostname.getValue(hostname).single()
+            stableByHostname[hostname].orEmpty().isEmpty() -> "legacy-host:$hostname"
+            else -> device.identityKey ?: "${device.collectorId}:${device.ipAddress}"
+        }
+    }.values.map { rows ->
+        val latest = rows.maxBy { it.receivedAt ?: it.lastSeen }
+        latest.copy(observedIpAddresses = (rows.flatMap { it.observedIpAddresses } + rows.map { it.ipAddress }).distinct())
+    }.sortedByDescending { it.receivedAt ?: it.lastSeen }
+}
+
+private fun stableDeviceIdentity(device: LanDeviceDto): String? =
+    normalizedDeviceUuid(device.deviceUuid)?.let { "uuid:$it" }
+        ?: normalizedMac(device.macAddress)?.let { "mac:$it" }
+        ?: device.identityKey?.takeIf { it.startsWith("uuid:") || it.startsWith("mac:") }

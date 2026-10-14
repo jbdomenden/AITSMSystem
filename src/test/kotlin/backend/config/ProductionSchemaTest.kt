@@ -21,7 +21,7 @@ class ProductionSchemaTest {
             "colleague_requests", "direct_messages", "eula_acceptance", "devices", "tickets",
             "ticket_history", "notifications", "sla_policies", "system_settings", "knowledge_articles",
             "audit_logs", "ai_conversation_messages", "inventory_assets", "inventory_asset_snapshots",
-            "monitoring_collectors", "monitoring_devices", "monitoring_discovery_requests",
+            "monitoring_collectors", "monitoring_devices", "monitoring_device_addresses", "monitoring_discovery_requests",
             "sla_risk_predictions"
         )
 

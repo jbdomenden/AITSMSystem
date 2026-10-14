@@ -292,7 +292,8 @@ data class HostTelemetryDto(
     val storageTotalBytes: Long? = null,
     val storageUsedBytes: Long? = null,
     val identityKey: String? = null,
-    val deviceUuid: String? = null
+    val deviceUuid: String? = null,
+    val observedIpAddresses: List<String> = emptyList()
 )
 
 @Serializable

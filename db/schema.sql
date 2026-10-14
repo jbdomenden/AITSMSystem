@@ -166,6 +166,19 @@ CREATE TABLE IF NOT EXISTS monitoring_devices (
   UNIQUE(collector_id, device_key)
 );
 
+CREATE TABLE IF NOT EXISTS monitoring_device_addresses (
+  id BIGSERIAL PRIMARY KEY,
+  device_id INT NOT NULL REFERENCES monitoring_devices(id) ON DELETE CASCADE,
+  collector_id UUID REFERENCES monitoring_collectors(id) ON DELETE SET NULL,
+  ip_address VARCHAR(45) NOT NULL,
+  mac_address VARCHAR(32),
+  first_seen_at TIMESTAMP NOT NULL,
+  last_seen_at TIMESTAMP NOT NULL,
+  observation_count BIGINT NOT NULL DEFAULT 1,
+  UNIQUE(device_id, ip_address)
+);
+CREATE INDEX IF NOT EXISTS monitoring_device_addresses_last_seen_idx ON monitoring_device_addresses(last_seen_at);
+
 CREATE TABLE IF NOT EXISTS monitoring_discovery_requests (
   id UUID PRIMARY KEY,
   collector_id UUID NOT NULL REFERENCES monitoring_collectors(id) ON DELETE CASCADE,

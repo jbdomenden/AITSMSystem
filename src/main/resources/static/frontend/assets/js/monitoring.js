@@ -160,7 +160,7 @@ function renderMonitorTable(devices) {
 
   rows.innerHTML = devices.map(d => `<tr>
     <td>${escapeHtml(d.hostname || '-')}</td>
-    <td>${escapeHtml(d.ipAddress || '-')}</td>
+    <td title='${escapeHtml(`Observed IPs: ${(d.observedIpAddresses || [d.ipAddress]).join(', ')}`)}'>${escapeHtml(d.ipAddress || '-')}${(d.observedIpAddresses || []).length > 1 ? `<div class='small'>${d.observedIpAddresses.length} addresses observed</div>` : ''}</td>
     <td>${escapeHtml(d.telemetrySourceType || '-')}</td>
     <td>${d.reachable ? 'Online' : 'Offline'}</td>
     <td>${d.cpuUsagePercent != null ? `${Number(d.cpuUsagePercent).toFixed(1)}%` : '-'}</td>

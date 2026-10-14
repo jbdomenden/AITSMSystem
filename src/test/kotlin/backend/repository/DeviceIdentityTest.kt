@@ -1,5 +1,6 @@
 package backend.repository
 
+import backend.models.LanDeviceDto
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -16,4 +17,45 @@ class DeviceIdentityTest {
         assertNull(normalizedMac("00-00-00-00-00-00"))
         assertNull(normalizedMac("not-a-mac"))
     }
+
+    @Test fun `legacy agent rows collapse while preserving dynamic IP history`() {
+        val older = device(id = "1", ip = "192.168.137.1", receivedAt = "2026-10-14T10:00:00Z")
+        val newer = device(id = "2", ip = "192.168.1.34", receivedAt = "2026-10-14T11:00:00Z")
+
+        val collapsed = collapseLegacyDeviceRows(listOf(older, newer))
+
+        assertEquals(1, collapsed.size)
+        assertEquals("192.168.1.34", collapsed.single().ipAddress)
+        assertEquals(setOf("192.168.137.1", "192.168.1.34"), collapsed.single().observedIpAddresses.toSet())
+    }
+
+    @Test fun `conflicting stable identities with the same hostname remain separate`() {
+        val first = device("1", "192.168.1.10", "2026-10-14T10:00:00Z", deviceUuid = "11111111-2222-4333-8444-555555555555")
+        val second = device("2", "192.168.1.11", "2026-10-14T11:00:00Z", deviceUuid = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee")
+        assertEquals(2, collapseLegacyDeviceRows(listOf(first, second)).size)
+    }
+
+    @Test fun `legacy address attaches to the only stable identity for a hostname`() {
+        val legacy = device("1", "192.168.137.1", "2026-10-14T10:00:00Z")
+        val stable = device("2", "192.168.1.34", "2026-10-14T11:00:00Z", deviceUuid = "11111111-2222-4333-8444-555555555555")
+        val collapsed = collapseLegacyDeviceRows(listOf(legacy, stable))
+        assertEquals(1, collapsed.size)
+        assertEquals(setOf("192.168.137.1", "192.168.1.34"), collapsed.single().observedIpAddresses.toSet())
+    }
+
+    private fun device(id: String, ip: String, receivedAt: String, deviceUuid: String? = null) = LanDeviceDto(
+        id = id,
+        hostname = "ELLE",
+        ipAddress = ip,
+        reachable = false,
+        telemetryAvailable = true,
+        telemetrySourceType = "COLLECTOR_AGENT",
+        lastSeen = receivedAt,
+        receivedAt = receivedAt,
+        stale = true,
+        collectorId = id,
+        identityKey = if (deviceUuid == null) "legacy:$id" else "uuid:$deviceUuid",
+        deviceUuid = deviceUuid,
+        observedIpAddresses = listOf(ip)
+    )
 }

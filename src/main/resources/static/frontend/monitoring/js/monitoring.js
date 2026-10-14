@@ -214,7 +214,7 @@ function renderMonitorTable(devices) {
 
   rows.innerHTML = visible.map(d => `<tr>
     <td>${aitsmEscapeHtml(d.hostname || '-')}</td>
-    <td>${aitsmEscapeHtml(d.ipAddress || '-')}</td>
+    <td title='${aitsmEscapeHtml(`Observed IPs: ${(d.observedIpAddresses || [d.ipAddress]).join(', ')}`)}'>${aitsmEscapeHtml(d.ipAddress || '-')}${(d.observedIpAddresses || []).length > 1 ? `<div class='small'>${d.observedIpAddresses.length} addresses observed</div>` : ''}</td>
     <td>${aitsmEscapeHtml(d.telemetrySourceType || '-')}</td>
     <td>${d.stale ? 'Stale' : (d.reachable ? 'Online' : 'Offline')}</td>
     <td>${d.cpuUsagePercent != null ? `${Number(d.cpuUsagePercent).toFixed(1)}%` : '-'}</td>

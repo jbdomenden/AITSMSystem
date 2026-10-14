@@ -57,4 +57,15 @@ class CollectorInstallerContractTest {
         assertTrue(migration.contains("device_uuid"))
         assertTrue(migration.contains("agent_version"))
     }
+
+    @Test fun `dynamic addresses are retained separately from canonical devices`() {
+        val migration = Files.readString(Path.of("db/migrations/V011__canonical_devices_and_address_history.sql"))
+        val repository = Files.readString(Path.of("src/main/kotlin/backend/repository/MonitoringRepository.kt"))
+        assertTrue(migration.contains("monitoring_device_addresses"))
+        assertTrue(migration.contains("UNIQUE(device_id, ip_address)"))
+        assertTrue(migration.contains("first_seen_at"))
+        assertTrue(migration.contains("last_seen_at"))
+        assertTrue(repository.contains("recordAddress"))
+        assertTrue(repository.contains("collapseLegacyDeviceRows"))
+    }
 }
