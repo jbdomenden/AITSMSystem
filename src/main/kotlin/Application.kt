@@ -236,7 +236,7 @@ fun Application.module() {
         colleagueRoutes(container.colleagueService)
         knowledgeRoutes(container.knowledgeService)
         inventoryRoutes(container.inventoryService, container.reauthenticationService)
-        slaRoutes(container.slaService)
+        slaRoutes(container.slaService, container.reauthenticationService)
         settingsRoutes(container.assetDetectionService, container.reauthenticationService)
         aiRoutes(container.aiChatService, container.aiConfigService, container.ticketAiAdvisor, container.reauthenticationService)
         auditRoutes(container.auditRepo)

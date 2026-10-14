@@ -116,6 +116,19 @@ async function createTicket() {
   location.href = '/tickets';
 }
 
+function formatSla(ticket) {
+  const status = String(ticket.status || '').toLowerCase();
+  if (status === 'resolved' || status === 'closed') return 'Completed';
+  const minutes = Number(ticket.slaRemainingMinutes);
+  if (!Number.isFinite(minutes)) return 'Not available';
+  const absolute = Math.abs(minutes);
+  const days = Math.floor(absolute / 1440);
+  const hours = Math.floor((absolute % 1440) / 60);
+  const mins = absolute % 60;
+  const duration = [days ? `${days}d` : '', hours ? `${hours}h` : '', `${mins}m`].filter(Boolean).join(' ');
+  return ticket.overdue ? `Breached by ${duration}` : `${duration} remaining`;
+}
+
 async function analyzeTicketWithAi() {
   const button = document.getElementById('analyzeTicketBtn');
   const host = document.getElementById('ticketAiInsights');
@@ -281,7 +294,7 @@ async function loadTickets() {
     const actions = role === 'end-user' ? `<td>${actionMenu(t)}</td>` : '<td>-</td>';
     return `<tr data-ticket-id='${Number(t.id)}'>
       <td><a class='ticket-link' href='${userTicketHref(t.id)}'>#${Number(t.id)}</a></td><td><a class='ticket-link ticket-link-title' href='${userTicketHref(t.id)}' title='${aitsmEscapeHtml(t.title || '-')}'>${aitsmEscapeHtml(t.title || '-')}</a></td><td>${aitsmEscapeHtml(t.priority || '-')}</td><td><span class='badge ${aitsmEscapeHtml(klass)}'>${aitsmEscapeHtml(t.status || '-')}</span></td>
-      <td style='color:${t.overdue ? "var(--danger)" : "inherit"}'>${t.slaRemainingMinutes ?? '-'} min</td>
+      <td style='color:${t.overdue ? "var(--danger)" : "inherit"}'>${aitsmEscapeHtml(formatSla(t))}</td>
       ${actions}
     </tr>`;
   }).join('') || `<tr><td colspan='6' class='small'>No tickets found.</td></tr>`;

@@ -16,13 +16,14 @@
 
     <section class='settings-grid'>
       <article class='card'>
-        <div class='card-head'><h3 class='section-title'>SLA Policies</h3><span class='card-icon'>SLA</span></div>
+        <div class='card-head'><div><h3 class='section-title'>SLA Policies</h3><p class='section-subtitle'>Response and resolution targets apply in elapsed minutes.</p></div><span class='card-icon'>SLA</span></div>
         <div class='table-wrap'>
           <table>
-            <thead><tr><th>Priority</th><th>Response (min)</th><th>Resolution (min)</th></tr></thead>
+            <thead><tr><th>Priority</th><th>Response (min)</th><th>Resolution (min)</th><th>Action</th></tr></thead>
             <tbody id='slaRows'></tbody>
           </table>
         </div>
+        <p id='slaPolicyMessage' class='small' role='status'></p>
       </article>
 
       <article class='card'>

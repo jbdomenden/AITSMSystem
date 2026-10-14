@@ -66,6 +66,6 @@ class ServiceContainer(application: Application) {
     private val aiProvider = GeminiProvider()
     val aiChatService = AIChatService(aiProvider, aiConfigService, aiConversationRepository)
     val ticketAiAdvisor = TicketAiAdvisor(ticketService, knowledgeRepo, aiProvider, aiConfigService)
-    val slaService = SLAService()
+    val slaService = SLAService(auditRepo)
     val knowledgeService = KnowledgeService(knowledgeRepo, auditRepo)
 }

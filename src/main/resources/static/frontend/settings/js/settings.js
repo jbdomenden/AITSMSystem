@@ -22,7 +22,40 @@ function setAiButtonsDisabled(disabled) { ['aiTestConnectionBtn', 'aiSaveConfigB
 
 async function loadSlaPolicies() {
   const policies = await fetchJsonOrThrow('/api/sla');
-  document.getElementById('slaRows').innerHTML = policies.map(policy => `<tr><td>${policy.priority}</td><td>${policy.responseTime}</td><td>${policy.resolutionTime}</td></tr>`).join('');
+  document.getElementById('slaRows').innerHTML = policies.map(policy => `<tr>
+    <td>${aitsmEscapeHtml(policy.priority)}</td>
+    <td><input id='slaResponse-${policy.id}' type='number' min='1' max='43200' value='${Number(policy.responseTime)}' aria-label='${aitsmEscapeHtml(policy.priority)} response minutes'></td>
+    <td><input id='slaResolution-${policy.id}' type='number' min='1' max='43200' value='${Number(policy.resolutionTime)}' aria-label='${aitsmEscapeHtml(policy.priority)} resolution minutes'></td>
+    <td><button class='btn btn-ghost' type='button' onclick='saveSlaPolicy(${policy.id}, ${JSON.stringify(policy.priority)})'>Save</button></td>
+  </tr>`).join('');
+}
+async function saveSlaPolicy(id, priority) {
+  const message = document.getElementById('slaPolicyMessage');
+  const responseTime = Number(document.getElementById(`slaResponse-${id}`)?.value);
+  const resolutionTime = Number(document.getElementById(`slaResolution-${id}`)?.value);
+  if (!Number.isInteger(responseTime) || !Number.isInteger(resolutionTime) || responseTime < 1 || resolutionTime < 1) {
+    message.textContent = 'Enter whole-minute targets greater than zero.';
+    message.className = 'small text-danger';
+    return;
+  }
+  if (responseTime > resolutionTime) {
+    message.textContent = 'Response time cannot exceed resolution time.';
+    message.className = 'small text-danger';
+    return;
+  }
+  message.textContent = `Saving ${priority} SLA…`;
+  message.className = 'small';
+  try {
+    await fetchJsonOrThrow(`/api/sla/${encodeURIComponent(priority)}`, {
+      method: 'PUT', body: JSON.stringify({ responseTime, resolutionTime })
+    }, true);
+    message.textContent = `${priority} SLA saved.`;
+    message.className = 'small text-success';
+    await loadSlaPolicies();
+  } catch (error) {
+    message.textContent = error.message || 'Unable to save SLA policy.';
+    message.className = 'small text-danger';
+  }
 }
 async function loadAssetDetectionPrefixes() {
   const data = await fetchJsonOrThrow('/settings/asset-ip-prefixes');

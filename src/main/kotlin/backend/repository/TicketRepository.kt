@@ -108,6 +108,7 @@ class TicketRepository {
             .singleOrNull()?.get(SLAPoliciesTable.resolutionTime) ?: 480
         val deadline = row[TicketsTable.createdAt].plusMinutes(slaMinutes.toLong())
         val remaining = Duration.between(LocalDateTime.now(), deadline).toMinutes()
+        val ticketStatus = runCatching { TicketStatus.valueOf(row[TicketsTable.status]) }.getOrDefault(TicketStatus.OPEN)
         return Ticket(
             id = row[TicketsTable.id],
             userId = row[TicketsTable.userId],
@@ -115,7 +116,7 @@ class TicketRepository {
             description = row[TicketsTable.description],
             priority = priorityValue,
             category = row[TicketsTable.category],
-            status = runCatching { TicketStatus.valueOf(row[TicketsTable.status]) }.getOrDefault(TicketStatus.OPEN),
+            status = ticketStatus,
             assignedTo = row[TicketsTable.assignedTo],
             reviewedResolution = row[TicketsTable.reviewedResolution],
             resolutionUpdatedBy = row[TicketsTable.resolutionUpdatedBy],
@@ -124,7 +125,10 @@ class TicketRepository {
             createdAt = row[TicketsTable.createdAt].toString(),
             updatedAt = row[TicketsTable.updatedAt].toString(),
             slaRemainingMinutes = remaining,
-            overdue = remaining < 0 && runCatching { TicketStatus.valueOf(row[TicketsTable.status]) }.getOrDefault(TicketStatus.OPEN) != TicketStatus.RESOLVED
+            overdue = isTicketSlaOverdue(remaining, ticketStatus)
         )
     }
 }
+
+internal fun isTicketSlaOverdue(remainingMinutes: Long, status: TicketStatus): Boolean =
+    remainingMinutes < 0 && status !in setOf(TicketStatus.RESOLVED, TicketStatus.CLOSED)

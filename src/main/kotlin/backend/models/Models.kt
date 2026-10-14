@@ -313,6 +313,7 @@ data class Notification(
     val readAt: String? = null
 )
 @Serializable data class SLA(val id: Int, val priority: String, val responseTime: Int, val resolutionTime: Int)
+@Serializable data class SLAUpdateRequest(val responseTime: Int, val resolutionTime: Int)
 @Serializable data class KnowledgeArticle(val id: Int, val title: String, val content: String, val category: String, val createdAt: String)
 @Serializable data class KnowledgeRequest(val title: String, val content: String, val category: String)
 @Serializable data class AuditLog(val id: Int, val userId: Int?, val action: String, val entity: String, val timestamp: String, val target: String? = null, val result: String = "SUCCESS", val requestId: String? = null, val sourceIp: String? = null, val userAgent: String? = null, val metadata: String? = null)
