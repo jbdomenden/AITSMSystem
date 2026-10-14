@@ -151,7 +151,11 @@ internal fun isMfaRecoveryPath(path: String): Boolean =
         path.startsWith("/modules/") || path.startsWith("/api/auth/mfa/")
 
 internal fun isAuthenticationPage(path: String): Boolean =
-    path in setOf("/", "/index.html", "/index/html/index.html", "/login", "/login.html", "/login/html/login.html")
+    path in setOf(
+        "/", "/index.html", "/index/html/index.html",
+        "/login", "/login.html", "/login/html/login.html",
+        "/signup", "/signup.html", "/signup/html/signup.html"
+    )
 
 fun ApplicationCall.principal(): SessionPrincipal? = attributes.getOrNull(PrincipalKey)
 fun ApplicationCall.userId(): Int? = principal()?.user?.id

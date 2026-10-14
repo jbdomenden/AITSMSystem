@@ -352,25 +352,19 @@ async function loadAdminTicketManagement() {
   showTableSkeleton(rows, { rowCount: 8, columnCount: 8, hasActions: true });
 
   try {
-    const [ticketsRes, usersRes] = await Promise.all([
-      fetch('/api/tickets?limit=500', { headers: authHeaders() }),
+    const [ticketsData, usersRes] = await Promise.all([
+      window.aitsmFetchAllPaginated('/api/tickets'),
       fetch('/api/users', { headers: authHeaders() })
     ]);
 
-    const ticketsData = await ticketsRes.json();
     const usersData = await usersRes.json();
-
-    if (!ticketsRes.ok) {
-      renderTableErrorState(rows, 8, ticketsData.error || 'Unable to load tickets');
-      return;
-    }
 
     if (!usersRes.ok) {
       renderTableErrorState(rows, 8, usersData.error || 'Unable to load requester data');
       return;
     }
 
-    adminTicketState.tickets = normalizeTicketList(ticketsData);
+    adminTicketState.tickets = ticketsData;
     adminTicketState.usersById = new Map((Array.isArray(usersData) ? usersData : []).map((user) => [Number(user.id), user]));
 
     clearTableSkeleton(rows);

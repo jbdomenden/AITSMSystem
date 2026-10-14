@@ -143,19 +143,25 @@ async function loadUserDashboard() {
   if (rows) showTableSkeleton(rows, { rowCount: 5, columnCount: 5 });
 
   try {
-    const tickets = await fetchJsonOrThrow('/api/tickets');
+    const tickets = await window.aitsmFetchAllPaginated('/api/tickets');
 
     const sortedTickets = collectionFromResponse(tickets).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
 
     renderUserSummary(sortedTickets);
     if (rows) clearTableSkeleton(rows);
     renderRecentTickets(sortedTickets);
-    await loadMyCollectors();
   } catch (error) {
     renderUserSummary([]);
     if (rows) renderTableErrorState(rows, 5, 'Unable to load tickets right now. Please try again.');
   } finally {
     if (rows) clearTableSkeleton(rows);
+  }
+
+  try {
+    await loadMyCollectors();
+  } catch (error) {
+    const target = document.getElementById('myCollectors');
+    if (target) target.innerHTML = `<p class='small text-danger'>${aitsmEscapeHtml(error.message || 'Unable to load collectors.')}</p>`;
   }
 }
 

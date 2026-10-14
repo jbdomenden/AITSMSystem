@@ -118,6 +118,9 @@ class SecurityBoundariesTest {
         assertTrue(isAuthenticationPage("/login"))
         assertTrue(isAuthenticationPage("/login.html"))
         assertTrue(isAuthenticationPage("/login/html/login.html"))
+        assertTrue(isAuthenticationPage("/signup"))
+        assertTrue(isAuthenticationPage("/signup.html"))
+        assertTrue(isAuthenticationPage("/signup/html/signup.html"))
         assertFalse(isAuthenticationPage("/api/auth/login"))
         assertFalse(isAuthenticationPage("/dashboard-user"))
     }

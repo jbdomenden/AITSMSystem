@@ -618,7 +618,7 @@ async function loadAdminDashboard() {
 
   try {
     const [ticketsPayload, monitorSummary, lanDevices, notifications, inventoryStats] = await Promise.all([
-      fetchJsonOrThrow('/api/tickets?limit=500'),
+      window.aitsmFetchAllPaginated('/api/tickets'),
       fetchJsonOrThrow('/api/monitoring/summary'),
       fetchJsonOrThrow('/api/monitoring/lan-devices'),
       fetchJsonOrThrow('/api/notifications'),

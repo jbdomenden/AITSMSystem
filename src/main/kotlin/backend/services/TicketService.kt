@@ -168,7 +168,7 @@ class TicketService(
         message: String
     ) {
         val adminIds = users.listUsers()
-            .filter { it.role == UserRole.ADMIN || it.role == UserRole.SUPERADMIN }
+            .filter { it.role in setOf(UserRole.ADMIN, UserRole.IT_ADMIN, UserRole.SUPERADMIN) }
             .map { it.id }
 
         adminIds.forEach {

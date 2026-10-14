@@ -93,6 +93,29 @@ async function fetchJson(url, options = {}) {
 }
 
 window.aitsmFetchJson = fetchJson;
+
+async function fetchAllPaginated(url, options = {}, pageSize = 100) {
+  const items = [];
+  const parsed = new URL(url, window.location.origin);
+  const safePageSize = Math.min(Math.max(Number(pageSize) || 100, 1), 100);
+  let offset = 0;
+
+  for (;;) {
+    parsed.searchParams.set('limit', String(safePageSize));
+    parsed.searchParams.set('offset', String(offset));
+    const payload = await fetchJson(`${parsed.pathname}${parsed.search}`, options);
+    const page = Array.isArray(payload) ? payload : (Array.isArray(payload?.data) ? payload.data : []);
+    items.push(...page);
+
+    const total = Number(payload?.meta?.totalCount);
+    if (page.length < safePageSize || (Number.isFinite(total) && items.length >= total)) break;
+    offset += page.length;
+  }
+
+  return items;
+}
+
+window.aitsmFetchAllPaginated = fetchAllPaginated;
 const reauthCache = new Map();
 let pendingReauthPassword = null;
 

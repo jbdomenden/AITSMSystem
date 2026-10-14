@@ -64,4 +64,25 @@ class FrontendSafetyContractTest {
         assertTrue(invitationScript.contains("form.hidden = false"))
         assertFalse(invitationScript.contains("/api/auth/register"))
     }
+
+    @Test fun `ticket workspaces load every paginated ticket`() {
+        val common = Files.readString(Path.of("src/main/resources/static/frontend/modules/common/js/app.js"))
+        val pages = listOf(
+            "src/main/resources/static/frontend/dashboard-admin/js/dashboard.js",
+            "src/main/resources/static/frontend/dashboard-user/js/user-dashboard.js",
+            "src/main/resources/static/frontend/ticket-management/js/admin-ticket-management.js",
+            "src/main/resources/static/frontend/tickets/js/tickets.js",
+            "src/main/resources/static/frontend/create-ticket/js/tickets.js"
+        ).map { Files.readString(Path.of(it)) }
+
+        assertTrue(common.contains("window.aitsmFetchAllPaginated = fetchAllPaginated"))
+        assertTrue(common.contains("payload?.meta?.totalCount"))
+        assertTrue(pages.all { it.contains("aitsmFetchAllPaginated('/api/tickets')") })
+        assertTrue(pages.none { it.contains("/api/tickets?limit=500") })
+    }
+
+    @Test fun `new tickets notify every administrator portal role`() {
+        val service = Files.readString(Path.of("src/main/kotlin/backend/services/TicketService.kt"))
+        assertTrue(service.contains("UserRole.ADMIN, UserRole.IT_ADMIN, UserRole.SUPERADMIN"))
+    }
 }

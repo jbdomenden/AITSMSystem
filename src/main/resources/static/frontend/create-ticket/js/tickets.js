@@ -268,10 +268,13 @@ async function loadTickets() {
   const rows = document.getElementById('ticketRows');
   if (!rows) return;
   const role = currentRole();
-  const res = await fetch('/api/tickets', { headers: authHeaders() });
-  const data = await res.json();
-  if(!res.ok){ rows.innerHTML = `<tr><td colspan='6' class='small text-danger'>${aitsmEscapeHtml(data.error || 'Unable to load tickets')}</td></tr>`; return; }
-  const tickets = normalizeListResponse(data);
+  let tickets;
+  try {
+    tickets = await window.aitsmFetchAllPaginated('/api/tickets');
+  } catch (error) {
+    rows.innerHTML = `<tr><td colspan='6' class='small text-danger'>${aitsmEscapeHtml(error.message || 'Unable to load tickets')}</td></tr>`;
+    return;
+  }
 
   rows.innerHTML = tickets.map(t => {
     const klass = (t.status || 'Open').toLowerCase().replace(/\s+/g, '-');

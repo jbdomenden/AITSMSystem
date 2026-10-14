@@ -156,13 +156,7 @@ async function loadTickets() {
   const role = currentRole();
   showTableSkeleton(rows, { rowCount: 6, columnCount: 6, hasActions: true });
   try {
-    const res = await fetch('/api/tickets', { headers: authHeaders() });
-    const data = await res.json();
-    if (!res.ok) {
-      renderTableErrorState(rows, 6, data.error || 'Unable to load tickets');
-      return;
-    }
-    const tickets = normalizeListResponse(data);
+    const tickets = await window.aitsmFetchAllPaginated('/api/tickets');
 
     clearTableSkeleton(rows);
     if (!tickets.length) {
