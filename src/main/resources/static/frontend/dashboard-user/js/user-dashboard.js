@@ -95,12 +95,40 @@ async function downloadMyCollector() {
   finally { button.disabled = false; }
 }
 
+let myCollectorRecords = new Map();
+
+async function repairMyCollector(id) {
+  const item = myCollectorRecords.get(id); if (!item) return;
+  const status = document.getElementById('myCollectorStatus');
+  status.textContent = `Creating a repair installer for ${item.name}…`; status.className = 'small';
+  try {
+    const response = await fetch('/api/monitoring/collector-packages', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ name: item.name, siteId: item.siteId, scope: 'SELF' }) });
+    const enrollment = await response.json();
+    if (!response.ok) throw new Error(enrollment.error || 'Unable to create repair enrollment');
+    const download = await fetch('/api/monitoring/collector-installer/windows', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ enrollmentCode: enrollment.enrollmentCode }) });
+    if (!download.ok) { const data = await download.json().catch(() => ({})); throw new Error(data.error || 'Installer download failed'); }
+    const disposition = download.headers.get('content-disposition') || '';
+    const filename = disposition.match(/filename="([^"]+)"/i)?.[1] || 'AITSMCollectorSetup.exe';
+    const url = URL.createObjectURL(await download.blob());
+    const link = document.createElement('a'); link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+    status.textContent = 'Repair installer downloaded. Run it as administrator on the same computer.'; status.className = 'small text-success';
+  } catch (error) { status.textContent = error.message || 'Unable to create repair installer.'; status.className = 'small text-danger'; }
+}
+
+async function downloadMyCollectorDiagnostics(id) {
+  const response = await fetch(`/api/monitoring/my-collectors/${encodeURIComponent(id)}/diagnostics`, { headers: authHeaders() });
+  if (!response.ok) { const data = await response.json().catch(() => ({})); return showAppAlert(data.error || 'Unable to download diagnostics'); }
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a'); link.href = url; link.download = 'AITSM-collector-diagnostics.txt'; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+}
+
 async function loadMyCollectors() {
   const target = document.getElementById('myCollectors');
   const response = await fetch('/api/monitoring/my-collectors', { headers: authHeaders() });
   const collectors = await response.json();
   if (!response.ok) throw new Error(collectors.error || 'Unable to load collectors');
-  target.innerHTML = collectors.length ? collectors.map(item => `<div class='insight-item'><div><strong>${aitsmEscapeHtml(item.name)}</strong><div class='small'>${aitsmEscapeHtml(item.state)} · ${item.lastSeenAt ? aitsmEscapeHtml(formatDateTime(item.lastSeenAt)) : 'Never connected'}</div><div class='small'>${aitsmEscapeHtml(item.statusReason || '')}</div></div>${item.state === 'REVOKED' ? '' : `<button class='btn btn-ghost' type='button' onclick='revokeMyCollector("${item.collectorId}")'>Remove</button>`}</div>`).join('') : `<p class='small'>No collector installed for your account.</p>`;
+  myCollectorRecords = new Map(collectors.map(item => [item.collectorId, item]));
+  target.innerHTML = collectors.length ? collectors.map(item => `<div class='insight-item'><div><strong>${aitsmEscapeHtml(item.name)}</strong><div class='small'>${aitsmEscapeHtml(item.state)} · ${item.lastSeenAt ? aitsmEscapeHtml(formatDateTime(item.lastSeenAt)) : 'Never connected'}</div><div class='small'>${aitsmEscapeHtml(item.statusReason || '')}</div><div class='small'>Agent ${aitsmEscapeHtml(item.agentVersion || 'legacy')} · Failures ${Number(item.consecutiveFailures || 0)}</div>${item.lastReportedError ? `<div class='small text-danger'>Last error: ${aitsmEscapeHtml(item.lastReportedError)}</div>` : ''}</div><div class='inline-actions'><button class='btn btn-ghost' type='button' onclick='downloadMyCollectorDiagnostics("${item.collectorId}")'>Diagnostics</button>${item.state === 'REVOKED' ? '' : `<button class='btn btn-ghost' type='button' onclick='repairMyCollector("${item.collectorId}")'>Repair</button><button class='btn btn-ghost' type='button' onclick='revokeMyCollector("${item.collectorId}")'>Remove</button>`}</div></div>`).join('') : `<p class='small'>No collector installed for your account.</p>`;
 }
 
 async function revokeMyCollector(id) {

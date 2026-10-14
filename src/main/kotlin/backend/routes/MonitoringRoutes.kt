@@ -25,6 +25,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondOutputStream
+import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
@@ -90,10 +91,27 @@ fun Route.monitoringRoutes(
         }
 
         get("/collectors") { if (call.requireRole(UserRole.ADMIN)) call.respond(service.collectors()) }
+        get("/collectors/{id}/diagnostics") {
+            if (!call.requireRole(UserRole.ADMIN)) return@get
+            val id = call.parameters["id"] ?: return@get call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(400, "Collector id is required"))
+            val diagnostics = service.collectorDiagnostics(id)
+                ?: return@get call.respond(HttpStatusCode.NotFound, ApiErrorResponse(404, "Collector not found"))
+            call.response.headers.append(HttpHeaders.ContentDisposition, "attachment; filename=\"AITSM-collector-$id-diagnostics.txt\"")
+            call.respondText(diagnostics, ContentType.Text.Plain)
+        }
         get("/my-collectors") {
             if (!call.requireAuthenticated()) return@get
             val actorId = call.userId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             call.respond(service.collectorsForUser(actorId))
+        }
+        get("/my-collectors/{id}/diagnostics") {
+            if (!call.requireAuthenticated()) return@get
+            val actorId = call.userId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
+            val id = call.parameters["id"] ?: return@get call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(400, "Collector id is required"))
+            val diagnostics = service.collectorDiagnostics(id, actorId)
+                ?: return@get call.respond(HttpStatusCode.NotFound, ApiErrorResponse(404, "Collector not found"))
+            call.response.headers.append(HttpHeaders.ContentDisposition, "attachment; filename=\"AITSM-collector-diagnostics.txt\"")
+            call.respondText(diagnostics, ContentType.Text.Plain)
         }
         post("/collectors") {
             if (!call.requireRole(UserRole.ADMIN)) return@post

@@ -5,6 +5,7 @@ using System.Net.Http.Headers;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using System.Reflection;
 using System.ServiceProcess;
 using System.Text;
 using System.Text.Json;
@@ -22,6 +23,8 @@ internal static class Program
     internal static readonly string InstalledExe = Path.Combine(InstallDir, "AITSMCollector.exe");
     internal static readonly string ConfigPath = Path.Combine(InstallDir, "collector.dat");
     internal static readonly string LogPath = Path.Combine(InstallDir, "collector.log");
+    internal static readonly string StatusPath = Path.Combine(InstallDir, "collector-status.json");
+    internal static string AgentVersion => Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.1.0";
 
     public static int Main(string[] args)
     {
@@ -55,8 +58,10 @@ internal static class Program
             }
             else
             {
-                _ = JsonSerializer.Deserialize<AgentConfig>(MachineProtection.Unprotect(File.ReadAllBytes(ConfigPath)), JsonOptions())
+                var existing = JsonSerializer.Deserialize<AgentConfig>(MachineProtection.Unprotect(File.ReadAllBytes(ConfigPath)), JsonOptions())
                     ?? throw new InvalidOperationException("Existing collector configuration is invalid. Uninstall it before enrolling again.");
+                if (!existing.BaseUrl.Equals(baseUrl, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException($"This computer is already enrolled with {existing.BaseUrl}. Uninstall that collector before switching environments.");
                 Console.WriteLine("Repairing the existing AITSM Collector installation...");
             }
             RestrictInstallDirectory();
@@ -65,10 +70,12 @@ internal static class Program
             RunSc("delete", ServiceName, ignoreFailure: true);
             File.Copy(Environment.ProcessPath!, InstalledExe, true);
             RunSc("create", ServiceName, "binPath=", $"\"{InstalledExe}\" --service", "start=", "auto", "DisplayName=", "AITSM Windows Collector");
+            RunSc("config", ServiceName, "start=", "delayed-auto");
             RunSc("description", ServiceName, "Securely reports this computer's inventory and telemetry to AITSM.");
             RunSc("failure", ServiceName, "reset=", "86400", "actions=", "restart/60000/restart/60000/restart/60000");
+            RunSc("failureflag", ServiceName, "1");
             RunSc("start", ServiceName);
-            Console.WriteLine("AITSM Collector installed and started successfully.");
+            Console.WriteLine($"AITSM Collector {AgentVersion} installed and started successfully for {baseUrl}.");
             Console.WriteLine("This window can now be closed.");
             return 0;
         }
@@ -89,6 +96,7 @@ internal static class Program
             RunSc("stop", ServiceName, ignoreFailure: true);
             RunSc("delete", ServiceName, ignoreFailure: true);
             if (File.Exists(ConfigPath)) File.Delete(ConfigPath);
+            if (File.Exists(StatusPath)) File.Delete(StatusPath);
             Console.WriteLine("AITSM Collector service removed. Revoke its entry in AITSM to invalidate the server token.");
             return 0;
         }
@@ -156,6 +164,22 @@ internal static class Program
         }
         catch { }
     }
+    internal static void WriteStatus(string state, string baseUrl, DateTimeOffset startedAt, int consecutiveFailures, string? lastError, DateTimeOffset? lastSuccess)
+    {
+        try
+        {
+            Directory.CreateDirectory(InstallDir);
+            var status = JsonSerializer.Serialize(new {
+                state, agentVersion = AgentVersion, target = baseUrl, serviceStartedAt = startedAt,
+                checkedAt = DateTimeOffset.UtcNow, lastSuccessAt = lastSuccess,
+                consecutiveFailures, lastError
+            }, JsonOptions());
+            var temporary = StatusPath + ".tmp";
+            File.WriteAllText(temporary, status);
+            File.Move(temporary, StatusPath, true);
+        }
+        catch { }
+    }
 }
 
 internal sealed class CollectorWindowsService : ServiceBase
@@ -165,31 +189,50 @@ internal sealed class CollectorWindowsService : ServiceBase
     protected override void OnStart(string[] args)
     {
         cancellation = new CancellationTokenSource();
+        Program.Log($"Collector service {Program.AgentVersion} started.");
         _ = Task.Run(() => CollectorLoop.Run(cancellation.Token));
     }
-    protected override void OnStop() { cancellation?.Cancel(); }
+    protected override void OnStop() { cancellation?.Cancel(); Program.Log("Collector service stopped."); }
 }
 
 internal static class CollectorLoop
 {
     public static async Task Run(CancellationToken stoppingToken)
     {
+        var startedAt = DateTimeOffset.UtcNow;
+        var consecutiveFailures = 0;
+        string? previousError = null;
+        DateTimeOffset? lastSuccess = null;
         while (!stoppingToken.IsCancellationRequested)
         {
             var delay = 60;
+            string target = "unknown";
             try
             {
                 var config = JsonSerializer.Deserialize<AgentConfig>(MachineProtection.Unprotect(File.ReadAllBytes(Program.ConfigPath)), Program.JsonOptions())
                     ?? throw new InvalidOperationException("Collector configuration is invalid.");
                 delay = Math.Max(30, config.IntervalSeconds);
-                await Report(config, stoppingToken);
+                target = config.BaseUrl;
+                await Report(config, startedAt, previousError, stoppingToken);
+                consecutiveFailures = 0;
+                previousError = null;
+                lastSuccess = DateTimeOffset.UtcNow;
+                Program.WriteStatus("online", target, startedAt, consecutiveFailures, null, lastSuccess);
             }
-            catch (Exception error) { Program.Log($"Collection cycle failed: {error.Message}"); }
+            catch (Exception error)
+            {
+                consecutiveFailures++;
+                previousError = Regex.Replace(error.Message, "[\\r\\n]+", " ");
+                if (previousError.Length > 500) previousError = previousError[..500];
+                delay = Math.Min(900, delay * (1 << Math.Min(consecutiveFailures, 4)));
+                Program.Log($"Collection cycle failed ({consecutiveFailures}); retrying in {delay}s: {previousError}");
+                Program.WriteStatus("error", target, startedAt, consecutiveFailures, previousError, lastSuccess);
+            }
             try { await Task.Delay(TimeSpan.FromSeconds(delay), stoppingToken); } catch (OperationCanceledException) { }
         }
     }
 
-    private static async Task Report(AgentConfig config, CancellationToken token)
+    private static async Task Report(AgentConfig config, DateTimeOffset serviceStartedAt, string? previousError, CancellationToken token)
     {
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.Token);
@@ -205,7 +248,10 @@ internal static class CollectorLoop
         }
         var devices = new List<object> { InventoryReader.ReadHost() };
         if (config.Scope == "LAN") devices.AddRange(InventoryReader.ReadPeers(config.PrivateCidrs));
-        var payload = JsonSerializer.Serialize(new { measuredAt = DateTimeOffset.UtcNow, devices, discoveryRequestId = discoveryId, discoveryError = (string?)null }, Program.JsonOptions());
+        var payload = JsonSerializer.Serialize(new {
+            measuredAt = DateTimeOffset.UtcNow, devices, discoveryRequestId = discoveryId, discoveryError = (string?)null,
+            agentVersion = Program.AgentVersion, serviceStartedAt, previousError, consecutiveFailures = 0
+        }, Program.JsonOptions());
         using var response = await http.PostAsync($"{config.BaseUrl}/api/monitoring/collector/reports", new StringContent(payload, Encoding.UTF8, "application/json"), token);
         if (!response.IsSuccessStatusCode)
         {

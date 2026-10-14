@@ -31,7 +31,9 @@ Each download contains a high-entropy, single-use enrollment code in its generat
 - **Never connected**: enrollment exists but no report has arrived.
 - **Revoked**: the server will reject further reports for that credential.
 
-Running the same installer again repairs a partially completed local service installation by reusing the already protected local credential. To replace a revoked enrollment, uninstall locally first and download a new installer.
+Running a newly downloaded installer from the same portal again repairs the local service installation, updates the collector binary, and reuses the already protected local credential. The installer refuses to silently switch an existing computer between beta and production. To switch environments or replace a revoked enrollment, uninstall locally first and download a new installer from the intended portal.
+
+The collector starts automatically after Windows boots (delayed automatic start), restarts after service crashes, and uses exponential retry up to 15 minutes during repeated network or server failures. It records a secret-free local health snapshot at `C:\ProgramData\AITSMCollector\collector-status.json`. Administrators and device owners can download a server-side diagnostic summary or create a repair installer from the portal.
 
 Administrators can revoke all managed collectors in Settings. End users can view and revoke only collectors that they enrolled for themselves. Revocation is immediate and does not erase historical inventory under the normal data-retention policy.
 
@@ -41,7 +43,7 @@ To remove the local service, run an elevated command from the installed binary:
 "C:\ProgramData\AITSMCollector\AITSMCollector.exe" --uninstall
 ```
 
-Then revoke the matching portal entry. The encrypted credential is deleted locally. The service log is at `C:\ProgramData\AITSMCollector\collector.log`; it is capped by rotation and never intentionally logs the token.
+Then revoke the matching portal entry. The encrypted credential and local status snapshot are deleted locally. The service log is at `C:\ProgramData\AITSMCollector\collector.log`; it is capped by rotation and never intentionally logs the token.
 
 ## Network and troubleshooting
 

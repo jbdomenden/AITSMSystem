@@ -212,7 +212,9 @@ data class HostTelemetryDto(
 @Serializable data class CollectorView(
     val collectorId: String, val siteId: String, val name: String, val state: String,
     val enrolledAt: String, val lastSeenAt: String? = null, val revokedAt: String? = null,
-    val scope: String = "LAN", val ownerUserId: Int? = null, val statusReason: String? = null
+    val scope: String = "LAN", val ownerUserId: Int? = null, val statusReason: String? = null,
+    val agentVersion: String? = null, val serviceStartedAt: String? = null,
+    val lastReportedError: String? = null, val consecutiveFailures: Int = 0
 )
 @Serializable data class CollectorDeviceReport(
     val deviceKey: String, val hostname: String, val ipAddress: String, val macAddress: String? = null,
@@ -249,7 +251,9 @@ data class HostTelemetryDto(
 )
 @Serializable data class CollectorReportRequest(
     val measuredAt: String, val devices: List<CollectorDeviceReport>,
-    val discoveryRequestId: String? = null, val discoveryError: String? = null
+    val discoveryRequestId: String? = null, val discoveryError: String? = null,
+    val agentVersion: String? = null, val serviceStartedAt: String? = null,
+    val previousError: String? = null, val consecutiveFailures: Int = 0
 )
 @Serializable data class CollectorReportResponse(val accepted: Boolean, val receivedAt: String, val devicesAccepted: Int)
 @Serializable data class DiscoveryCommand(val requestId: String, val privateCidrs: List<String>, val requestedAt: String)
@@ -273,7 +277,9 @@ data class HostTelemetryDto(
     val macAddress: String? = null,
     val osDetails: String? = null,
     val storageTotalBytes: Long? = null,
-    val storageUsedBytes: Long? = null
+    val storageUsedBytes: Long? = null,
+    val identityKey: String? = null,
+    val deviceUuid: String? = null
 )
 
 @Serializable

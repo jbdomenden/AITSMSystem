@@ -15,8 +15,11 @@ import backend.models.DiscoveryCommand
 import backend.models.LanDeviceDto
 import backend.models.normalizeCollectorMeasurement
 import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
@@ -166,7 +169,9 @@ class MonitoringRepository(private val clock: Clock = Clock.systemUTC()) {
             }
             CollectorView(row[MonitoringCollectorsTable.id].toString(), row[MonitoringCollectorsTable.siteId], row[MonitoringCollectorsTable.name], state,
                 iso(row[MonitoringCollectorsTable.enrolledAt])!!, iso(lastSeen), iso(row[MonitoringCollectorsTable.revokedAt]),
-                row[MonitoringCollectorsTable.scope], row[MonitoringCollectorsTable.ownerUserId], statusReason)
+                row[MonitoringCollectorsTable.scope], row[MonitoringCollectorsTable.ownerUserId], statusReason,
+                row[MonitoringCollectorsTable.agentVersion], iso(row[MonitoringCollectorsTable.serviceStartedAt]),
+                row[MonitoringCollectorsTable.lastError], row[MonitoringCollectorsTable.consecutiveFailures])
         }
     }
 
@@ -180,6 +185,10 @@ class MonitoringRepository(private val clock: Clock = Clock.systemUTC()) {
         val received = now()
         MonitoringCollectorsTable.update({ (MonitoringCollectorsTable.id eq collectorId) and MonitoringCollectorsTable.revokedAt.isNull() }) {
             it[lastSeenAt] = received
+            it[agentVersion] = report.agentVersion?.take(40)
+            it[serviceStartedAt] = parseAgentTimestamp(report.serviceStartedAt)
+            it[lastError] = report.previousError?.replace(Regex("[\\r\\n]+"), " ")?.take(500)
+            it[consecutiveFailures] = report.consecutiveFailures.coerceIn(0, 100_000)
         }
         report.devices.forEach { device -> upsertDevice(collectorId, device, measurement, received) }
         report.discoveryRequestId?.let { rawId ->
@@ -196,13 +205,27 @@ class MonitoringRepository(private val clock: Clock = Clock.systemUTC()) {
     }
 
     private fun org.jetbrains.exposed.sql.Transaction.upsertDevice(collectorId: UUID, device: CollectorDeviceReport, fallbackMeasurement: Instant, received: LocalDateTime) {
-        val existing = MonitoringDevicesTable.selectAll().where {
-            (MonitoringDevicesTable.collectorId eq collectorId) and (MonitoringDevicesTable.deviceKey eq device.deviceKey)
-        }.singleOrNull()
+        val uuid = normalizedDeviceUuid(device.inventory?.deviceUuid)
+        val mac = normalizedMac(device.macAddress)
+        val collectorKey = "collector:$collectorId:${device.deviceKey.lowercase()}"
+        val preferredIdentity = uuid?.let { "uuid:$it" } ?: mac?.let { "mac:$it" } ?: collectorKey
+        val identityCandidates = listOfNotNull(uuid?.let { "uuid:$it" }, mac?.let { "mac:$it" }, collectorKey).distinct()
+        val matches = MonitoringDevicesTable.selectAll().where {
+            (MonitoringDevicesTable.identityKey inList identityCandidates) or
+                ((MonitoringDevicesTable.collectorId eq collectorId) and (MonitoringDevicesTable.deviceKey eq device.deviceKey))
+        }.orderBy(MonitoringDevicesTable.receivedAt, SortOrder.DESC).toList()
+        val existing = matches.firstOrNull { it[MonitoringDevicesTable.identityKey] == preferredIdentity } ?: matches.firstOrNull()
+        val duplicateIds = matches.filterNot { it[MonitoringDevicesTable.id] == existing?.get(MonitoringDevicesTable.id) }
+            .map { it[MonitoringDevicesTable.id] }
+        duplicateIds.forEach { duplicateId -> MonitoringDevicesTable.deleteWhere { id eq duplicateId } }
         val measured = runCatching {
             normalizeCollectorMeasurement(device.measurementAt ?: fallbackMeasurement.toString(), fallbackMeasurement)
         }.getOrDefault(fallbackMeasurement)
         val values: MonitoringDevicesTable.(org.jetbrains.exposed.sql.statements.UpdateBuilder<*>) -> Unit = { statement ->
+            statement[MonitoringDevicesTable.collectorId] = collectorId
+            statement[MonitoringDevicesTable.deviceKey] = device.deviceKey
+            statement[identityKey] = preferredIdentity
+            statement[deviceUuid] = uuid
             statement[hostname] = device.hostname
             statement[ipAddress] = device.ipAddress
             statement[macAddress] = device.macAddress
@@ -219,8 +242,6 @@ class MonitoringRepository(private val clock: Clock = Clock.systemUTC()) {
         }
         if (existing == null) {
             MonitoringDevicesTable.insert {
-                it[MonitoringDevicesTable.collectorId] = collectorId
-                it[deviceKey] = device.deviceKey
                 values(MonitoringDevicesTable, it)
             }
         } else {
@@ -242,9 +263,10 @@ class MonitoringRepository(private val clock: Clock = Clock.systemUTC()) {
                 lastSeen = iso(row[MonitoringDevicesTable.lastSeenAt])!!, measurementAt = iso(row[MonitoringDevicesTable.measurementAt]),
                 receivedAt = iso(received), stale = stale, collectorId = row[MonitoringDevicesTable.collectorId].toString(),
                 macAddress = row[MonitoringDevicesTable.macAddress], osDetails = row[MonitoringDevicesTable.osDetails],
-                storageTotalBytes = row[MonitoringDevicesTable.storageTotalBytes], storageUsedBytes = row[MonitoringDevicesTable.storageUsedBytes]
+                storageTotalBytes = row[MonitoringDevicesTable.storageTotalBytes], storageUsedBytes = row[MonitoringDevicesTable.storageUsedBytes],
+                identityKey = row[MonitoringDevicesTable.identityKey], deviceUuid = row[MonitoringDevicesTable.deviceUuid]
             )
-        }.distinctBy { "${it.collectorId}:${it.ipAddress}" }
+        }.distinctBy { it.identityKey ?: "${it.collectorId}:${it.ipAddress}" }
     }
 
     fun queueDiscovery(): Pair<UUID, UUID> = transaction {
@@ -277,4 +299,19 @@ class MonitoringRepository(private val clock: Clock = Clock.systemUTC()) {
             ?: return@transaction Triple("NEVER", null, null)
         Triple(row[DiscoveryRequestsTable.status], iso(row[DiscoveryRequestsTable.completedAt]), row[DiscoveryRequestsTable.errorMessage])
     }
+
+    private fun parseAgentTimestamp(value: String?): LocalDateTime? = value?.let { raw ->
+        runCatching { Instant.parse(raw) }.getOrNull()?.takeIf { instant ->
+            val current = clock.instant()
+            !instant.isAfter(current.plusSeconds(300)) && !instant.isBefore(current.minusSeconds(31_536_000))
+        }?.let { LocalDateTime.ofInstant(it, ZoneOffset.UTC) }
+    }
 }
+
+internal fun normalizedDeviceUuid(value: String?): String? = value?.trim()?.lowercase()
+    ?.takeIf { it.matches(Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")) }
+    ?.takeUnless { it == "00000000-0000-0000-0000-000000000000" || it == "ffffffff-ffff-ffff-ffff-ffffffffffff" }
+
+internal fun normalizedMac(value: String?): String? = value?.filter(Char::isLetterOrDigit)?.uppercase()
+    ?.takeIf { it.length == 12 && it.all { character -> character in '0'..'9' || character in 'A'..'F' } }
+    ?.takeUnless { it == "000000000000" || it == "FFFFFFFFFFFF" }

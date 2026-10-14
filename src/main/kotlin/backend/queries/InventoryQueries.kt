@@ -5,6 +5,8 @@ import backend.config.InventoryAssetsTable
 import backend.config.DevicesTable
 import backend.models.InventoryFilters
 import backend.models.InventoryUpsertDetectedRequest
+import backend.repository.normalizedDeviceUuid
+import backend.repository.normalizedMac
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNotNull
@@ -162,20 +164,29 @@ class InventoryQueries {
     }
 
     fun getByHostname(hostname: String): InventoryAssetRecord? = transaction {
-        InventoryAssetsTable.selectAll().where { InventoryAssetsTable.hostname eq hostname.trim() }.singleOrNull()?.let(::rowToRecord)
+        InventoryAssetsTable.selectAll().where { InventoryAssetsTable.hostname eq hostname.trim() }
+            .orderBy(InventoryAssetsTable.updatedAt, org.jetbrains.exposed.sql.SortOrder.DESC).limit(1).singleOrNull()?.let(::rowToRecord)
     }
 
     fun getByIp(ip: String): InventoryAssetRecord? = transaction {
-        InventoryAssetsTable.selectAll().where { InventoryAssetsTable.ipAddress eq ip.trim() }.singleOrNull()?.let(::rowToRecord)
+        InventoryAssetsTable.selectAll().where { InventoryAssetsTable.ipAddress eq ip.trim() }
+            .orderBy(InventoryAssetsTable.updatedAt, org.jetbrains.exposed.sql.SortOrder.DESC).limit(1).singleOrNull()?.let(::rowToRecord)
     }
 
     fun getByDeviceUuid(deviceUuid: String): InventoryAssetRecord? = transaction {
-        InventoryAssetsTable.selectAll().where { InventoryAssetsTable.deviceUuid eq deviceUuid.trim() }.singleOrNull()?.let(::rowToRecord)
+        val normalized = normalizedDeviceUuid(deviceUuid) ?: return@transaction null
+        getInventoryRecords().filter { normalizedDeviceUuid(it.deviceUuid) == normalized }.maxByOrNull { it.updatedAt }
+    }
+
+    fun getByMac(macAddress: String): InventoryAssetRecord? = transaction {
+        val normalized = normalizedMac(macAddress) ?: return@transaction null
+        getInventoryRecords().filter { normalizedMac(it.macAddress) == normalized }.maxByOrNull { it.updatedAt }
     }
 
     fun upsertAsset(payload: InventoryUpsertDetectedRequest, status: String, normalizedStorageFree: String?): Pair<InventoryAssetRecord, Boolean> = transaction {
         val now = LocalDateTime.now()
         val existing = payload.deviceUuid?.takeIf { it.isNotBlank() }?.let { getByDeviceUuid(it) }
+            ?: payload.macAddress?.takeIf { it.isNotBlank() }?.let { getByMac(it) }
             ?: payload.ipAddress?.takeIf { it.isNotBlank() }?.let { getByIp(it) }
             ?: payload.hostname?.takeIf { it.isNotBlank() }?.let { getByHostname(it) }
 

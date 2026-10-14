@@ -36,6 +36,38 @@ class MonitoringService(
     )
     fun collectors() = repository.listCollectors()
     fun collectorsForUser(userId: Int) = repository.listCollectors(userId)
+    fun collectorDiagnostics(rawId: String, ownerId: Int? = null): String? {
+        val id = runCatching { UUID.fromString(rawId) }.getOrNull() ?: return null
+        val collector = (if (ownerId == null) collectors() else collectorsForUser(ownerId))
+            .firstOrNull { it.collectorId == id.toString() } ?: return null
+        val environment = Env.get("DEPLOYMENT_ENV")?.trim()?.lowercase() ?: "production"
+        val baseUrl = Env.get("APP_BASE_URL")?.trim()?.removeSuffix("/").orEmpty()
+        return buildString {
+            appendLine("AITSM Collector Diagnostics")
+            appendLine("Generated: ${clock.instant()}")
+            appendLine("Environment: $environment")
+            appendLine("Portal: $baseUrl")
+            appendLine("Collector ID: ${collector.collectorId}")
+            appendLine("Name: ${collector.name}")
+            appendLine("Site: ${collector.siteId}")
+            appendLine("Scope: ${collector.scope}")
+            appendLine("State: ${collector.state}")
+            appendLine("Reason: ${collector.statusReason.orEmpty()}")
+            appendLine("Enrolled: ${collector.enrolledAt}")
+            appendLine("Last report: ${collector.lastSeenAt ?: "Never"}")
+            appendLine("Agent version: ${collector.agentVersion ?: "Not reported (legacy installer)"}")
+            appendLine("Service started: ${collector.serviceStartedAt ?: "Not reported"}")
+            appendLine("Consecutive failures: ${collector.consecutiveFailures}")
+            appendLine("Last reported error: ${collector.lastReportedError ?: "None"}")
+            appendLine()
+            appendLine("Local Windows checks (run as Administrator):")
+            appendLine("  sc.exe query AITSMCollector")
+            appendLine("  Get-Content 'C:\\ProgramData\\AITSMCollector\\collector-status.json'")
+            appendLine("  Get-Content 'C:\\ProgramData\\AITSMCollector\\collector.log' -Tail 100")
+            appendLine("Run a newly downloaded installer on the same computer to repair the service and update the collector binary.")
+            appendLine("This diagnostic intentionally contains no collector token or secret.")
+        }
+    }
     fun createPackage(userId: Int, role: UserRole, request: CollectorPackageRequest) = run {
         val requestedScope = request.scope.trim().uppercase()
         val admin = role in setOf(UserRole.ADMIN, UserRole.IT_ADMIN, UserRole.SUPERADMIN)
@@ -93,6 +125,9 @@ class MonitoringService(
         if (collector.scope == "SELF") require(report.devices.size == 1) { "Self-device collectors may report exactly one device." }
         val measuredAt = parseMeasurement(report.measuredAt)
         report.discoveryError?.let { require(it.length <= 500) { "Discovery error is too long." } }
+        require((report.agentVersion?.length ?: 0) <= 40) { "Agent version is too long." }
+        require((report.previousError?.length ?: 0) <= 500) { "Collector diagnostic error is too long." }
+        require(report.consecutiveFailures in 0..100_000) { "Collector failure count is invalid." }
         report.devices.forEach { validateDevice(it, collector.scope) }
         val (receivedAt, count) = repository.saveReport(collector.id, report, measuredAt)
         report.devices.forEach { device ->
@@ -155,12 +190,18 @@ internal fun preferredLiveDevicesByIp(devices: List<backend.models.LanDeviceDto>
 
 internal fun deduplicatedLiveDevices(devices: List<backend.models.LanDeviceDto>): List<backend.models.LanDeviceDto> =
     devices.filter { it.telemetrySourceType != "HOST" }
-        .groupBy { it.ipAddress }
+        .groupBy { device ->
+            normalizedDeviceIdentity(device.deviceUuid, device.macAddress) ?: device.identityKey ?: "ip:${device.ipAddress}"
+        }
         .map { (_, readings) ->
             readings.firstOrNull { it.telemetryAvailable && !it.stale }
                 ?: readings.firstOrNull { it.reachable && !it.stale }
                 ?: readings.first()
         }
+
+internal fun normalizedDeviceIdentity(deviceUuid: String?, macAddress: String?): String? =
+    backend.repository.normalizedDeviceUuid(deviceUuid)?.let { "uuid:$it" }
+        ?: backend.repository.normalizedMac(macAddress)?.let { "mac:$it" }
 
 internal fun CollectorDeviceReport.toInventoryUpsert(): InventoryUpsertDetectedRequest {
     val details = inventory

@@ -221,11 +221,11 @@ class InventoryService(
             osBuild = input.osBuild.normalizedOrNull(),
             installedOn = input.installedOn.normalizedOrNull(),
             domainOrWorkgroup = input.domainOrWorkgroup.normalizedOrNull(),
-            deviceUuid = input.deviceUuid.normalizedOrNull(),
+            deviceUuid = normalizedInventoryUuid(input.deviceUuid),
             productId = input.productId.normalizedOrNull(),
             penTouchSupport = input.penTouchSupport.normalizedOrNull(),
             ipAddress = input.ipAddress.normalizedOrNull(),
-            macAddress = input.macAddress.normalizedOrNull(),
+            macAddress = normalizedInventoryMac(input.macAddress),
             connectionSource = normalizeSource(input.connectionSource),
             status = input.status?.trim(),
             assignedDepartment = input.assignedDepartment?.trim(),
@@ -313,4 +313,8 @@ class InventoryService(
     }
 
     private fun String?.normalizedOrNull(): String? = this?.trim()?.ifBlank { null }
+
+    private fun normalizedInventoryUuid(value: String?): String? = backend.repository.normalizedDeviceUuid(value)
+
+    private fun normalizedInventoryMac(value: String?): String? = backend.repository.normalizedMac(value)?.chunked(2)?.joinToString("-")
 }

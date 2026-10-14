@@ -22,8 +22,13 @@ class CollectorInstallerContractTest {
         assertTrue(source.contains("private const int LocalMachine = 0x4"))
         assertTrue(source.contains("/inheritance:r"))
         assertTrue(source.contains("\"start=\", \"auto\""))
+        assertTrue(source.contains("\"start=\", \"delayed-auto\""))
+        assertTrue(source.contains("collector-status.json"))
+        assertTrue(source.contains("consecutiveFailures"))
+        assertTrue(source.contains("previousError"))
         assertTrue(source.contains("config.Scope == \"LAN\""))
         assertFalse(source.contains("Console.WriteLine(config.Token)"))
+        assertFalse(source.contains("lastError, config.Token"))
     }
 
     @Test fun `self service enrollment remains owner and role scoped`() {
@@ -43,5 +48,13 @@ class CollectorInstallerContractTest {
         assertTrue(migration.contains("owner_user_id INTEGER REFERENCES users(id)"))
         assertFalse(migration.contains("raw_token"))
         assertFalse(migration.contains("enrollment_code VARCHAR"))
+    }
+
+    @Test fun `device identity migration is durable and unique`() {
+        val migration = Files.readString(Path.of("db/migrations/V009__collector_diagnostics_and_device_identity.sql"))
+        assertTrue(migration.contains("identity_key"))
+        assertTrue(migration.contains("monitoring_devices_identity_unique_idx"))
+        assertTrue(migration.contains("device_uuid"))
+        assertTrue(migration.contains("agent_version"))
     }
 }

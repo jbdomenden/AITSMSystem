@@ -175,6 +175,10 @@ object MonitoringCollectorsTable : Table("monitoring_collectors") {
     val enrolledAt = datetime("enrolled_at")
     val lastSeenAt = datetime("last_seen_at").nullable().index()
     val revokedAt = datetime("revoked_at").nullable().index()
+    val agentVersion = varchar("agent_version", 40).nullable()
+    val serviceStartedAt = datetime("service_started_at").nullable()
+    val lastError = varchar("last_error", 500).nullable()
+    val consecutiveFailures = integer("consecutive_failures").default(0)
     override val primaryKey = PrimaryKey(id)
 }
 
@@ -196,6 +200,8 @@ object MonitoringDevicesTable : Table("monitoring_devices") {
     val id = integer("id").autoIncrement()
     val collectorId = uuid("collector_id").references(MonitoringCollectorsTable.id, onDelete = ReferenceOption.CASCADE).index()
     val deviceKey = varchar("device_key", 200)
+    val identityKey = varchar("identity_key", 220).nullable().index()
+    val deviceUuid = varchar("device_uuid", 160).nullable().index()
     val hostname = varchar("hostname", 200)
     val ipAddress = varchar("ip_address", 45).index()
     val macAddress = varchar("mac_address", 32).nullable()
@@ -436,6 +442,23 @@ object DatabaseFactory {
                 InventoryAssetsTable,
                 InventoryAssetSnapshotsTable
             )
+            exec("""
+                UPDATE monitoring_devices
+                SET identity_key = CASE
+                  WHEN mac_address IS NOT NULL AND length(regexp_replace(mac_address, '[^0-9A-Fa-f]', '', 'g')) = 12
+                    THEN 'mac:' || upper(regexp_replace(mac_address, '[^0-9A-Fa-f]', '', 'g'))
+                  ELSE 'legacy:' || id::text
+                END
+                WHERE identity_key IS NULL
+            """.trimIndent())
+            exec("""
+                DELETE FROM monitoring_devices older
+                USING monitoring_devices newer
+                WHERE older.id <> newer.id
+                  AND older.identity_key = newer.identity_key
+                  AND (older.received_at < newer.received_at OR (older.received_at = newer.received_at AND older.id < newer.id))
+            """.trimIndent())
+            exec("CREATE UNIQUE INDEX IF NOT EXISTS monitoring_devices_identity_unique_idx ON monitoring_devices(identity_key) WHERE identity_key IS NOT NULL")
             exec("CREATE UNIQUE INDEX IF NOT EXISTS profile_photo_requests_one_pending_per_user ON profile_photo_requests(user_id) WHERE status = 'PENDING'")
             exec("CREATE UNIQUE INDEX IF NOT EXISTS colleague_requests_pair_idx ON colleague_requests (LEAST(sender_id, recipient_id), GREATEST(sender_id, recipient_id))")
             exec("CREATE INDEX IF NOT EXISTS ai_conversation_messages_owner_session_idx ON ai_conversation_messages(user_id, session_id, created_at)")

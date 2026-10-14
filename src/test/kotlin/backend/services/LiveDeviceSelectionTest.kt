@@ -34,4 +34,15 @@ class LiveDeviceSelectionTest {
         assertEquals(1, devices.size)
         assertEquals(agent, devices.single())
     }
+
+    @Test fun `stable mac collapses a device after its ip changes`() {
+        val oldAddress = reading("LAN_OBSERVED", telemetry = false, stale = true).copy(
+            ipAddress = "192.168.1.20", macAddress = "30-d0-42-11-6c-c9"
+        )
+        val newAddress = reading("COLLECTOR_AGENT", telemetry = true, stale = false, cpu = 18.0).copy(
+            ipAddress = "192.168.1.51", macAddress = "30-D0-42-11-6C-C9"
+        )
+
+        assertEquals(listOf(newAddress), deduplicatedLiveDevices(listOf(oldAddress, newAddress)))
+    }
 }
