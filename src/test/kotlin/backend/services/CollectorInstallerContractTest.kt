@@ -70,5 +70,8 @@ class CollectorInstallerContractTest {
         assertTrue(migration.contains("last_seen_at"))
         assertTrue(repository.contains("recordAddress"))
         assertTrue(repository.contains("collapseLegacyDeviceRows"))
+        val adapterMigration = Files.readString(Path.of("db/migrations/V012__merge_stale_adapter_identity_into_uuid_device.sql"))
+        assertTrue(adapterMigration.contains("COUNT(DISTINCT lower(device_uuid))"))
+        assertTrue(adapterMigration.contains("monitoring_device_addresses"))
     }
 }

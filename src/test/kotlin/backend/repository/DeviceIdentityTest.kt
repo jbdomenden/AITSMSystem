@@ -43,6 +43,27 @@ class DeviceIdentityTest {
         assertEquals(setOf("192.168.137.1", "192.168.1.34"), collapsed.single().observedIpAddresses.toSet())
     }
 
+    @Test fun `stale mac identity attaches to the sole uuid after an adapter change`() {
+        val oldAdapter = device("1", "192.168.137.1", "2026-10-14T10:00:00Z").copy(
+            identityKey = "mac:001122334455",
+            macAddress = "00-11-22-33-44-55"
+        )
+        val current = device("2", "192.168.1.34", "2026-10-14T11:00:00Z", deviceUuid = "11111111-2222-4333-8444-555555555555")
+        val collapsed = collapseLegacyDeviceRows(listOf(oldAdapter, current))
+        assertEquals(1, collapsed.size)
+        assertEquals(setOf("192.168.137.1", "192.168.1.34"), collapsed.single().observedIpAddresses.toSet())
+    }
+
+    @Test fun `stale mac identity remains separate when hostname has conflicting uuids`() {
+        val oldAdapter = device("1", "192.168.137.1", "2026-10-14T10:00:00Z").copy(
+            identityKey = "mac:001122334455",
+            macAddress = "00-11-22-33-44-55"
+        )
+        val first = device("2", "192.168.1.34", "2026-10-14T11:00:00Z", deviceUuid = "11111111-2222-4333-8444-555555555555")
+        val second = device("3", "192.168.1.35", "2026-10-14T12:00:00Z", deviceUuid = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee")
+        assertEquals(3, collapseLegacyDeviceRows(listOf(oldAdapter, first, second)).size)
+    }
+
     private fun device(id: String, ip: String, receivedAt: String, deviceUuid: String? = null) = LanDeviceDto(
         id = id,
         hostname = "ELLE",

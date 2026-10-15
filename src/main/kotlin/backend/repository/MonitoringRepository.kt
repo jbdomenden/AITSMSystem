@@ -215,12 +215,20 @@ class MonitoringRepository(private val clock: Clock = Clock.systemUTC()) {
             (MonitoringDevicesTable.identityKey inList identityCandidates) or
                 ((MonitoringDevicesTable.collectorId eq collectorId) and (MonitoringDevicesTable.deviceKey eq device.deviceKey))
         }.orderBy(MonitoringDevicesTable.receivedAt, SortOrder.DESC).toList()
+        val hostnameUuids = if (uuid != null && device.hostname.isNotBlank()) {
+            MonitoringDevicesTable.selectAll().where { MonitoringDevicesTable.hostname eq device.hostname }
+                .mapNotNull { normalizedDeviceUuid(it[MonitoringDevicesTable.deviceUuid]) }
+                .distinct()
+        } else emptyList()
+        val hostnameCanBelongToIncomingUuid = uuid != null &&
+            (hostnameUuids.isEmpty() || hostnameUuids.singleOrNull() == uuid)
         val legacyHostnameMatches = if ((uuid != null || mac != null) && device.telemetryAvailable && device.hostname.isNotBlank()) {
             MonitoringDevicesTable.selectAll().where { MonitoringDevicesTable.hostname eq device.hostname }
                 .filter { row ->
                     row[MonitoringDevicesTable.telemetryAvailable] &&
                         row[MonitoringDevicesTable.deviceUuid] == null &&
-                        row[MonitoringDevicesTable.identityKey]?.startsWith("legacy:") == true
+                        if (uuid != null) hostnameCanBelongToIncomingUuid && row[MonitoringDevicesTable.lastSeenAt].isBefore(received.minusMinutes(10))
+                        else row[MonitoringDevicesTable.identityKey]?.startsWith("legacy:") == true
                 }
         } else emptyList()
         val matches = (identityMatches + legacyHostnameMatches)
@@ -386,11 +394,16 @@ internal fun collapseLegacyDeviceRows(devices: List<LanDeviceDto>): List<LanDevi
     val stableByHostname = devices.filter { it.telemetryAvailable }
         .groupBy { it.hostname.trim().lowercase() }
         .mapValues { (_, rows) -> rows.mapNotNull(::stableDeviceIdentity).distinct() }
+    val uuidByHostname = devices.filter { it.telemetryAvailable }
+        .groupBy { it.hostname.trim().lowercase() }
+        .mapValues { (_, rows) -> rows.mapNotNull(::uuidDeviceIdentity).distinct() }
     return devices.groupBy { device ->
         val hostname = device.hostname.trim().lowercase()
         val stable = stableDeviceIdentity(device)
+        val soleUuid = uuidByHostname[hostname].orEmpty().singleOrNull()
         when {
             !device.telemetryAvailable || hostname.isBlank() -> stable ?: device.identityKey ?: "${device.collectorId}:${device.ipAddress}"
+            soleUuid != null && (uuidDeviceIdentity(device) != null || (device.deviceUuid == null && device.stale)) -> soleUuid
             stable != null -> stable
             stableByHostname[hostname].orEmpty().size == 1 -> stableByHostname.getValue(hostname).single()
             stableByHostname[hostname].orEmpty().isEmpty() -> "legacy-host:$hostname"
@@ -403,6 +416,10 @@ internal fun collapseLegacyDeviceRows(devices: List<LanDeviceDto>): List<LanDevi
 }
 
 private fun stableDeviceIdentity(device: LanDeviceDto): String? =
-    normalizedDeviceUuid(device.deviceUuid)?.let { "uuid:$it" }
+    uuidDeviceIdentity(device)
         ?: normalizedMac(device.macAddress)?.let { "mac:$it" }
         ?: device.identityKey?.takeIf { it.startsWith("uuid:") || it.startsWith("mac:") }
+
+private fun uuidDeviceIdentity(device: LanDeviceDto): String? =
+    normalizedDeviceUuid(device.deviceUuid)?.let { "uuid:$it" }
+        ?: device.identityKey?.takeIf { it.startsWith("uuid:") }
