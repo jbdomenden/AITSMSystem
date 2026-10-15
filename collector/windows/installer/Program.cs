@@ -44,25 +44,24 @@ internal static class Program
             RequireAdministrator();
             var (baseUrl, code) = ReadBootstrapFromFilename(Environment.ProcessPath ?? "");
             Directory.CreateDirectory(InstallDir);
-            if (!File.Exists(ConfigPath))
+            AgentConfig? existing = null;
+            if (File.Exists(ConfigPath))
             {
-                Console.WriteLine("Enrolling this computer with AITSM...");
-                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-                var payload = JsonSerializer.Serialize(new { enrollmentCode = code });
-                using var response = await http.PostAsync($"{baseUrl}/api/monitoring/collector/redeem", new StringContent(payload, Encoding.UTF8, "application/json"));
-                var json = await response.Content.ReadAsStringAsync();
-                if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"Enrollment failed (HTTP {(int)response.StatusCode}). The download may be expired or already used.");
-                var enrollment = JsonSerializer.Deserialize<RedeemResponse>(json, JsonOptions()) ?? throw new InvalidOperationException("Enrollment response was invalid.");
-                var config = new AgentConfig(baseUrl, enrollment.Token, enrollment.Scope, enrollment.PrivateCidrs ?? [], Math.Max(30, enrollment.IntervalSeconds));
-                File.WriteAllBytes(ConfigPath, MachineProtection.Protect(JsonSerializer.SerializeToUtf8Bytes(config)));
+                existing = JsonSerializer.Deserialize<AgentConfig>(MachineProtection.Unprotect(File.ReadAllBytes(ConfigPath)), JsonOptions())
+                    ?? throw new InvalidOperationException("Existing collector configuration is invalid. Use the uninstall option before reinstalling.");
+            }
+
+            if (existing != null && existing.BaseUrl.Equals(baseUrl, StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine("Repairing the existing AITSM Collector installation...");
             }
             else
             {
-                var existing = JsonSerializer.Deserialize<AgentConfig>(MachineProtection.Unprotect(File.ReadAllBytes(ConfigPath)), JsonOptions())
-                    ?? throw new InvalidOperationException("Existing collector configuration is invalid. Uninstall it before enrolling again.");
-                if (!existing.BaseUrl.Equals(baseUrl, StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidOperationException($"This computer is already enrolled with {existing.BaseUrl}. Uninstall that collector before switching environments.");
-                Console.WriteLine("Repairing the existing AITSM Collector installation...");
+                Console.WriteLine(existing == null
+                    ? "Enrolling this computer with AITSM..."
+                    : $"Switching this computer from {existing.BaseUrl} to {baseUrl}...");
+                var config = await Redeem(baseUrl, code);
+                File.WriteAllBytes(ConfigPath, MachineProtection.Protect(JsonSerializer.SerializeToUtf8Bytes(config)));
             }
             RestrictInstallDirectory();
             RunSc("stop", ServiceName, ignoreFailure: true);
@@ -86,6 +85,19 @@ internal static class Program
             Console.ReadLine();
             return 1;
         }
+    }
+
+    private static async Task<AgentConfig> Redeem(string baseUrl, string code)
+    {
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        var payload = JsonSerializer.Serialize(new { enrollmentCode = code });
+        using var response = await http.PostAsync($"{baseUrl}/api/monitoring/collector/redeem", new StringContent(payload, Encoding.UTF8, "application/json"));
+        var json = await response.Content.ReadAsStringAsync();
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException($"Enrollment failed (HTTP {(int)response.StatusCode}). The download may be expired or already used.");
+        var enrollment = JsonSerializer.Deserialize<RedeemResponse>(json, JsonOptions())
+            ?? throw new InvalidOperationException("Enrollment response was invalid.");
+        return new AgentConfig(baseUrl, enrollment.Token, enrollment.Scope, enrollment.PrivateCidrs ?? [], Math.Max(30, enrollment.IntervalSeconds));
     }
 
     private static int Uninstall()

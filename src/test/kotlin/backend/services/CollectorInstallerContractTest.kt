@@ -26,7 +26,10 @@ class CollectorInstallerContractTest {
         assertTrue(source.contains("collector-status.json"))
         assertTrue(source.contains("consecutiveFailures"))
         assertTrue(source.contains("previousError"))
+        assertTrue(source.contains("Switching this computer from"))
+        assertTrue(source.contains("await Redeem(baseUrl, code)"))
         assertTrue(source.contains("config.Scope == \"LAN\""))
+        assertFalse(source.contains("Uninstall that collector before switching environments"))
         assertFalse(source.contains("Console.WriteLine(config.Token)"))
         assertFalse(source.contains("lastError, config.Token"))
     }
