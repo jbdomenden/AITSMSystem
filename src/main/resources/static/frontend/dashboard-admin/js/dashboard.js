@@ -439,19 +439,21 @@ function renderSystemPerformance() {
   const ticketLoad = Math.min(100, (activeTickets / totalTickets) * 100);
 
   const metrics = [
-    { label: 'Device CPU Average', value: average('cpuUsagePercent'), target: 'Reporting devices only' },
-    { label: 'Device Memory Average', value: average('memoryUsagePercent'), target: 'Reporting devices only' },
-    { label: 'Telemetry Coverage', value: telemetryCoverage, target: 'Above 70%' },
-    { label: 'Active Ticket Load', value: ticketLoad, target: 'Lower is better' }
+    { label: 'Device CPU Average', value: average('cpuUsagePercent'), target: 'Reporting devices only', higherIsBetter: false },
+    { label: 'Device Memory Average', value: average('memoryUsagePercent'), target: 'Reporting devices only', higherIsBetter: false },
+    { label: 'Telemetry Coverage', value: telemetryCoverage, target: 'Above 70%', higherIsBetter: true },
+    { label: 'Active Ticket Load', value: ticketLoad, target: 'Lower is better', higherIsBetter: false }
   ].map((metric) => ({ ...metric, value: Math.max(0, Math.min(100, Number(metric.value.toFixed(1)))) }));
 
   summaryHost.innerHTML = metrics.map((metric) => {
-    const tone = metric.value >= 85 ? 'open' : metric.value >= 70 ? 'warning' : 'resolved';
+    const health = metric.higherIsBetter
+      ? (metric.value >= 70 ? { tone: 'resolved', label: 'Stable' } : metric.value >= 50 ? { tone: 'warning', label: 'Watch' } : { tone: 'open', label: 'Critical' })
+      : (metric.value >= 85 ? { tone: 'open', label: 'Critical' } : metric.value >= 70 ? { tone: 'warning', label: 'Watch' } : { tone: 'resolved', label: 'Stable' });
     return `<div class='insight-item'>
       <div class='insight-label'>${metric.label}</div>
       <div class='insight-value'>${metric.value}%</div>
       <div class='small'>Target: ${metric.target}</div>
-      <span class='badge ${tone}' style='margin-top:6px'>${metric.value >= 85 ? 'Critical' : metric.value >= 70 ? 'Watch' : 'Stable'}</span>
+      <span class='badge ${health.tone}' style='margin-top:6px'>${health.label}</span>
     </div>`;
   }).join('');
 
