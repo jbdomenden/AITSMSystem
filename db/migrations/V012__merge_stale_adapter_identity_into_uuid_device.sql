@@ -1,6 +1,8 @@
 -- A physical Windows device can change network adapters and IP addresses. When
 -- exactly one UUID-backed device exists for a hostname, preserve the address
 -- history of older UUID-less agent rows and consolidate them into that device.
+BEGIN;
+
 WITH uuid_hosts AS (
   SELECT lower(trim(hostname)) AS normalized_hostname
   FROM monitoring_devices
@@ -74,3 +76,5 @@ WHERE lower(trim(duplicate.hostname)) = canonical.normalized_hostname
   AND duplicate.telemetry_available = TRUE
   AND duplicate.device_uuid IS NULL
   AND duplicate.last_seen_at < CURRENT_TIMESTAMP - INTERVAL '10 minutes';
+
+COMMIT;
