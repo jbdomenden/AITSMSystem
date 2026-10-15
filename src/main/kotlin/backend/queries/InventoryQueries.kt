@@ -358,8 +358,11 @@ class InventoryQueries {
         }
     }
 
-    fun getStats(): InventoryStatsRaw = transaction {
-        val rows = getInventoryRecords()
+    fun getStats(connectionSource: String? = null): InventoryStatsRaw = transaction {
+        val normalizedSource = connectionSource?.trim()?.lowercase().orEmpty()
+        val rows = getInventoryRecords().filter {
+            normalizedSource.isBlank() || it.connectionSource?.lowercase() == normalizedSource
+        }
         InventoryStatsRaw(
             total = rows.size.toLong(),
             online = rows.count { it.status.equals("online", ignoreCase = true) }.toLong(),

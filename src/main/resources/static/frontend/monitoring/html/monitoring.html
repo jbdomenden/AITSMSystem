@@ -10,7 +10,7 @@
     <div class='topbar'>
       <div>
         <h1 class='page-title'>LAN Monitoring</h1>
-        <p class='page-subtitle'>Device health and utilization for clients connected to your internal network.</p>
+        <p class='page-subtitle'>Health and utilization reported by installed collector agents.</p>
       </div>
       <div class='inline-actions monitor-actions'>
         <div id='monitorLiveStatus' class='live-status-chip' aria-live='polite'>
@@ -28,7 +28,7 @@
         <div class='card-head'>
           <div>
             <h3 class='section-title'>Device Status</h3>
-            <p class='section-subtitle'>Live snapshot of LAN client resources.</p>
+            <p class='section-subtitle'>Live snapshot of collector-managed device resources.</p>
           </div>
           <span class='card-icon'>🖧</span>
         </div>
@@ -51,14 +51,14 @@
       <div class='card-head'>
         <div>
           <h3 class='section-title'>Device Inventory</h3>
-          <p class='section-subtitle'>Structured list with filtering and sorting for fast LAN triage.</p>
+          <p class='section-subtitle'>Collector-managed devices only.</p>
         </div>
         <div id='monitorTableCount' class='small'></div>
       </div>
       <div class='form-grid' style='margin-bottom:12px'>
         <div class='form-group'>
           <label for='monitorSearchInput'>Search</label>
-          <input id='monitorSearchInput' type='search' placeholder='Device name, IP, or source'>
+          <input id='monitorSearchInput' type='search' placeholder='Device name or IP address'>
         </div>
         <div class='form-group'>
           <label for='monitorReachabilityFilter'>Reachability</label>
@@ -66,14 +66,6 @@
             <option value='all'>All</option>
             <option value='online'>Online</option>
             <option value='offline'>Offline</option>
-          </select>
-        </div>
-        <div class='form-group'>
-          <label for='monitorTelemetryFilter'>Telemetry</label>
-          <select id='monitorTelemetryFilter'>
-            <option value='all'>All</option>
-            <option value='available'>Available</option>
-            <option value='unavailable'>Unavailable</option>
           </select>
         </div>
         <div class='form-group'>
@@ -88,7 +80,7 @@
       </div>
       <div class='table-wrap'>
         <table>
-          <thead><tr><th>Device</th><th>IP Address</th><th>Telemetry Source</th><th>Reachability</th><th>CPU</th><th>Memory</th><th>Telemetry State</th></tr></thead>
+          <thead><tr><th>Device</th><th>IP Address</th><th>Status</th><th>CPU</th><th>Memory</th><th>Last Report</th></tr></thead>
           <tbody id='monitorTableRows'></tbody>
         </table>
       </div>

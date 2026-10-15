@@ -19,6 +19,21 @@
   margin-top: 12px;
 }
 
+.inventory-device-row {
+  cursor: pointer;
+  transition: background-color .15s ease, box-shadow .15s ease;
+}
+
+.inventory-device-row:hover,
+.inventory-device-row:focus-visible {
+  background: color-mix(in srgb, var(--primary) 7%, transparent);
+  outline: none;
+}
+
+.inventory-device-row:focus-visible {
+  box-shadow: inset 3px 0 var(--primary);
+}
+
 .inventory-detail-modal {
   max-width: 1100px;
   width: min(1100px, 96vw);

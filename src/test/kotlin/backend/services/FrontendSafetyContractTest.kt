@@ -85,4 +85,19 @@ class FrontendSafetyContractTest {
         val service = Files.readString(Path.of("src/main/kotlin/backend/services/TicketService.kt"))
         assertTrue(service.contains("UserRole.ADMIN, UserRole.IT_ADMIN, UserRole.SUPERADMIN"))
     }
+
+    @Test fun `device surfaces are collector only and inventory details are click through`() {
+        val monitoring = Files.readString(Path.of("src/main/kotlin/backend/services/MonitoringService.kt"))
+        val inventoryService = Files.readString(Path.of("src/main/kotlin/backend/services/InventoryService.kt"))
+        val inventoryHtml = Files.readString(Path.of("src/main/resources/static/frontend/inventory/html/inventory.html"))
+        val inventoryScript = Files.readString(Path.of("src/main/resources/static/frontend/inventory/js/inventory.js"))
+
+        assertTrue(monitoring.contains("visibleCollectorDevices"))
+        assertTrue(monitoring.contains("it.telemetryAvailable && it.inventory != null"))
+        assertTrue(inventoryService.contains("filters.copy(connectionSource = \"agent\")"))
+        assertTrue(inventoryScript.contains("class='inventory-device-row'"))
+        assertTrue(inventoryScript.contains("openInventoryDetail"))
+        assertTrue(inventoryHtml.contains("<th>Device</th><th>IP Address</th><th>Status</th><th>Last Seen</th><th>Department</th>"))
+        assertFalse(inventoryHtml.contains("<th>Processor</th>"))
+    }
 }

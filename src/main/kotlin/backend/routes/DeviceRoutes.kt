@@ -119,19 +119,6 @@ fun Route.deviceRoutes(
                     )
                 }
             val synced = deviceRepository.syncDiscoveredDevices(peers)
-            peers.forEach { peer ->
-                runCatching {
-                    inventoryService.upsertDetectedAsset(
-                        InventoryUpsertDetectedRequest(
-                            hostname = peer.hostname,
-                            deviceName = peer.hostname,
-                            ipAddress = peer.ipAddress,
-                            status = if (peer.reachable) "online" else "offline",
-                            connectionSource = "lan-detected"
-                        )
-                    )
-                }
-            }
             call.respond(DeviceSyncResponse(message = "Device registry synchronized", devices = synced.size))
         }
 

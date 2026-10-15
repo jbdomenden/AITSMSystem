@@ -8,6 +8,7 @@ import backend.models.LanDeviceDto
 import backend.services.AssetDetectionService
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
@@ -81,7 +82,8 @@ class DeviceRepository(private val assetDetectionService: AssetDetectionService)
     }
 
     fun listWithLiveStatus(liveDevices: Map<String, LanDeviceDto>, limit: Int = 100, offset: Long = 0): PagedResult<Device> = transaction {
-        val base = DevicesTable.selectAll()
+        if (liveDevices.isEmpty()) return@transaction PagedResult(emptyList(), 0)
+        val base = DevicesTable.selectAll().where { DevicesTable.ipAddress inList liveDevices.keys.toList() }
         val items = base.limit(limit, offset).map { row ->
             val current = toDevice(row)
             val live = liveDevices[current.ipAddress]

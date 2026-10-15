@@ -25,9 +25,10 @@ class InventoryService(
 
     fun listAssets(filters: InventoryFilters): PaginatedResponse<InventoryAssetListItem> {
         refreshAssetStatus()
-        val page = inventoryQueries.getAll(filters)
-        val pageSize = filters.pageSize.coerceIn(1, 100)
-        val currentPage = filters.page.coerceAtLeast(1)
+        val collectorFilters = filters.copy(connectionSource = "agent")
+        val page = inventoryQueries.getAll(collectorFilters)
+        val pageSize = collectorFilters.pageSize.coerceIn(1, 100)
+        val currentPage = collectorFilters.page.coerceAtLeast(1)
         return PaginatedResponse(
             data = page.items.map { record ->
                 InventoryAssetListItem(
@@ -58,7 +59,7 @@ class InventoryService(
 
     fun getAssetDetails(id: Int): InventoryAssetDetails? {
         refreshAssetStatus()
-        val record = inventoryQueries.getById(id) ?: return null
+        val record = inventoryQueries.getById(id)?.takeIf { it.connectionSource.equals("agent", ignoreCase = true) } ?: return null
         return InventoryAssetDetails(
             id = record.id,
             assetTag = record.assetTag,
@@ -139,7 +140,7 @@ class InventoryService(
 
     fun getInventoryStats(): InventoryStatsResponse {
         refreshAssetStatus()
-        val raw = inventoryQueries.getStats()
+        val raw = inventoryQueries.getStats("agent")
         return InventoryStatsResponse(
             total = raw.total.toInt(),
             online = raw.online.toInt(),
@@ -150,23 +151,26 @@ class InventoryService(
     }
 
     fun updateAssignment(id: Int, department: String?, assignedUser: String?): InventoryAssetDetails? {
+        if (getAssetDetails(id) == null) return null
         inventoryQueries.updateAssignment(id, department?.trim(), assignedUser?.trim()) ?: return null
         return getAssetDetails(id)
     }
 
     fun updateNotes(id: Int, notes: String): InventoryAssetDetails? {
+        if (getAssetDetails(id) == null) return null
         val sanitized = sanitizeNotes(notes)
         inventoryQueries.updateNotes(id, sanitized) ?: return null
         return getAssetDetails(id)
     }
 
     fun updateStatus(id: Int, status: String): InventoryAssetDetails? {
+        if (getAssetDetails(id) == null) return null
         inventoryQueries.updateStatus(id, normalizeStatus(status, null)) ?: return null
         return getAssetDetails(id)
     }
 
     fun exportAssetsCsv(filters: InventoryFilters): String {
-        val rows = inventoryQueries.findAllForExport(filters)
+        val rows = inventoryQueries.findAllForExport(filters.copy(connectionSource = "agent"))
         val header = listOf(
             "id", "deviceName", "hostname", "ipAddress", "manufacturer", "model", "processor", "ram", "storageTotal", "storageUsed", "storageFree", "os", "status", "lastSeenAt", "department", "assignedUser", "source"
         ).joinToString(",")

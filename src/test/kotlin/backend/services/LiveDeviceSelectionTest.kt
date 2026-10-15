@@ -45,4 +45,11 @@ class LiveDeviceSelectionTest {
 
         assertEquals(listOf(newAddress), deduplicatedLiveDevices(listOf(oldAddress, newAddress)))
     }
+
+    @Test fun `only collector agent telemetry is visible across device views`() {
+        val observed = reading("LAN_OBSERVED", telemetry = false, stale = false)
+        val agent = reading("COLLECTOR_AGENT", telemetry = true, stale = false, cpu = 18.0)
+
+        assertEquals(listOf(agent), visibleCollectorDevices(listOf(observed, agent)))
+    }
 }

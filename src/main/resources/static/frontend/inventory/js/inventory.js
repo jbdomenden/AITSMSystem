@@ -31,7 +31,6 @@ function buildInventoryQuery() {
   const search = (document.getElementById('inventorySearch')?.value || '').trim();
   const status = (document.getElementById('inventoryStatusFilter')?.value || '').trim();
   const department = (document.getElementById('inventoryDepartmentFilter')?.value || '').trim();
-  const source = (document.getElementById('inventorySourceFilter')?.value || '').trim();
   const sortValue = (document.getElementById('inventorySortFilter')?.value || 'lastSeen-desc').trim();
   const [sortByRaw, sortOrderRaw] = sortValue.split('-');
   const sortBy = sortByRaw || 'lastSeen';
@@ -40,7 +39,6 @@ function buildInventoryQuery() {
   if (search) params.set('search', search);
   if (status) params.set('status', status);
   if (department) params.set('department', department);
-  if (source) params.set('connectionSource', source);
 
   params.set('page', String(inventoryState.page));
   params.set('pageSize', String(inventoryState.pageSize));
@@ -103,24 +101,17 @@ function renderInventoryRows(items) {
   if (!rows) return;
 
   if (!items.length) {
-    renderTableEmptyState(rows, 12, 'No registered assets found for the selected filters.');
+    renderTableEmptyState(rows, 5, 'No collector-managed devices found for the selected filters.');
     return;
   }
 
   rows.innerHTML = items.map((asset) => `
-    <tr>
-      <td>${aitsmEscapeHtml(asset.deviceName || asset.hostname || 'Unavailable')}</td>
+    <tr class='inventory-device-row' tabindex='0' role='button' aria-label='View ${aitsmEscapeHtml(asset.deviceName || asset.hostname || 'device')} details' onclick='openInventoryDetail(${Number(asset.id)})' onkeydown='handleInventoryRowKey(event, ${Number(asset.id)})'>
+      <td><strong>${aitsmEscapeHtml(asset.deviceName || asset.hostname || 'Unavailable')}</strong><div class='small'>${aitsmEscapeHtml(asset.manufacturer || 'Collector agent')}</div></td>
       <td>${aitsmEscapeHtml(asset.ipAddress || 'Unavailable')}</td>
-      <td>${aitsmEscapeHtml(asset.manufacturer || 'Unavailable')}</td>
-      <td>${aitsmEscapeHtml(asset.model || 'Unavailable')}</td>
-      <td>${aitsmEscapeHtml(asset.processorName || 'Unavailable')}</td>
-      <td>${aitsmEscapeHtml(asset.installedRam || 'Unavailable')}</td>
-      <td>${aitsmEscapeHtml(asset.storageSummary || 'Unavailable')}</td>
-      <td>${aitsmEscapeHtml(asset.osSummary || 'Unavailable')}</td>
       <td><span class='badge ${inventoryStatusBadge(asset.status)}'>${aitsmEscapeHtml(asset.status || 'unknown')}</span></td>
       <td>${aitsmEscapeHtml(asset.lastSeenAt || 'Unavailable')}</td>
       <td>${aitsmEscapeHtml(asset.assignedDepartment || 'Unavailable')}</td>
-      <td><div class='inline-actions'><button class='btn btn-ghost' type='button' onclick='openInventoryDetail(${Number(asset.id)})'>View</button><a class='btn btn-ghost' href='/monitoring?editDevice=${encodeURIComponent(asset.id)}'>Edit</a></div></td>
     </tr>
   `).join('');
 }
@@ -130,7 +121,7 @@ async function loadInventory() {
   if (!rows || inventoryState.loading) return;
 
   inventoryState.loading = true;
-  showTableSkeleton(rows, { rowCount: 8, columnCount: 12, hasActions: true });
+  showTableSkeleton(rows, { rowCount: 8, columnCount: 5 });
 
   try {
     const query = buildInventoryQuery();
@@ -143,7 +134,7 @@ async function loadInventory() {
     const statsPayload = await statsRes.json();
 
     if (!listRes.ok) {
-      renderTableErrorState(rows, 12, listPayload.error || 'Unable to load inventory assets.');
+      renderTableErrorState(rows, 5, listPayload.error || 'Unable to load inventory assets.');
       return;
     }
 
@@ -154,7 +145,7 @@ async function loadInventory() {
     updateInventoryPagination(normalized.meta);
     renderInventoryStats(statsRes.ok ? statsPayload : null);
   } catch (error) {
-    renderTableErrorState(rows, 12, error.message || 'Unable to load inventory assets.');
+    renderTableErrorState(rows, 5, error.message || 'Unable to load inventory assets.');
   } finally {
     clearTableSkeleton(rows);
     inventoryState.loading = false;
@@ -267,6 +258,12 @@ async function openInventoryDetail(id) {
   }
 }
 
+function handleInventoryRowKey(event, id) {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  event.preventDefault();
+  openInventoryDetail(id);
+}
+
 function closeInventoryDetail() {
   const modal = document.getElementById('inventoryDetailModal');
   modal?.classList.remove('show');
@@ -303,7 +300,7 @@ function bindInventoryEvents() {
     inventoryState.searchDebounceTimer = window.setTimeout(() => loadInventory(), 220);
   });
 
-  ['inventoryStatusFilter', 'inventoryDepartmentFilter', 'inventorySourceFilter', 'inventorySortFilter'].forEach((id) => {
+  ['inventoryStatusFilter', 'inventoryDepartmentFilter', 'inventorySortFilter'].forEach((id) => {
     document.getElementById(id)?.addEventListener('change', () => {
       inventoryState.page = 1;
       loadInventory();

@@ -17,7 +17,7 @@
     <div class='topbar'>
       <div>
         <h1 class='page-title'>Inventory</h1>
-        <p class='page-subtitle'>Connected asset inventory with passive LAN detection and client-reported machine details.</p>
+        <p class='page-subtitle'>Collector-managed devices. Select a device to view its complete hardware and operating-system profile.</p>
       </div>
       <div class='inline-actions'>
         <button id='inventoryRefreshBtn' class='btn btn-ghost' type='button'>Refresh</button>
@@ -49,15 +49,6 @@
           </select>
         </div>
         <div class='form-group'>
-          <label for='inventorySourceFilter'>Source</label>
-          <select id='inventorySourceFilter'>
-            <option value=''>All</option>
-            <option value='lan-detected'>LAN detected</option>
-            <option value='manual'>Manual</option>
-            <option value='agent'>Agent</option>
-          </select>
-        </div>
-        <div class='form-group'>
           <label for='inventorySortFilter'>Sort</label>
           <select id='inventorySortFilter'>
             <option value='lastSeen-desc'>Last seen (latest)</option>
@@ -74,7 +65,7 @@
     <section class='card' style='margin-top:16px'>
       <div class='table-wrap'>
         <table>
-          <thead><tr><th>Device Name</th><th>IP Address</th><th>Manufacturer</th><th>Model</th><th>Processor</th><th>RAM</th><th>Storage</th><th>OS</th><th>Status</th><th>Last Seen</th><th>Assigned Department</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Device</th><th>IP Address</th><th>Status</th><th>Last Seen</th><th>Department</th></tr></thead>
           <tbody id='inventoryRows'></tbody>
         </table>
       </div>

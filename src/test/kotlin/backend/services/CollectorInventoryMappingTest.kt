@@ -35,7 +35,7 @@ class CollectorInventoryMappingTest {
     }
 
     @Test
-    fun `LAN peer creates only a basic inventory asset`() {
+    fun `LAN peer mapping remains non-agent for internal discovery use`() {
         val payload = CollectorDeviceReport(
             deviceKey = "peer:192.168.1.51",
             hostname = "Haruto.local",

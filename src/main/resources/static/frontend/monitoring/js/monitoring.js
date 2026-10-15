@@ -9,7 +9,6 @@ let monitoringDevicesCache = [];
 const monitoringFilters = {
   search: '',
   reachability: 'all',
-  telemetry: 'all',
   sort: 'cpu-desc'
 };
 
@@ -71,19 +70,14 @@ function applyMonitoringFilters(devices) {
   const filtered = safe.filter((device) => {
     const matchesSearch = !search || [
       device.hostname,
-      device.ipAddress,
-      device.telemetrySourceType
+      device.ipAddress
     ].map(normalizedMonitorText).some((token) => token.includes(search));
 
     const matchesReachability = monitoringFilters.reachability === 'all'
       || (monitoringFilters.reachability === 'online' && device.reachable)
       || (monitoringFilters.reachability === 'offline' && !device.reachable);
 
-    const matchesTelemetry = monitoringFilters.telemetry === 'all'
-      || (monitoringFilters.telemetry === 'available' && device.telemetryAvailable)
-      || (monitoringFilters.telemetry === 'unavailable' && !device.telemetryAvailable);
-
-    return matchesSearch && matchesReachability && matchesTelemetry;
+    return matchesSearch && matchesReachability;
   });
 
   return filtered.sort((a, b) => {
@@ -98,7 +92,7 @@ function applyMonitoringFilters(devices) {
 function renderMonitorTableCount(visibleCount, totalCount) {
   const el = document.getElementById('monitorTableCount');
   if (!el) return;
-  el.textContent = `${visibleCount} shown / ${totalCount} discovered`;
+  el.textContent = `${visibleCount} shown / ${totalCount} collector devices`;
 }
 
 function updateMonitoringLiveStatus(state = 'idle', message) {
@@ -136,7 +130,7 @@ function renderMonitorSummary(summary) {
   if (!wrap) return;
 
   const chips = [
-    ['Discovered Devices', summary?.totalDiscovered ?? 0],
+    ['Collector Devices', summary?.totalDiscovered ?? 0],
     ['Monitored Devices', summary?.monitoredDevices ?? 0],
     ['Telemetry Available', summary?.telemetryAvailableDevices ?? 0],
     ['Collector', String(summary?.collectorState || 'NOT_ENROLLED').replaceAll('_', ' ')]
@@ -196,7 +190,7 @@ function renderMonitorCards(devices) {
     </article>`).join('');
 
   if (devices.length > highlight.length) {
-    wrap.innerHTML += `<div class='small'>Showing top ${highlight.length} devices by utilization out of ${devices.length} discovered devices.</div>`;
+    wrap.innerHTML += `<div class='small'>Showing top ${highlight.length} devices by utilization out of ${devices.length} collector-managed devices.</div>`;
   }
 }
 
@@ -208,18 +202,17 @@ function renderMonitorTable(devices) {
   renderMonitorTableCount(visible.length, devices.length);
 
   if (!visible.length) {
-    renderTableEmptyState(rows, 7, devices.length ? 'No devices matched the current filters.' : 'No LAN devices discovered yet.');
+    renderTableEmptyState(rows, 6, devices.length ? 'No devices matched the current filters.' : 'No collector-managed devices are reporting yet.');
     return;
   }
 
   rows.innerHTML = visible.map(d => `<tr>
     <td>${aitsmEscapeHtml(d.hostname || '-')}</td>
     <td title='${aitsmEscapeHtml(`Observed IPs: ${(d.observedIpAddresses || [d.ipAddress]).join(', ')}`)}'>${aitsmEscapeHtml(d.ipAddress || '-')}${(d.observedIpAddresses || []).length > 1 ? `<div class='small'>${d.observedIpAddresses.length} addresses observed</div>` : ''}</td>
-    <td>${aitsmEscapeHtml(d.telemetrySourceType || '-')}</td>
     <td>${d.stale ? 'Stale' : (d.reachable ? 'Online' : 'Offline')}</td>
     <td>${d.cpuUsagePercent != null ? `${Number(d.cpuUsagePercent).toFixed(1)}%` : '-'}</td>
     <td>${d.memoryUsagePercent != null ? `${Number(d.memoryUsagePercent).toFixed(1)}%` : '-'}</td>
-    <td><span class='badge ${statusBadge(d.telemetryAvailable && !d.stale ? 'online' : 'unavailable')}'>${d.stale ? 'Stale' : (d.telemetryAvailable ? 'Telemetry' : 'No telemetry')}</span></td>
+    <td>${formatLastSeen(d.lastSeen)}</td>
   </tr>`).join('');
 }
 
@@ -267,7 +260,7 @@ async function loadMonitoring({ force = false, source = 'manual' } = {}) {
   monitoringRefreshInFlight = true;
   updateMonitoringLiveStatus('loading');
   const monitorRows = document.getElementById('monitorTableRows');
-  if (monitorRows) showTableSkeleton(monitorRows, { rowCount: 6, columnCount: 7 });
+  if (monitorRows) showTableSkeleton(monitorRows, { rowCount: 6, columnCount: 6 });
 
   try {
     const [summaryRes, devicesRes, peerIpsRes] = await Promise.all([
@@ -297,7 +290,7 @@ async function loadMonitoring({ force = false, source = 'manual' } = {}) {
   } catch {
     monitoringDevicesCache = [];
     renderMonitorTableCount(0, 0);
-    if (monitorRows) renderTableErrorState(monitorRows, 7, 'Unable to load monitoring table data.');
+    if (monitorRows) renderTableErrorState(monitorRows, 6, 'Unable to load monitoring table data.');
     updateMonitoringLiveStatus('error');
   } finally {
     if (monitorRows) clearTableSkeleton(monitorRows);
@@ -504,7 +497,6 @@ async function loadDevices() {
 function wireMonitoringTableFilters() {
   const search = document.getElementById('monitorSearchInput');
   const reachability = document.getElementById('monitorReachabilityFilter');
-  const telemetry = document.getElementById('monitorTelemetryFilter');
   const sort = document.getElementById('monitorSortSelect');
 
   if (search) {
@@ -518,14 +510,6 @@ function wireMonitoringTableFilters() {
     reachability.value = monitoringFilters.reachability;
     reachability.addEventListener('change', () => {
       monitoringFilters.reachability = reachability.value || 'all';
-      renderMonitorTable(monitoringDevicesCache);
-    });
-  }
-
-  if (telemetry) {
-    telemetry.value = monitoringFilters.telemetry;
-    telemetry.addEventListener('change', () => {
-      monitoringFilters.telemetry = telemetry.value || 'all';
       renderMonitorTable(monitoringDevicesCache);
     });
   }

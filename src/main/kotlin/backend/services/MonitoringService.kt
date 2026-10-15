@@ -88,7 +88,7 @@ class MonitoringService(
     fun canDownloadPackage(code: String, userId: Int) = repository.enrollmentCodeBelongsTo(code.trim(), userId)
     fun revoke(rawId: String): Boolean = repository.revoke(UUID.fromString(rawId))
     fun revokeOwned(rawId: String, userId: Int): Boolean = repository.revokeOwned(UUID.fromString(rawId), userId)
-    fun devices() = deduplicatedLiveDevices(repository.devices())
+    fun devices() = visibleCollectorDevices(deduplicatedLiveDevices(repository.devices()))
     fun lanDevices() = devices()
     fun lanPeerIps() = devices().map { it.ipAddress }.distinct().sorted()
     fun cpu() = devices().filter { it.telemetryAvailable }.map { mapOf("device" to it.hostname, "cpu" to (it.cpuUsagePercent?.toString() ?: "unavailable")) }
@@ -130,7 +130,7 @@ class MonitoringService(
         require(report.consecutiveFailures in 0..100_000) { "Collector failure count is invalid." }
         report.devices.forEach { validateDevice(it, collector.scope) }
         val (receivedAt, count) = repository.saveReport(collector.id, report, measuredAt)
-        report.devices.forEach { device ->
+        report.devices.filter { it.telemetryAvailable && it.inventory != null }.forEach { device ->
             inventoryService.upsertDetectedAsset(device.toInventoryUpsert(), saveSnapshot = false)
         }
         return CollectorReportResponse(true, receivedAt.toString(), count)
@@ -198,6 +198,9 @@ internal fun deduplicatedLiveDevices(devices: List<backend.models.LanDeviceDto>)
                 ?: readings.firstOrNull { it.reachable && !it.stale }
                 ?: readings.first()
         }
+
+internal fun visibleCollectorDevices(devices: List<backend.models.LanDeviceDto>): List<backend.models.LanDeviceDto> =
+    devices.filter { it.telemetryAvailable && it.telemetrySourceType == "COLLECTOR_AGENT" }
 
 internal fun normalizedDeviceIdentity(deviceUuid: String?, macAddress: String?): String? =
     backend.repository.normalizedDeviceUuid(deviceUuid)?.let { "uuid:$it" }
